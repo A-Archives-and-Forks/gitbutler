@@ -55,6 +55,10 @@ export class FocusManager {
 		this.fModeManager = new FModeManager();
 	}
 
+	setFModeEnabled(enabled: boolean): void {
+		this.fModeManager.setFeatureEnabled(enabled);
+	}
+
 	// ============================================
 	// Public API
 	// ============================================
@@ -140,7 +144,7 @@ export class FocusManager {
 		const previousNode = this.currentNode;
 
 		// Buttons cannot become active
-		if (node.options.button) {
+		if (!node.options.focusable) {
 			return false;
 		}
 
@@ -260,11 +264,12 @@ export class FocusManager {
 	private findNearestFocusableElement(start: HTMLElement): HTMLElement | undefined {
 		let pointer: HTMLElement | null = start;
 		while (pointer) {
-			if (this.isElementRegistered(pointer)) {
-				const node = this.getNode(pointer);
+			const node = this.getNode(pointer);
+			if (node) {
+				const navigableChild = this.findFirstNavigableDescendantNode(node);
 				// Skip button elements - continue traversing up
-				if (!node?.options.button) {
-					return pointer;
+				if (navigableChild) {
+					return navigableChild.element;
 				}
 			}
 			pointer = pointer.parentElement;
@@ -303,7 +308,7 @@ export class FocusManager {
 
 		// Handle F mode toggle and input (global, doesn't need current element)
 		if (event.key === 'f' || event.key === 'F' || this.fModeManager.active) {
-			if (this.fModeManager.handleKeypress(event, this.nodeMap)) {
+			if (this.fModeManager.handleKeypress(event, this.nodeMap, this.currentNode)) {
 				this.outline.set(false);
 				return;
 			}
