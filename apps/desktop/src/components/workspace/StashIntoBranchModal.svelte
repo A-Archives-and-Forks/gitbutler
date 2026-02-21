@@ -38,11 +38,13 @@
 
 	let modal: ReturnType<typeof Modal> | undefined;
 	let stashBranchName = $state<string>();
-	let slugifiedRefName: string | undefined = $state();
+	let normalizedRefName: string | undefined = $state();
+	let isStashBranchNameValid = $state(false);
 	let stashBranchNameInput = $state<ReturnType<typeof BranchNameTextbox>>();
 
 	export async function show(item: ChangedFilesItem) {
-		slugifiedRefName = undefined;
+		normalizedRefName = undefined;
+		isStashBranchNameValid = false;
 		modal?.show(item);
 		stashBranchName = await stackService.fetchNewBranchName(projectId);
 		if ($autoSelectBranchCreationFeature) {
@@ -72,7 +74,8 @@
 				placeholder="Enter your branch name..."
 				bind:value={stashBranchName}
 				autofocus
-				onslugifiedvalue={(value) => (slugifiedRefName = value)}
+				onnormalizedvalue={(value) => (normalizedRefName = value)}
+				onvalidationchange={(isValid) => (isStashBranchNameValid = isValid)}
 			/>
 			<div class="explanation">
 				<p class="primary-text">
@@ -98,10 +101,10 @@
 		<Button kind="outline" type="reset" onclick={close}>Cancel</Button>
 		<AsyncButton
 			style="pop"
-			disabled={!slugifiedRefName}
+			disabled={!isStashBranchNameValid}
 			type="submit"
 			action={async () => {
-				if (isChangedFilesItem(item)) await confirmStashIntoBranch(item, slugifiedRefName);
+				if (isChangedFilesItem(item)) await confirmStashIntoBranch(item, normalizedRefName);
 			}}
 		>
 			Stash into branch
