@@ -2,7 +2,7 @@ use anyhow::Context as _;
 use but_core::WORKSPACE_REF_NAME;
 use but_ctx::Context;
 use but_workspace::legacy::StacksFilter;
-use gix::refs::transaction::PreviousValue;
+use gix::refs::{Category, transaction::PreviousValue};
 use serde::Serialize;
 
 use crate::{
@@ -17,8 +17,13 @@ struct TeardownResult {
     checked_out_branch: String,
 }
 
-pub(crate) fn teardown(ctx: &mut Context, out: &mut OutputChannel) -> anyhow::Result<()> {
+pub(crate) fn teardown(
+    ctx: &mut Context,
+    checkout_to: Option<String>,
+    out: &mut OutputChannel,
+) -> anyhow::Result<()> {
     let t = theme::get();
+
     // Check that we're on gitbutler/workspace
     let head_name = {
         let repo = ctx.repo.get()?;
@@ -47,6 +52,24 @@ pub(crate) fn teardown(ctx: &mut Context, out: &mut OutputChannel) -> anyhow::Re
         }
         anyhow::bail!("Not on gitbutler/workspace branch");
     }
+
+    // Note: Validate checkout_to before snapshot creation to prevent unnecessary snapshot
+    let checkout_to = if let Some(checkout_to) = &checkout_to {
+        let repo = ctx.repo.get()?;
+        let ref_name: gix::refs::PartialName = checkout_to
+            .clone()
+            .try_into()
+            .context(format!("Invalid ref name: {checkout_to}"))?;
+        let resolved_ref = repo.find_reference(ref_name.as_ref())?;
+        if !matches!(resolved_ref.name().category(), Some(Category::LocalBranch)) {
+            anyhow::bail!(format!(
+                "Invalid ref for checkout: '{checkout_to}' is not a local branch"
+            ))
+        }
+        Some(resolved_ref.name().shorten().to_string())
+    } else {
+        None
+    };
 
     if let Some(out) = out.for_human() {
         writeln!(out, "{}", t.progress.paint("Exiting GitButler mode..."))?;
@@ -97,19 +120,27 @@ pub(crate) fn teardown(ctx: &mut Context, out: &mut OutputChannel) -> anyhow::Re
         }
     };
 
-    // Sort by order to ensure we get the leftmost (lowest order) stack first
-    stacks.sort_by_key(|s| s.order.unwrap_or(usize::MAX));
+    let target_branch_name = if let Some(checkout_to) = checkout_to {
+        checkout_to
+    } else {
+        // Sort by order to ensure we get the leftmost (lowest order) stack first
+        stacks.sort_by_key(|s| s.order.unwrap_or(usize::MAX));
 
-    let target_stack = stacks
-        .first()
-        .ok_or_else(|| anyhow::anyhow!("No active branches found"))?;
+        if let Some(target_stack) = stacks.first() {
+            target_stack
+                .heads
+                .first()
+                .map(|h| h.name.to_string())
+                .ok_or_else(|| anyhow::anyhow!("Stack has no branches"))?
+        } else {
+            let msg = "Failed to determine checkout target branch. Specify a target branch with `--checkout-to <branch>`.";
+            if let Some(out) = out.for_human() {
+                writeln!(out, "   {}", t.error.paint(msg))?;
+            }
 
-    // Get the name of the top branch in the stack
-    let target_branch_name = target_stack
-        .heads
-        .first()
-        .map(|h| h.name.to_string())
-        .ok_or_else(|| anyhow::anyhow!("Stack has no branches"))?;
+            anyhow::bail!(msg)
+        }
+    };
 
     if let Some(out) = out.for_human() {
         writeln!(
@@ -224,7 +255,7 @@ pub(crate) fn teardown(ctx: &mut Context, out: &mut OutputChannel) -> anyhow::Re
 
 // a call to get stacks failed, which could be because someone committed on top
 // of gitbutler/workspace. Try to fix that.
-fn try_stack_fixes(ctx: &mut Context, out: &mut OutputChannel) -> anyhow::Result<()> {
+fn try_stack_fixes(ctx: &Context, out: &mut OutputChannel) -> anyhow::Result<()> {
     let t = theme::get();
     if let Some(out) = out.for_human() {
         writeln!(

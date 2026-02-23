@@ -299,6 +299,7 @@ pub enum Subcommands {
     /// This command:
     /// - Creates an oplog snapshot of the current state
     /// - Finds the first active branch and checks it out
+    ///     - Alternatively, use `--checkout-to <branch>` to override this default
     /// - Cherry-picks any dangling commits from gitbutler/workspace
     /// - Provides instructions on how to return to GitButler mode
     ///
@@ -313,9 +314,17 @@ pub enum Subcommands {
     /// but teardown
     /// ```
     ///
+    /// ```text
+    /// but teardown --checkout-to my-feature-branch
+    /// ```
+    ///
     #[cfg(feature = "legacy")]
     #[clap(verbatim_doc_comment)]
-    Teardown,
+    Teardown {
+        /// Explicit override for which local branch to checkout to.
+        #[clap(long, short = 'c', value_name = "LOCAL_BRANCH")]
+        checkout_to: Option<String>,
+    },
 
     /// Updates all applied branches to be up to date with the target branch.
     ///

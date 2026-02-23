@@ -1123,7 +1123,7 @@ async fn match_subcommand(
                 .emit_metrics(metrics_ctx)
         }
         #[cfg(feature = "legacy")]
-        Subcommands::Teardown => {
+        Subcommands::Teardown { checkout_to } => {
             let mut ctx = setup::init_ctx(
                 &args,
                 InitCtxOptions {
@@ -1132,7 +1132,7 @@ async fn match_subcommand(
                 },
                 out,
             )?;
-            command::legacy::teardown::teardown(&mut ctx, out)
+            command::legacy::teardown::teardown(&mut ctx, checkout_to, out)
                 .context("Failed to teardown GitButler project.")
                 .emit_metrics(metrics_ctx)
         }
