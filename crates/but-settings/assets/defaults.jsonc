@@ -35,7 +35,8 @@
 		"irc": false,
 		/// Control how the filesystem watch should be established.
 		/// Possible values: "auto", "legacy", "modern".
-		"watchMode": "auto"
+		"watchMode": "auto",
+		"writeCommitEvolution": false
 	},
 	// Allows for additional "connect-src" hosts to be included. Requires app restart.
 	"extraCsp": {

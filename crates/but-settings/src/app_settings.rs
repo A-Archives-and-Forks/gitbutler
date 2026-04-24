@@ -67,6 +67,8 @@ pub struct FeatureFlags {
     /// "legacy" uses recursive watching.
     /// "modern" uses ignore-aware non-recursive watching.
     pub watch_mode: String,
+    /// Experimental.
+    pub write_commit_evolution: bool,
 }
 but_schemars::register_sdk_type!(FeatureFlags);
 

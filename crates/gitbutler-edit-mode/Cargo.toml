@@ -33,6 +33,7 @@ serde.workspace = true
 tracing.workspace = true
 schemars = { workspace = true, optional = true }
 but-schemars = { workspace = true, optional = true }
+git-meta-lib.workspace = true
 
 [dev-dependencies]
 but-testsupport.workspace = true

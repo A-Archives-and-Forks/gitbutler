@@ -366,6 +366,17 @@ pub(crate) fn save_and_return_to_workspace(ctx: &Context, perm: &mut RepoExclusi
     index.read_tree(&git2_repo.head()?.peel_to_tree()?)?;
     index.write()?;
 
+    // Write the commit evolution.
+    let session = git_meta_lib::Session::open(repo.path())?;
+    session
+        .target(&git_meta_lib::Target::commit(
+            &new_commit_oid.to_hex().to_string(),
+        )?)
+        .set_add(
+            "evolution-parent",
+            &edit_mode_metadata.commit_oid.to_hex().to_string(),
+        )?;
+
     Ok(())
 }
 
