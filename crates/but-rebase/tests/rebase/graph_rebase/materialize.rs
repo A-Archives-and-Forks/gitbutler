@@ -43,7 +43,7 @@ fn materialize_removes_dropped_commit_changes_from_worktree() -> Result<()> {
     └── 👉►:0[0]:main[🌳]
         ├── ·a96434e (⌂|1)
         ├── ·d591dfe (⌂|1)
-        └── ·35b8235 (⌂|1)
+        └── 🏁·35b8235 (⌂|1)
     ");
     let outcome = outcome.materialize()?;
     assert_eq!(overlayed, graph_tree(&outcome.workspace.graph).to_string());
@@ -103,7 +103,7 @@ fn materialize_without_checkout_preserves_dropped_commit_changes_in_worktree() -
     └── 👉►:0[0]:main[🌳]
         ├── ·a96434e (⌂|1)
         ├── ·d591dfe (⌂|1)
-        └── ·35b8235 (⌂|1)
+        └── 🏁·35b8235 (⌂|1)
     ");
     let outcome = outcome.materialize_without_checkout()?;
     assert_eq!(overlayed, graph_tree(&outcome.workspace.graph).to_string());
@@ -181,7 +181,7 @@ fn both_methods_update_references_identically() -> Result<()> {
     └── 👉►:0[0]:main[🌳]
         ├── ·a96434e (⌂|1)
         ├── ·d591dfe (⌂|1)
-        └── ·35b8235 (⌂|1)
+        └── 🏁·35b8235 (⌂|1)
     ");
     assert_eq!(overlayed_materialize, overlayed_without_checkout);
 

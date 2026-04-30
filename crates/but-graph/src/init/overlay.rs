@@ -157,6 +157,12 @@ impl<'repo> OverlayRepo<'repo> {
         Ok(self.inner.commit_graph_if_enabled()?)
     }
 
+    pub fn shallow_commits(
+        &self,
+    ) -> Result<Option<gix::shallow::Commits>, gix::shallow::read::Error> {
+        self.inner.shallow_commits()
+    }
+
     pub fn try_find_reference(
         &self,
         ref_name: &gix::refs::FullNameRef,

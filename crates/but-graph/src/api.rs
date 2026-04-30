@@ -13,8 +13,9 @@ use petgraph::{
 };
 
 use crate::{
-    Commit, CommitIndex, Edge, EntryPoint, Graph, Segment, SegmentFlags, SegmentIndex,
-    SegmentRelation, init::PetGraph, projection::commit::is_managed_workspace_by_message,
+    Commit, CommitFlags, CommitIndex, CutoffCondition, Edge, EntryPoint, Graph, Segment,
+    SegmentFlags, SegmentIndex, SegmentRelation, init::PetGraph,
+    projection::commit::is_managed_workspace_by_message,
 };
 
 /// Mutation
@@ -497,18 +498,8 @@ impl Graph {
     /// isn't fully defined as traversal stopped due to some abort condition.
     /// Valid partial segments always have at least one commit.
     fn is_partial_segment(&self, sidx: SegmentIndex) -> bool {
-        let has_outgoing = self
-            .inner
-            .edges_directed(sidx, Direction::Outgoing)
-            .next()
-            .is_some();
-        if has_outgoing {
-            return false;
-        }
-        self[sidx]
-            .commits
-            .last()
-            .is_none_or(|c| !c.parent_ids.is_empty())
+        self.traversal_condition(sidx)
+            .is_some_and(|c| c.traversal_ended_unnaturally())
     }
 
     /// Return all segments that sit on top of the `sidx` segment as `(source_commit_index(of sidx), destination_segment_index)`,
@@ -546,21 +537,28 @@ impl Graph {
         edges
     }
 
-    /// Return `true` if commit `sidx` is 'cut off', i.e. the traversal finished at
-    /// its last commit due to an abort condition.
-    pub fn is_early_end_of_traversal(&self, sidx: SegmentIndex) -> bool {
+    /// Return the condition under which traversal stopped at `sidx`, or `None` if nothing special applies.
+    pub fn traversal_condition(&self, sidx: SegmentIndex) -> Option<CutoffCondition> {
         if self
             .inner
             .edges_directed(sidx, Direction::Outgoing)
             .next()
             .is_some()
         {
-            return false;
+            return None;
         }
-        self[sidx]
-            .commits
-            .last()
-            .is_some_and(|c| !c.parent_ids.is_empty())
+        let commit = self[sidx].commits.last()?;
+        let mut condition = CutoffCondition::empty();
+        if commit.parent_ids.is_empty() {
+            condition |= CutoffCondition::FirstCommit;
+        }
+        if commit.flags.contains(CommitFlags::ShallowBoundary) {
+            condition |= CutoffCondition::ShallowBoundary;
+        }
+        if !commit.parent_ids.is_empty() && !condition.contains(CutoffCondition::ShallowBoundary) {
+            condition |= CutoffCondition::Limit;
+        }
+        (!condition.is_empty()).then_some(condition)
     }
 
     /// Return the number of segments stored within the graph.

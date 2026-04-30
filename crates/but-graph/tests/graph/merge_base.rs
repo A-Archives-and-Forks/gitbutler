@@ -32,7 +32,7 @@ fn find_git_merge_base_handles_duplicate_queue_entries_and_redundant_bases() -> 
             │       ├── ►:3[2]:anon:
             │       │   └── ·592abec (⌂|1)
             │       │       └── ►:7[3]:main
-            │       │           └── ·965998b (⌂|1)
+            │       │           └── 🏁·965998b (⌂|1)
             │       └── ►:4[2]:B
             │           └── ·f16dddf (⌂|1)
             │               └── →:7: (main)
@@ -73,7 +73,7 @@ fn relation_between_matches_merge_base_in_redundant_ancestor_case() -> anyhow::R
             │       ├── ►:3[2]:anon:
             │       │   └── ·592abec (⌂|1)
             │       │       └── ►:7[3]:main
-            │       │           └── ·965998b (⌂|1)
+            │       │           └── 🏁·965998b (⌂|1)
             │       └── ►:4[2]:B
             │           └── ·f16dddf (⌂|1)
             │               └── →:7: (main)

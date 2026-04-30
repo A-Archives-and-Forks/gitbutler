@@ -119,10 +119,10 @@ fn detached_head() {
         commits: vec![commit(id("a"), None, CommitFlags::empty())],
         ..Default::default()
     });
-    insta::assert_snapshot!(graph_tree(&graph), @r"
+    insta::assert_snapshot!(graph_tree(&graph), @"
 
     └── 👉►:0[0]:anon:
-        └── 🟣aaaaaaa
+        └── 🏁🟣aaaaaaa
     ");
 }
 

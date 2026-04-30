@@ -41,7 +41,7 @@ fn commits_maintain_state_if_not_cherry_picked() -> Result<()> {
                     └── ►:2[2]:a
                         └── ·3bfeb52 (⌂|1)
                             └── ►:3[3]:base
-                                └── ·b6e2f57 (⌂|1)
+                                └── 🏁·b6e2f57 (⌂|1)
     ");
     let outcome = outcome.materialize()?;
     assert_eq!(overlayed, graph_tree(&outcome.workspace.graph).to_string());
@@ -80,7 +80,7 @@ fn commits_are_signed_by_default() -> Result<()> {
         ├── ·06106c2 (⌂|1) ►c
         └── ·3bfeb52 (⌂|1) ►a, ►b
             └── ►:1[1]:base
-                └── ·b6e2f57 (⌂|1)
+                └── 🏁·b6e2f57 (⌂|1)
     ");
     let outcome = outcome.materialize()?;
     assert_eq!(overlayed, graph_tree(&outcome.workspace.graph).to_string());
@@ -155,7 +155,7 @@ fn when_cherry_picking_dont_resign_if_not_set() -> Result<()> {
         ├── ·a773b84 (⌂|1) ►c
         └── ·3bfeb52 (⌂|1) ►a, ►b
             └── ►:1[1]:base
-                └── ·b6e2f57 (⌂|1)
+                └── 🏁·b6e2f57 (⌂|1)
     ");
     let outcome = outcome.materialize()?;
     assert_eq!(overlayed, graph_tree(&outcome.workspace.graph).to_string());

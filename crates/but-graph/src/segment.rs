@@ -99,6 +99,37 @@ impl std::fmt::Debug for Commit {
 }
 
 bitflags! {
+    /// The reason a segment stops without an outgoing graph edge.
+    ///
+    /// Multiple flags can be present at once if multiple conditions apply to the same commit.
+    #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+    pub struct CutoffCondition: u8 {
+        /// Traversal stopped before following parents due to configured traversal limits.
+        ///
+        /// If this was a *hard* limit, the graph may not contain all the *interesting* portions of the commit-graph,
+        /// see [`hard_limit`](crate::init::Options::hard_limit)
+        const Limit = 1 << 0;
+        /// Traversal reached the first commit in history, which has no parents, and is an orphan.
+        /// There can be more than one in one graph if unrelated histories were merged.
+        const FirstCommit = 1 << 1;
+        /// Traversal reached a Git shallow boundary, as is created with the shallow clone feature.
+        const ShallowBoundary = 1 << 2;
+    }
+}
+
+impl CutoffCondition {
+    /// Return `true` if traversal stopped because the configured traversal limit was reached.
+    pub fn hit_limit(&self) -> bool {
+        self.contains(CutoffCondition::Limit)
+    }
+
+    /// Return `true` if traversal stopped due to an artificial boundary, not because history naturally ended.
+    pub fn traversal_ended_unnaturally(&self) -> bool {
+        self.intersects(CutoffCondition::Limit | CutoffCondition::ShallowBoundary)
+    }
+}
+
+bitflags! {
     /// Flags used temporarily during merge-base computation on segments.
     ///
     /// These flags are cleared before each merge-base computation and should not be persisted.
@@ -137,6 +168,8 @@ bitflags! {
         /// Note that when multiple workspaces are included in the traversal, this flag is set by
         /// any of many target branches.
         const Integrated = 1 << 2;
+        /// The commit is listed in the repository's shallow boundary file.
+        const ShallowBoundary = 1 << 3;
     }
 }
 
@@ -164,6 +197,7 @@ impl CommitFlags {
                 .replace("NotInRemote", "⌂")
                 .replace("InWorkspace", "🏘")
                 .replace("Integrated", "✓")
+                .replace("ShallowBoundary", "⛰")
                 .replace(" ", "");
             if extra != 0 {
                 out.push_str(&format!(

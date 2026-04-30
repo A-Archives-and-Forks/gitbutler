@@ -50,7 +50,7 @@ fn disconnect_and_remove_middle_commit_in_linear_history() -> Result<()> {
     └── 👉►:0[0]:main[🌳]
         ├── ·b4fd8ee (⌂|1)
         ├── ·d591dfe (⌂|1)
-        └── ·35b8235 (⌂|1)
+        └── 🏁·35b8235 (⌂|1)
     ");
     let outcome = outcome.materialize()?;
     assert_eq!(overlayed, graph_tree(&outcome.workspace.graph).to_string());
@@ -110,8 +110,8 @@ fn disconnect_and_remove_two_middle_commits_in_linear_history() -> Result<()> {
 
     └── 👉►:0[0]:main[🌳]
         ├── ·19f8134 (⌂|1)
-        └── ·35b8235 (⌂|1)
-    ");
+        └── 🏁·35b8235 (⌂|1)
+     ");
     let outcome = outcome.materialize()?;
     assert_eq!(overlayed, graph_tree(&outcome.workspace.graph).to_string());
 
@@ -170,7 +170,7 @@ fn disconnect_and_remove_commit_in_merge_history_rewires_children() -> Result<()
             └── ►:1[1]:anon:
                 └── ·01c4df0 (⌂|1)
                     ├── ►:2[3]:anon:
-                    │   └── ·8f0d338 (⌂|1) ►A, ►main, ►tags/base
+                    │   └── 🏁·8f0d338 (⌂|1) ►A, ►main, ►tags/base
                     └── ►:3[2]:B
                         └── ·984fd1c (⌂|1)
                             └── →:2:
@@ -247,7 +247,7 @@ fn disconnect_and_remove_merge_with_two_parents_and_two_children() -> Result<()>
             │       ├── ►:3[2]:anon:
             │       │   └── ·bc0e772 (⌂|1) ►M, ►P1
             │       │       └── ►:5[3]:main
-            │       │           └── ·7674a5e (⌂|1) ►tags/base
+            │       │           └── 🏁·7674a5e (⌂|1) ►tags/base
             │       └── ►:4[2]:P2
             │           └── ·392a8f8 (⌂|1)
             │               └── →:5: (main)
@@ -372,7 +372,7 @@ fn disconnect_and_remove_merge_with_two_parents_and_two_children_from_one_side()
             │       └── ►:3[2]:P1
             │           └── ·bc0e772 (⌂|1)
             │               └── ►:5[4]:main
-            │                   └── ·7674a5e (⌂|1) ►tags/base
+            │                   └── 🏁·7674a5e (⌂|1) ►tags/base
             └── ►:2[1]:C2
                 └── ·41cb528 (⌂|1)
                     └── ►:4[2]:M
@@ -491,7 +491,7 @@ fn disconnect_remove_merge_with_two_parents_and_two_children_children_only() -> 
             │               └── ►:4[3]:P2
             │                   └── ·392a8f8 (⌂|1)
             │                       └── ►:5[4]:main
-            │                           └── ·7674a5e (⌂|1) ►tags/base
+            │                           └── 🏁·7674a5e (⌂|1) ►tags/base
             └── ►:2[1]:C2
                 └── ·41cb528 (⌂|1)
                     └── →:3: (M)
@@ -626,7 +626,7 @@ fn disconnect_fails_when_parents_to_disconnect_is_none() -> Result<()> {
             │               ├── ►:4[3]:P1
             │               │   └── ·bc0e772 (⌂|1)
             │               │       └── ►:6[4]:main
-            │               │           └── ·7674a5e (⌂|1) ►tags/base
+            │               │           └── 🏁·7674a5e (⌂|1) ►tags/base
             │               └── ►:5[3]:P2
             │                   └── ·392a8f8 (⌂|1)
             │                       └── →:6: (main)
@@ -698,7 +698,7 @@ fn disconnect_fails_fast_if_parent_to_disconnect_is_not_direct_parent() -> Resul
             │               ├── ►:4[3]:P1
             │               │   └── ·bc0e772 (⌂|1)
             │               │       └── ►:6[4]:main
-            │               │           └── ·7674a5e (⌂|1) ►tags/base
+            │               │           └── 🏁·7674a5e (⌂|1) ►tags/base
             │               └── ►:5[3]:P2
             │                   └── ·392a8f8 (⌂|1)
             │                       └── →:6: (main)
@@ -770,7 +770,7 @@ fn disconnect_fails_fast_if_child_to_disconnect_is_not_direct_child() -> Result<
             │               ├── ►:4[3]:P1
             │               │   └── ·bc0e772 (⌂|1)
             │               │       └── ►:6[4]:main
-            │               │           └── ·7674a5e (⌂|1) ►tags/base
+            │               │           └── 🏁·7674a5e (⌂|1) ►tags/base
             │               └── ►:5[3]:P2
             │                   └── ·392a8f8 (⌂|1)
             │                       └── →:6: (main)

@@ -5,7 +5,7 @@ use bstr::{BString, ByteSlice, ByteVec};
 use gix::reference::Category;
 use petgraph::{prelude::EdgeRef, stable_graph::EdgeReference};
 
-use crate::{Edge, Graph, Segment, SegmentIndex, SegmentMetadata, init::PetGraph};
+use crate::{CutoffCondition, Edge, Graph, Segment, SegmentIndex, SegmentMetadata, init::PetGraph};
 
 /// Debugging
 impl Graph {
@@ -124,18 +124,14 @@ impl Graph {
     pub fn commit_debug_string(
         commit: &crate::Commit,
         is_entrypoint: bool,
-        is_early_end: bool,
+        cutoff_condition: Option<CutoffCondition>,
         hard_limit: bool,
         max_goals: Option<usize>,
     ) -> String {
         format!(
             "{ep}{end}{kind}{hex}{flags}{refs}",
             ep = if is_entrypoint { "👉" } else { "" },
-            end = if is_early_end {
-                if hard_limit { "❌" } else { "✂" }
-            } else {
-                ""
-            },
+            end = cutoff_debug_string(cutoff_condition, hard_limit),
             kind = if commit.flags.is_remote() {
                 "🟣"
             } else {
@@ -340,9 +336,9 @@ impl Graph {
                         c,
                         !show_segment_entrypoint && Some((sidx, Some(cidx))) == entrypoint,
                         if cidx + 1 != s.commits.len() {
-                            false
+                            None
                         } else {
-                            self.is_early_end_of_traversal(sidx)
+                            self.traversal_condition(sidx)
                         },
                         self.hard_limit_hit,
                         max_goals,
@@ -407,4 +403,21 @@ impl Graph {
         let dot = petgraph::dot::Dot::with_attr_getters(&self.inner, &[], &edge_attrs, &node_attrs);
         format!("{dot:?}")
     }
+}
+
+fn cutoff_debug_string(condition: Option<CutoffCondition>, hard_limit: bool) -> String {
+    let mut out = String::new();
+    let Some(condition) = condition else {
+        return out;
+    };
+    if condition.contains(CutoffCondition::Limit) {
+        out.push_str(if hard_limit { "❌" } else { "✂" });
+    }
+    if condition.contains(CutoffCondition::FirstCommit) {
+        out.push('🏁');
+    }
+    if condition.contains(CutoffCondition::ShallowBoundary) {
+        out.push('⛰');
+    }
+    out
 }

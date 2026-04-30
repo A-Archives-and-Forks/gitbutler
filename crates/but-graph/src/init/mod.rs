@@ -299,6 +299,7 @@ impl Graph {
             bail!("Cannot currently handle remotes as start position");
         }
         let commit_graph = repo.commit_graph_if_enabled()?;
+        let shallow_commits = repo.shallow_commits()?;
         let mut buf = Vec::new();
 
         let configured_remote_tracking_branches =
@@ -678,6 +679,12 @@ impl Graph {
             // These flags might be outdated as they have been queued, meanwhile we may have propagated flags.
             // So be sure this gets picked up.
             propagated_flags |= src_flags;
+            let is_shallow_boundary = shallow_commits
+                .as_ref()
+                .is_some_and(|boundary| boundary.binary_search(&id).is_ok());
+            if is_shallow_boundary {
+                propagated_flags |= CommitFlags::ShallowBoundary;
+            }
             let segment_idx_for_id = match instruction {
                 Instruction::CollectCommit { into: src_sidx } => match seen.entry(id) {
                     Entry::Occupied(_) => {
@@ -775,6 +782,7 @@ impl Graph {
                 segment_idx_for_id,
                 commit_idx_for_possible_fork,
                 limit.additional_goal(limit_to_let_local_find_remote),
+                is_shallow_boundary,
                 commit_graph.as_ref(),
                 repo.for_find_only(),
                 &mut buf,

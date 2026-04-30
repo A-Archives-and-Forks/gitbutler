@@ -53,7 +53,7 @@ fn insert_single_node_segment_above() -> Result<()> {
             ├── ►:1[1]:A
             │   └── ·706b5e8 (⌂|1)
             │       ├── ►:3[3]:anon:
-            │       │   └── ·8f0d338 (⌂|1) ►tags/base
+            │       │   └── 🏁·8f0d338 (⌂|1) ►tags/base
             │       └── ►:4[2]:B
             │           ├── ·a748762 (⌂|1)
             │           └── ·62e05ba (⌂|1)
@@ -134,7 +134,7 @@ fn insert_single_node_segment_below() -> Result<()> {
             ├── ►:1[2]:A
             │   └── ·032ef08 (⌂|1)
             │       ├── ►:4[4]:anon:
-            │       │   └── ·8f0d338 (⌂|1) ►tags/base
+            │       │   └── 🏁·8f0d338 (⌂|1) ►tags/base
             │       └── ►:5[3]:anon:
             │           └── ·62e05ba (⌂|1)
             │               └── →:4:
@@ -224,7 +224,7 @@ fn insert_multi_node_segment_above() -> Result<()> {
             │       └── ►:3[2]:anon:
             │           └── ·8e18b4e (⌂|1)
             │               ├── ►:4[4]:anon:
-            │               │   └── ·8f0d338 (⌂|1) ►tags/base
+            │               │   └── 🏁·8f0d338 (⌂|1) ►tags/base
             │               └── ►:5[3]:anon:
             │                   └── ·add59d2 (⌂|1)
             │                       └── →:4:
@@ -311,7 +311,7 @@ fn insert_multi_node_segment_below() -> Result<()> {
             │           ├── ·a748762 (⌂|1)
             │           └── ·62e05ba (⌂|1)
             │               └── ►:4[3]:anon:
-            │                   └── ·8f0d338 (⌂|1) ►tags/base
+            │                   └── 🏁·8f0d338 (⌂|1) ►tags/base
             ├── →:2: (B)
             └── ►:3[1]:C
                 ├── ·930563a (⌂|1)
@@ -396,7 +396,7 @@ fn insert_single_node_segment_above_with_explicit_children() -> Result<()> {
             ├── ►:1[2]:A
             │   └── ·706b5e8 (⌂|1)
             │       ├── ►:4[4]:anon:
-            │       │   └── ·8f0d338 (⌂|1) ►tags/base
+            │       │   └── 🏁·8f0d338 (⌂|1) ►tags/base
             │       └── ►:2[3]:B
             │           ├── ·a748762 (⌂|1)
             │           └── ·62e05ba (⌂|1)
@@ -491,7 +491,7 @@ fn insert_single_node_segment_below_with_explicit_parents() -> Result<()> {
             ├── ►:1[1]:A
             │   └── ·275b149 (⌂|1)
             │       ├── ►:4[4]:anon:
-            │       │   └── ·8f0d338 (⌂|1) ►tags/base
+            │       │   └── 🏁·8f0d338 (⌂|1) ►tags/base
             │       └── ►:2[2]:B
             │           └── ·9c9c689 (⌂|1)
             │               ├── ►:5[3]:anon:
