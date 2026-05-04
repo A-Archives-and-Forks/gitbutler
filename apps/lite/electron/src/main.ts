@@ -366,6 +366,7 @@ const createMainWindow = async (): Promise<void> => {
 	checkForUpdates();
 };
 
+app.enableSandbox(); // forces sandboxing for all renderers, even if they try to launch without
 void app.whenReady().then(async () => {
 	if (!app.isPackaged) await installExtension(REACT_DEVELOPER_TOOLS);
 	if (process.platform === "darwin" && !app.isPackaged) {
