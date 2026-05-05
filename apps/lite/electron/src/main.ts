@@ -67,6 +67,7 @@ import {
 	Menu,
 	net,
 	protocol,
+	session,
 	type MenuItemConstructorOptions,
 } from "electron";
 import { REACT_DEVELOPER_TOOLS, installExtension } from "electron-devtools-installer";
@@ -368,13 +369,78 @@ const createMainWindow = async (): Promise<void> => {
 
 app.enableSandbox(); // forces sandboxing for all renderers, even if they try to launch without
 void app.whenReady().then(async () => {
-	if (!app.isPackaged) await installExtension(REACT_DEVELOPER_TOOLS);
-	if (process.platform === "darwin" && !app.isPackaged) {
-		const dockIcon = getMacDockIcon();
-		if (dockIcon !== undefined && app.dock) app.dock.setIcon(dockIcon);
+	if (app.isPackaged) {
+		registerLiteProtocolHandler();
+
+		// Basic non-Strict CSP based on https://cheatsheetseries.owasp.org/cheatsheets/Content_Security_Policy_Cheat_Sheet.html#basic-non-strict-csp-policy
+		const productionCsp =
+			"default-src 'none';" +
+			"script-src 'self' 'wasm-unsafe-eval';" +
+			// Hash is for inline style in index.html
+			"style-src 'self' 'sha256-XBXaUBQCe+0UGd1QCfoPFCc7UsLKd8xrn9oXNYqjFog=';" +
+			// react-resizable-panels has inline styles in elements. `style-src-attr 'unsafe-inline'` is slightly more narrow
+			// than just `style-src 'unsafe-inline'`, but we should still try to get rid of this.
+			"style-src-attr 'unsafe-inline';" +
+			"font-src 'self';" +
+			"connect-src 'self';" +
+			"object-src 'none';" +
+			"base-uri 'none';" +
+			"frame-ancestors 'none';" +
+			"form-action 'none';" +
+			"img-src 'self' data:;" +
+			"worker-src 'self';";
+
+		session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+			callback({
+				responseHeaders: {
+					...details.responseHeaders,
+					"Content-Security-Policy": [productionCsp],
+				},
+			});
+		});
+	} else {
+		await installExtension(REACT_DEVELOPER_TOOLS);
+
+		if (process.platform === "darwin") {
+			const dockIcon = getMacDockIcon();
+			if (dockIcon !== undefined && app.dock) app.dock.setIcon(dockIcon);
+		}
+
+		// Loose dev CSP to allow for hot reload and development tools. This could be tightened with
+		// nonce-based CSP instead of using unsafe-inline, but it's just not worth the hassle right now.
+		const developmentCsp =
+			"default-src 'none';" +
+			// unsafe-inline necessary for HMR. Potentially fixable with nonce-based Strict CSP.
+			"script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval';" +
+			// unsafe-inline necessary for HMR. Potentially fixable with nonce-based Strict CSP.
+			"style-src 'self' 'unsafe-inline';" +
+			"font-src 'self';" +
+			// ws source for HMR
+			"connect-src 'self' ws://127.0.0.1:5173;" +
+			"object-src 'none';" +
+			"base-uri 'none';" +
+			"frame-ancestors 'none';" +
+			"form-action 'none';" +
+			"img-src 'self' data:;" +
+			"worker-src 'self';";
+
+		session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+			// Skip extensions, or React dev tools don't work
+			if (details.url.startsWith("chrome-extension://")) {
+				callback({ responseHeaders: details.responseHeaders });
+				return;
+			}
+
+			callback({
+				responseHeaders: {
+					...details.responseHeaders,
+					"Content-Security-Policy": [developmentCsp],
+				},
+			});
+		});
 	}
+
 	registerIpcHandlers();
-	registerLiteProtocolHandler();
 	await createMainWindow();
 
 	app.on("activate", () => {
