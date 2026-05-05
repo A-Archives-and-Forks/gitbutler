@@ -456,3 +456,11 @@ app.on("window-all-closed", () => {
 	WatcherManager.getInstance().destroy();
 	if (process.platform !== "darwin") app.quit();
 });
+
+app.on("web-contents-created", (_, contents) => {
+	contents.on("will-navigate", (event, navigationUrl) => {
+		// oxlint-disable-next-line no-console
+		console.error(`Blocked navigation to ${navigationUrl}`);
+		event.preventDefault();
+	});
+});
