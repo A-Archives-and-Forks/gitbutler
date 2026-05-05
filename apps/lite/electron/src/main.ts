@@ -463,4 +463,10 @@ app.on("web-contents-created", (_, contents) => {
 		console.error(`Blocked navigation to ${navigationUrl}`);
 		event.preventDefault();
 	});
+
+	contents.setWindowOpenHandler(({ url }) => {
+		// oxlint-disable-next-line no-console
+		console.error(`Blocked opening new window for ${url}`);
+		return { action: "deny" };
+	});
 });
