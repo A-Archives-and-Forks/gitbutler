@@ -178,6 +178,7 @@ Commit changes to a branch.
 ```bash
 but commit <branch> --only -m "message"  # Commit ONLY staged changes (recommended)
 but commit <branch> -m "message"         # Commit ALL uncommitted changes to branch
+but commit <branch> -am "message"        # Accepted Git muscle-memory form; -a is a no-op
 but commit <branch> -m "message" --changes <id>,<id>  # Commit specific files or hunks by CLI ID
 but commit <branch> -m "message" --changes <id> --changes <id>  # Alternative: repeat flag
 but commit <branch> --message-file msg.txt  # Read commit message from file

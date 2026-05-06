@@ -884,6 +884,9 @@ async fn match_subcommand(
                     if commit_args.only {
                         anyhow::bail!("--only cannot be used with 'commit empty'.");
                     }
+                    if commit_args.all {
+                        anyhow::bail!("--all cannot be used with 'commit empty'.");
+                    }
                     if commit_args.no_hooks {
                         anyhow::bail!("--no-hooks cannot be used with 'commit empty'.");
                     }
@@ -996,6 +999,7 @@ async fn match_subcommand(
                         commit_args.branch.as_deref(),
                         &commit_args.changes,
                         commit_args.only,
+                        commit_args.all,
                         commit_args.create,
                         commit_args.no_hooks,
                         commit_args.ai.clone(),

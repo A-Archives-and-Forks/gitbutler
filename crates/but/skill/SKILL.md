@@ -40,6 +40,7 @@ but <mutation> ... --status-after
 ## Command Patterns
 
 - Commit: `but commit <branch> -m "<msg>" --changes <id>,<id> --status-after`
+- `but commit -a` is accepted as a no-op compatibility flag; GitButler already includes unstaged changes by default.
 - Commit + create branch: `but commit <branch> -c -m "<msg>" --changes <id> --status-after`
 - Amend: `but amend <file-id> <commit-id> --status-after`
 - Reorder commits: `but move <source-commit-id> <target-commit-id> --status-after` (**commit IDs**, not branch names)
