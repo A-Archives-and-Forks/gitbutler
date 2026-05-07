@@ -53,13 +53,12 @@ import {
 	NavigationIndex,
 	navigationIndexIncludes,
 } from "#ui/workspace/navigation-index.ts";
-import { filterNavigationIndexForOutlineMode } from "#ui/outline/mode.ts";
 import { useCommand } from "#ui/commands/manager.ts";
 
 const useNavigationIndex = (projectId: string, parent: Operand, files: Array<Operand>) => {
 	const dispatch = useAppDispatch();
 
-	const navigationIndexUnfiltered = buildNavigationIndex([{ section: parent, children: files }]);
+	const navigationIndex = buildNavigationIndex([{ section: parent, children: files }]);
 
 	const selection = useAppSelector((state) => selectProjectSelectionFiles(state, projectId));
 
@@ -68,21 +67,14 @@ const useNavigationIndex = (projectId: string, parent: Operand, files: Array<Ope
 	// React allows state updates on render, but not for external stores.
 	// https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
 	useEffect(() => {
-		if (!navigationIndexIncludes(navigationIndexUnfiltered, selection))
+		if (!navigationIndexIncludes(navigationIndex, selection))
 			dispatch(
 				projectActions.selectFiles({
 					projectId,
 					selection: parent,
 				}),
 			);
-	}, [navigationIndexUnfiltered, selection, projectId, dispatch, parent]);
-
-	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
-
-	const navigationIndex = filterNavigationIndexForOutlineMode({
-		navigationIndex: navigationIndexUnfiltered,
-		outlineMode,
-	});
+	}, [navigationIndex, selection, projectId, dispatch, parent]);
 
 	const focusedPanel = useFocusedProjectPanel(projectId);
 
