@@ -8,12 +8,12 @@ mod db;
 mod review;
 pub use ci::{CiCheck, CiConclusion, CiOutput, CiStatus, ci_checks_for_ref_with_cache};
 pub use review::{
-    CacheConfig, CreateForgeReviewParams, ForgeAccountValidity, ForgeReview,
-    ForgeReviewDescriptionUpdate, ForgeReviewFilter, ReviewTemplateFunctions,
-    available_review_templates, check_forge_account_is_valid, create_forge_review,
-    get_forge_review, get_review_template_functions, list_forge_reviews_for_branch,
-    list_forge_reviews_with_cache, merge_review, set_review_auto_merge_state,
-    set_review_draftiness, update_review_description_tables,
+    CacheConfig, CreateForgeReviewParams, ForgeAccountValidity, ForgeReview, ForgeReviewFilter,
+    ForgeReviewTargetUpdate, ForgeReviewUpdate, ReviewTemplateFunctions,
+    available_review_templates, check_forge_account_is_valid, compute_review_target_updates,
+    create_forge_review, get_forge_review, get_review_template_functions,
+    list_forge_reviews_for_branch, list_forge_reviews_with_cache, merge_review,
+    set_review_auto_merge_state, set_review_draftiness, sync_reviews,
 };
 
 fn determine_forge_from_host(host: &str) -> Option<ForgeName> {

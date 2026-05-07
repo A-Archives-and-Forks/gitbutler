@@ -41,7 +41,7 @@ struct FailedBranch {
     error: String,
 }
 
-pub fn handle(
+pub async fn handle(
     args: push::Command,
     ctx: &mut Context,
     out: &mut OutputChannel,
@@ -69,13 +69,21 @@ pub fn handle(
     };
 
     // Handle branch selection
-    match branch_selection {
-        BranchSelection::All => push_all_branches(ctx, &args, gerrit_mode, out),
+    let had_successful_push = match branch_selection {
+        BranchSelection::All => push_all_branches(ctx, &args, gerrit_mode, out)?,
         BranchSelection::Single(branch_name) => {
-            push_single_branch(ctx, &branch_name, &args, gerrit_mode, out)
+            push_single_branch(ctx, &branch_name, &args, gerrit_mode, out)?;
+            true
         }
-        BranchSelection::None => Ok(()),
+        BranchSelection::None => return Ok(()),
+    };
+
+    // Best-effort: update PR/MR target branches to match the current stack structure.
+    if had_successful_push && let Err(err) = update_review_targets_for_stacks(ctx).await {
+        tracing::warn!(?err, "Failed to update review target branches after push");
     }
+
+    Ok(())
 }
 
 /// Information about what would be pushed for a branch
@@ -661,12 +669,13 @@ fn push_single_branch_impl(
     Ok(result)
 }
 
+/// Returns `true` if at least one branch was pushed successfully.
 fn push_all_branches(
     ctx: &mut Context,
     args: &Command,
     gerrit_mode: bool,
     out: &mut OutputChannel,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<bool> {
     let t = theme::get();
     let mut progress = out.progress_channel();
     let branches_with_info = get_branches_with_unpushed_info(ctx)?;
@@ -692,7 +701,7 @@ fn push_all_branches(
             "{}",
             t.hint.paint("No branches have unpushed commits.")
         )?;
-        return Ok(());
+        return Ok(false);
     }
 
     writeln!(progress)?;
@@ -813,7 +822,7 @@ fn push_all_branches(
         }
     }
 
-    Ok(())
+    Ok(!pushed_results.is_empty())
 }
 
 fn handle_no_branch_specified(
@@ -1126,6 +1135,38 @@ fn find_stack_id_by_branch_name(ctx: &Context, branch_name: &str) -> anyhow::Res
         branch_name,
         format_branch_suggestions(&available_branches)
     ))
+}
+
+/// Update PR/MR target branches to match the current stack structure.
+async fn update_review_targets_for_stacks(ctx: &Context) -> anyhow::Result<()> {
+    let base_branch = gitbutler_branch_actions::base::get_base_branch_data(ctx)?;
+    let stacks = but_api::legacy::workspace::stacks(
+        ctx,
+        Some(but_workspace::legacy::StacksFilter::InWorkspace),
+    )?;
+
+    let mut target_updates = Vec::new();
+    for stack in &stacks {
+        // heads are ordered top-first, so iterate in reverse for bottom-to-top
+        let heads: Vec<(String, Option<i64>)> = stack
+            .heads
+            .iter()
+            .rev()
+            .map(|h| (h.name.to_string(), h.review_id.map(|id| id as i64)))
+            .collect();
+        target_updates.extend(but_forge::compute_review_target_updates(
+            &heads,
+            &base_branch.short_name,
+        ));
+    }
+
+    if target_updates.is_empty() {
+        return Ok(());
+    }
+
+    let reviews: Vec<but_forge::ForgeReviewUpdate> =
+        target_updates.into_iter().map(Into::into).collect();
+    but_api::legacy::forge::update_review_footers(ctx.to_sync(), reviews).await
 }
 
 /// Check if a branch contains any conflicted commits
