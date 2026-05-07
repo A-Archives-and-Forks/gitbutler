@@ -42,7 +42,7 @@
 </tspan>
     <tspan x="10px" y="190px"><tspan>┊</tspan>
 </tspan>
-    <tspan x="10px" y="208px"><tspan>┊╭┄(upstream) ⏫ 2 new commits</tspan>
+    <tspan x="10px" y="208px"><tspan>┊╭┄(upstream) ⏫ 2 commits</tspan>
 </tspan>
     <tspan x="10px" y="226px"><tspan>┊</tspan><tspan class="fg-green">●</tspan><tspan> </tspan><tspan class="fg-cyan">9354ac4</tspan><tspan> </tspan><tspan class="dimmed">main-advance</tspan>
 </tspan>
@@ -50,7 +50,7 @@
 </tspan>
     <tspan x="10px" y="262px"><tspan>┊┊</tspan>
 </tspan>
-    <tspan x="10px" y="280px"><tspan>├╯ </tspan><tspan class="dimmed">efc9211</tspan><tspan> [</tspan><tspan class="fg-magenta">origin/main</tspan><tspan>] </tspan><tspan class="dimmed">2000-01-02</tspan><tspan> base</tspan>
+    <tspan x="10px" y="280px"><tspan>├╯ </tspan><tspan class="dimmed">efc9211</tspan><tspan> (common base) </tspan><tspan class="dimmed">2000-01-02</tspan><tspan> base</tspan>
 </tspan>
     <tspan x="10px" y="298px">
 </tspan>

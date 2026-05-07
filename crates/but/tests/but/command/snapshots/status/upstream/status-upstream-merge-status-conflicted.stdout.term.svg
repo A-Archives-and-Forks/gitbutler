@@ -5,7 +5,6 @@
     .fg-blue { fill: #0000AA }
     .fg-cyan { fill: #00AAAA }
     .fg-green { fill: #00AA00 }
-    .fg-magenta { fill: #AA00AA }
     .fg-red { fill: #AA0000 }
     .container {
       padding: 0 10px;
@@ -35,13 +34,13 @@
 </tspan>
     <tspan x="10px" y="118px"><tspan>┊</tspan>
 </tspan>
-    <tspan x="10px" y="136px"><tspan>┊╭┄(upstream) ⏫ 1 new commits</tspan>
+    <tspan x="10px" y="136px"><tspan>┊╭┄(upstream) ⏫ 1 commit</tspan>
 </tspan>
     <tspan x="10px" y="154px"><tspan>┊</tspan><tspan class="fg-green">●</tspan><tspan> </tspan><tspan class="fg-cyan">bdfcf28</tspan><tspan> </tspan><tspan class="dimmed">main-change</tspan>
 </tspan>
     <tspan x="10px" y="172px"><tspan>┊┊</tspan>
 </tspan>
-    <tspan x="10px" y="190px"><tspan>├╯ </tspan><tspan class="dimmed">efc9211</tspan><tspan> [</tspan><tspan class="fg-magenta">origin/main</tspan><tspan>] </tspan><tspan class="dimmed">2000-01-02</tspan><tspan> base</tspan>
+    <tspan x="10px" y="190px"><tspan>├╯ </tspan><tspan class="dimmed">efc9211</tspan><tspan> (common base) </tspan><tspan class="dimmed">2000-01-02</tspan><tspan> base</tspan>
 </tspan>
     <tspan x="10px" y="208px">
 </tspan>

@@ -565,10 +565,10 @@ fn status_upstream_and_merge_base_messages_truncate_when_unpaged() -> anyhow::Re
 ┊●   601614c add A
 ├╯
 ┊
-┊╭┄(upstream) ⏫ 1 new commits
+┊╭┄(upstream) ⏫ 1 commit
 ┊● 67247ca add upstream-commit-message-that-is-intentionally-very-very-long-to-exc…
 ┊┊
-├╯ 9fd740d [origin/main] 2000-01-02 add merge-base-message-that-is-intentio…
+├╯ 9fd740d (common base) 2000-01-02 add merge-base-message-that-is-intentio…
 
 Hint: run `but help` for all commands
 
@@ -634,11 +634,11 @@ fn status_upstream_prunes_untracked_integrated_branch() -> anyhow::Result<()> {
 ┊●   536958e B-change
 ├╯
 ┊
-┊╭┄(upstream) ⏫ 2 new commits
+┊╭┄(upstream) ⏫ 2 commits
 ┊● 9354ac4 main-advance
 ┊● 756ee31 A-change
 ┊┊
-├╯ efc9211 [origin/main] 2000-01-02 base
+├╯ efc9211 (common base) 2000-01-02 base
 
 Hint: run `but help` for all commands
 
@@ -681,11 +681,11 @@ fn status_upstream_prunes_metadata_tracked_integrated_branches() -> anyhow::Resu
 ┊╭┄ex [extra-untracked] ○ empty (no commits)
 ├╯
 ┊
-┊╭┄(upstream) ⏫ 2 new commits
+┊╭┄(upstream) ⏫ 2 commits
 ┊● 9354ac4 main-advance
 ┊● 756ee31 A-change
 ┊┊
-├╯ efc9211 [origin/main] 2000-01-02 base
+├╯ efc9211 (common base) 2000-01-02 base
 
 Hint: run `but help` for all commands
 
@@ -734,11 +734,11 @@ fn status_upstream_prunes_with_different_bases() -> anyhow::Result<()> {
 ┊●   6daac93 M1
 ├╯
 ┊
-┊╭┄(upstream) ⏫ 2 new commits
+┊╭┄(upstream) ⏫ 2 commits
 ┊● ba5149e M2
 ┊● 6daac93 M1
 ┊┊
-├╯ efc9211 [origin/main] 2000-01-02 base
+├╯ efc9211 (common base) 2000-01-02 base
 
 Hint: run `but help` for all commands
 

@@ -70,13 +70,13 @@ fn multi_squash_multiple_marked_sources_into_unmarked_target() {
         .assert_current_line_eq(str!["┊✔︎   9477ae7 add A"]);
 
     tui.input_then_render(KeyCode::Down)
-        .assert_current_line_eq(str!["┴ 0dc3733 [origin/main] 2000-01-02 add M"]);
+        .assert_current_line_eq(str!["┴ 0dc3733 (common base) 2000-01-02 add M"]);
 
     tui.input_then_render('r')
-        .assert_current_line_eq(str!["┴ 0dc3733 [origin/main] 2000-01-02 add M"]);
+        .assert_current_line_eq(str!["┴ 0dc3733 (common base) 2000-01-02 add M"]);
 
     tui.input_then_render(KeyCode::Enter)
-        .assert_current_line_eq(str!["┴ 0dc3733 [origin/main] 2000-01-02 add M"])
+        .assert_current_line_eq(str!["┴ 0dc3733 (common base) 2000-01-02 add M"])
         .assert_rendered_term_svg_eq(file![
             "snapshots/multi_squash_multiple_marked_sources_into_unmarked_target_final.svg"
         ]);

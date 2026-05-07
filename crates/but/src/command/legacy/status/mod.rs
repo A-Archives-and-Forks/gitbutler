@@ -571,8 +571,13 @@ fn print_upstream_state(
     if status_ctx.flags.show_upstream {
         // When showing detailed commits, only show count in summary
         let mut upstream_summary = Vec::from([Span::raw(format!(
-            "(upstream) ⏫ {} new commits",
-            upstream.behind_count
+            "(upstream) ⏫ {} {}",
+            upstream.behind_count,
+            if upstream.behind_count == 1 {
+                "commit"
+            } else {
+                "commits"
+            }
         ))]);
         if !last_checked_text.is_empty() {
             upstream_summary.push(Span::raw(" "));
@@ -617,8 +622,13 @@ fn print_upstream_state(
         let mut upstream_summary = Vec::from([
             Span::styled(upstream.latest_commit.clone(), t.hint),
             Span::raw(format!(
-                " (upstream) ⏫ {} new commits",
-                upstream.behind_count
+                " (upstream) ⏫ {} {}",
+                upstream.behind_count,
+                if upstream.behind_count == 1 {
+                    "commit"
+                } else {
+                    "commits"
+                }
             )),
         ]);
         if !last_checked_text.is_empty() {
@@ -659,12 +669,7 @@ fn print_common_merge_base_summary(
                 status_ctx.common_merge_base_data.common_merge_base.clone(),
                 t.hint,
             ),
-            Span::raw(" ["),
-            Span::styled(
-                status_ctx.common_merge_base_data.target_name.clone(),
-                t.remote_branch,
-            ),
-            Span::raw("] "),
+            Span::raw(" (common base) "),
             Span::styled(
                 status_ctx.common_merge_base_data.commit_date.clone(),
                 t.hint,
