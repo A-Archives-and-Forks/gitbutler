@@ -172,7 +172,7 @@ export const operationLabel = (operation: Operation): string =>
 			CommitSquash: () => "Squash",
 			CommitUncommit: () => "Uncommit",
 			CommitUncommitChanges: () => "Uncommit",
-			MoveBranch: () => "Stack branch onto here",
+			MoveBranch: () => "Move above",
 			TearOffBranch: () => "Tear off branch",
 		}),
 	);
