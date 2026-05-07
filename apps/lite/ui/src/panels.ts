@@ -147,8 +147,8 @@ export const useNavigationIndexHotkeys = ({
 		focusPanel("outline");
 	};
 
-	const enterRubMode = (source: Operand) => () => {
-		dispatch(projectActions.enterRubMode({ projectId, source }));
+	const enterRubMode = () => {
+		dispatch(projectActions.enterRubMode({ projectId, source: selection }));
 		focusPanel("outline");
 	};
 
@@ -178,20 +178,12 @@ export const useNavigationIndexHotkeys = ({
 		hotkeys: [{ hotkey: "Mod+X", ignoreInputs: true }],
 	});
 
-	useCommand(enterRubMode(selection), {
+	useCommand(enterRubMode, {
 		enabled: focusedPanel === panel && outlineMode._tag === "Default",
 		layer: "focused-selection-tree",
 		commandPalette: { group, label: "Rub" },
 		shortcutsBar: { label: "Rub" },
 		hotkeys: [{ hotkey: "R" }],
-	});
-
-	useCommand(enterRubMode(changesSectionOperand), {
-		enabled: focusedPanel === panel && outlineMode._tag === "Default",
-		layer: "focused-selection-tree",
-		commandPalette: { group, label: "Rub changes" },
-		shortcutsBar: { label: "Rub changes" },
-		hotkeys: [{ hotkey: "Shift+R" }],
 	});
 
 	useCommand(enterCommitMode, {

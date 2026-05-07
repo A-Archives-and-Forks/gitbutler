@@ -496,7 +496,11 @@ const CommitRow: FC<
 		const prevItem = navigationIndex.items[selectionIdx - 1];
 		if (!prevItem) return;
 
-		const operation = moveOperation({ source: operand, target: prevItem, side: "above" });
+		const operation = moveOperation({
+			source: operand,
+			target: prevItem,
+			side: "above",
+		});
 		if (!operation) return;
 
 		runOperation(projectId, operation);
@@ -513,7 +517,11 @@ const CommitRow: FC<
 		const nextItem = navigationIndex.items[nextIdx];
 		if (!nextItem) return;
 
-		const operation = moveOperation({ source: operand, target: nextItem, side: "below" });
+		const operation = moveOperation({
+			source: operand,
+			target: nextItem,
+			side: "below",
+		});
 		if (!operation) return;
 
 		runOperation(projectId, operation);
@@ -555,6 +563,24 @@ const CommitRow: FC<
 			}
 		});
 	};
+
+	const amendCommit = () => {
+		dispatch(projectActions.enterRubMode({ projectId, source: changesSectionOperand }));
+		focusPanel("outline");
+	};
+
+	const { contextMenu: amendCommitContextMenuItem } = useCommand(amendCommit, {
+		enabled: isSelected && focusedPanel === "outline" && outlineMode._tag === "Default",
+		layer: "focused-selection",
+		commandPalette: { group: "Commit", label: "Amend" },
+		shortcutsBar: { label: "Amend" },
+		contextMenu: {
+			label: "Amend commit",
+			// Focus change is too slow / the menu item isn't reactive.
+			enabled: true,
+		},
+		hotkeys: [{ hotkey: "Shift+A" }],
+	});
 
 	const { contextMenu: cutCommitContextMenuItem } = useCommand(cutCommit, {
 		enabled: isSelected && focusedPanel === "outline" && outlineMode._tag === "Default",
@@ -646,6 +672,7 @@ const CommitRow: FC<
 	});
 
 	const menuItems: Array<NativeMenuItem> = [
+		amendCommitContextMenuItem,
 		cutCommitContextMenuItem,
 		startEditingContextMenuItem,
 		{
@@ -939,7 +966,10 @@ const Changes: FC<{
 		commitCreate.mutate(
 			{
 				projectId,
-				relativeTo: { type: "referenceBytes", subject: branch.branch.branchRef },
+				relativeTo: {
+					type: "referenceBytes",
+					subject: branch.branch.branchRef,
+				},
 				side: "below",
 				changes,
 				message: commitTextareaRef.current?.value ?? "",

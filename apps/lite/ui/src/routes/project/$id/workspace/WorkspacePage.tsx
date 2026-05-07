@@ -306,7 +306,7 @@ const TopBarActions: FC = () => {
 		layer: "global",
 		commandPalette: { group: "Branches", label: "Apply" },
 		shortcutsBar: { label: "Apply" },
-		hotkeys: [{ hotkey: "Shift+A" }],
+		hotkeys: [{ hotkey: "Mod+Shift+A" }],
 	});
 
 	const toggleDetailsCommand = useCommand(toggleDetails, {
