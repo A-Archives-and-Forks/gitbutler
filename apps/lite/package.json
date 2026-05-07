@@ -27,6 +27,16 @@
 	},
 	"build": {
 		"appId": "com.gitbutler.lite",
+		"electronFuses": {
+			"runAsNode": false,
+			"enableCookieEncryption": true,
+			"enableNodeOptionsEnvironmentVariable": false,
+			"enableNodeCliInspectArguments": false,
+			"enableEmbeddedAsarIntegrityValidation": true,
+			"onlyLoadAppFromAsar": true,
+			"loadBrowserProcessSpecificV8Snapshot": false,
+			"grantFileProtocolExtraPrivileges": false
+		},
 		"publish": {
 			"provider": "s3",
 			"region": "us-east-1",
