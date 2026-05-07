@@ -116,7 +116,7 @@ fn move_multiple_commits_before_another_commit() -> anyhow::Result<()> {
 ┊●   9477ae7 add A
 ├╯
 ┊
-┴ 0dc3733 [origin/main] 2000-01-02 add M
+┴ 0dc3733 (common base) 2000-01-02 add M
 
 Hint: run `but help` for all commands
 
@@ -160,7 +160,7 @@ Moved 2 commits → before fce8ecc
 ┊●   9477ae7 add A
 ├╯
 ┊
-┴ 0dc3733 [origin/main] 2000-01-02 add M
+┴ 0dc3733 (common base) 2000-01-02 add M
 
 Hint: run `but help` for all commands
 
@@ -194,7 +194,7 @@ fn move_multiple_commits_after_another_commit() -> anyhow::Result<()> {
 ┊●   9477ae7 add A
 ├╯
 ┊
-┴ 0dc3733 [origin/main] 2000-01-02 add M
+┴ 0dc3733 (common base) 2000-01-02 add M
 
 Hint: run `but help` for all commands
 
@@ -238,7 +238,7 @@ Moved 2 commits → after 23e1bf8
 ┊●   9477ae7 add A
 ├╯
 ┊
-┴ 0dc3733 [origin/main] 2000-01-02 add M
+┴ 0dc3733 (common base) 2000-01-02 add M
 
 Hint: run `but help` for all commands
 
@@ -275,7 +275,7 @@ fn move_multiple_commits_from_different_branches() -> anyhow::Result<()> {
 ┊●   984fd1c C: new file with 10 lines
 ├╯
 ┊
-┴ 8f0d338 [origin/main] 2000-01-02 base
+┴ 8f0d338 (common base) 2000-01-02 base
 
 Hint: run `but help` for all commands
 
@@ -382,7 +382,7 @@ Moved 4 commits → before [..]
 ┊╭┄i0 [C] (no commits)
 ├╯
 ┊
-┴ 8f0d338 [origin/main] 2000-01-02 base
+┴ 8f0d338 (common base) 2000-01-02 base
 
 Hint: run `but help` for all commands
 
@@ -419,7 +419,7 @@ fn move_multiple_commits_from_different_branches_after() -> anyhow::Result<()> {
 ┊●   984fd1c C: new file with 10 lines
 ├╯
 ┊
-┴ 8f0d338 [origin/main] 2000-01-02 base
+┴ 8f0d338 (common base) 2000-01-02 base
 
 Hint: run `but help` for all commands
 
@@ -526,7 +526,7 @@ Moved 4 commits → after a748762
 ┊╭┄i0 [C] (no commits)
 ├╯
 ┊
-┴ 8f0d338 [origin/main] 2000-01-02 base
+┴ 8f0d338 (common base) 2000-01-02 base
 
 Hint: run `but help` for all commands
 
@@ -799,7 +799,7 @@ fn move_branch_by_name_from_top_level_move() -> anyhow::Result<()> {
 ┊●   d3e2ba3 add B
 ├╯
 ┊
-┴ 0dc3733 [origin/main] 2000-01-02 add M
+┴ 0dc3733 (common base) 2000-01-02 add M
 
 Hint: run `but help` for all commands
 
@@ -834,7 +834,7 @@ Moved branch A on top of C.
 ┊●   d3e2ba3 add B
 ├╯
 ┊
-┴ 0dc3733 [origin/main] 2000-01-02 add M
+┴ 0dc3733 (common base) 2000-01-02 add M
 
 Hint: run `but help` for all commands
 
@@ -869,7 +869,7 @@ fn move_branch_by_cli_id_from_top_level_move() -> anyhow::Result<()> {
 ┊●   d3e2ba3 add B
 ├╯
 ┊
-┴ 0dc3733 [origin/main] 2000-01-02 add M
+┴ 0dc3733 (common base) 2000-01-02 add M
 
 Hint: run `but help` for all commands
 
@@ -915,7 +915,7 @@ Moved branch A on top of C.
 ┊●   d3e2ba3 add B
 ├╯
 ┊
-┴ 0dc3733 [origin/main] 2000-01-02 add M
+┴ 0dc3733 (common base) 2000-01-02 add M
 
 Hint: run `but help` for all commands
 
@@ -950,7 +950,7 @@ fn tear_off_branch_with_top_level_move_to_zz() -> anyhow::Result<()> {
 ┊●   d3e2ba3 add B
 ├╯
 ┊
-┴ 0dc3733 [origin/main] 2000-01-02 add M
+┴ 0dc3733 (common base) 2000-01-02 add M
 
 Hint: run `but help` for all commands
 
@@ -999,7 +999,7 @@ Unstacked branch C.
 ┊●   31e83cd add C
 ├╯
 ┊
-┴ 0dc3733 [origin/main] 2000-01-02 add M
+┴ 0dc3733 (common base) 2000-01-02 add M
 
 Hint: run `but help` for all commands
 
@@ -1034,7 +1034,7 @@ fn move_branch_with_after_flag_fails_from_top_level_move() -> anyhow::Result<()>
 ┊●   d3e2ba3 add B
 ├╯
 ┊
-┴ 0dc3733 [origin/main] 2000-01-02 add M
+┴ 0dc3733 (common base) 2000-01-02 add M
 
 Hint: run `but help` for all commands
 
@@ -1066,7 +1066,7 @@ Failed to move branch. The --after flag only makes sense when moving a commit to
 ┊●   d3e2ba3 add B
 ├╯
 ┊
-┴ 0dc3733 [origin/main] 2000-01-02 add M
+┴ 0dc3733 (common base) 2000-01-02 add M
 
 Hint: run `but help` for all commands
 

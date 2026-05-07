@@ -651,7 +651,7 @@ fn uncommit_command_with_discard_on_commit() -> anyhow::Result<()> {
 ┊│     d3:pl A B
 ├╯
 ┊
-┴ 0dc3733 [origin/main] 2000-01-02 add M
+┴ 0dc3733 (common base) 2000-01-02 add M
 
 Hint: run `but help` for all commands
 
@@ -695,7 +695,7 @@ Hint: run `but help` for all commands
 ┊│     d3:pl A B
 ├╯
 ┊
-┴ 0dc3733 [origin/main] 2000-01-02 add M
+┴ 0dc3733 (common base) 2000-01-02 add M
 
 Hint: run `but help` for all commands
 
@@ -735,7 +735,7 @@ fn uncommit_command_with_discard_on_committed_file() -> anyhow::Result<()> {
 ┊│     d3:pl A B
 ├╯
 ┊
-┴ 0dc3733 [origin/main] 2000-01-02 add M
+┴ 0dc3733 (common base) 2000-01-02 add M
 
 Hint: run `but help` for all commands
 
@@ -778,7 +778,7 @@ Hint: run `but help` for all commands
 ┊│     d3:pl A B
 ├╯
 ┊
-┴ 0dc3733 [origin/main] 2000-01-02 add M
+┴ 0dc3733 (common base) 2000-01-02 add M
 
 Hint: run `but help` for all commands
 
@@ -1457,7 +1457,7 @@ fn rub_commit_without_message_to_commit() -> anyhow::Result<()> {
 ┊●   9477ae7 add A
 ├╯
 ┊
-┴ 0dc3733 [origin/main] 2000-01-02 add M
+┴ 0dc3733 (common base) 2000-01-02 add M
 
 "#]]);
 
@@ -1475,7 +1475,7 @@ fn rub_commit_without_message_to_commit() -> anyhow::Result<()> {
 ┊●   9477ae7 add A
 ├╯
 ┊
-┴ 0dc3733 [origin/main] 2000-01-02 add M
+┴ 0dc3733 (common base) 2000-01-02 add M
 
 "#]]);
 
@@ -1492,7 +1492,7 @@ fn rub_commit_without_message_to_commit() -> anyhow::Result<()> {
 ┊●   9477ae7 add A
 ├╯
 ┊
-┴ 0dc3733 [origin/main] 2000-01-02 add M
+┴ 0dc3733 (common base) 2000-01-02 add M
 
 "#]]);
 

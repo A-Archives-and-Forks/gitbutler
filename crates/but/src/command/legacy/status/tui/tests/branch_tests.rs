@@ -90,10 +90,10 @@ fn focus_reload_preserves_merge_base_selection() {
         .assert_current_line_eq(str!["┊╭┄g0 [A]"]);
 
     tui.input_then_render((KeyModifiers::SHIFT, KeyCode::Char('J')))
-        .assert_current_line_eq(str!["┴ [..] [origin/main] 2000-01-02 add M"]);
+        .assert_current_line_eq(str!["┴ 0dc3733 (common base) 2000-01-02 add M"]);
 
     tui.render_with_messages(Some(Event::FocusGained), Vec::new())
-        .assert_current_line_eq(str!["┴ [..] [origin/main] 2000-01-02 add M"]);
+        .assert_current_line_eq(str!["┴ 0dc3733 (common base) 2000-01-02 add M"]);
 }
 
 #[test]
