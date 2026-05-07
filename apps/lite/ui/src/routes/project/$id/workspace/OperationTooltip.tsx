@@ -170,11 +170,11 @@ export const OperationTooltip: FC<
 		isActive && !!operationMode
 			? Match.value(operationMode).pipe(
 					Match.tags({
-						DragAndDrop: () => {
+						DragAndDrop: ({ operationType }) => {
 							const operation = getOperation({
 								source: operationMode.source,
 								target: operand,
-								operationType: operationModeToOperationType(operationMode),
+								operationType,
 							});
 							if (!operation) return null;
 
