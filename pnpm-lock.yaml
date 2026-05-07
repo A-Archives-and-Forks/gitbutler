@@ -323,6 +323,9 @@ importers:
       autoprefixer:
         specifier: ^10.4.27
         version: 10.4.27(postcss@8.5.10)
+      buildkite-test-collector:
+        specifier: ^1.9.5
+        version: 1.9.5
       cssnano:
         specifier: ^7.1.3
         version: 7.1.3(postcss@8.5.10)
@@ -635,6 +638,9 @@ importers:
       '@wdio/globals':
         specifier: ^9.26.1
         version: 9.27.0(expect-webdriverio@5.6.5)(webdriverio@9.27.0)
+      '@wdio/junit-reporter':
+        specifier: ^9.26.1
+        version: 9.27.1
       '@wdio/local-runner':
         specifier: ^9.26.1
         version: 9.27.0(@wdio/globals@9.27.0)(webdriverio@9.27.0)
@@ -647,6 +653,9 @@ importers:
       '@wdio/types':
         specifier: ^9.26.1
         version: 9.27.0
+      buildkite-test-collector:
+        specifier: ^1.9.5
+        version: 1.9.5
       wdio-video-reporter:
         specifier: ^6.0.0
         version: 6.2.0(expect-webdriverio@5.6.5)(webdriverio@9.27.0)
@@ -4873,6 +4882,10 @@ packages:
       expect-webdriverio: ^5.6.5
       webdriverio: ^9.0.0
 
+  '@wdio/junit-reporter@9.27.1':
+    resolution: {integrity: sha512-/JBQhkx9pzxpLbNBiwJ29FYD0Fqj0Hw35YmP1JJmulQVFwHBRoG/AjVNYM+epKJMLitXdEJ32Txc3HuPGVz/JA==}
+    engines: {node: '>=18.20.0'}
+
   '@wdio/local-runner@9.27.0':
     resolution: {integrity: sha512-0AqAbz1UhZ9e72ebqH4/B9/qOy0LVm3iOOYp16Rz2zkE5DOudLPPn3DpakafqW22Z7Q+Wb/23KRttPMrq0rOxw==}
     engines: {node: '>=18.20.0'}
@@ -4904,6 +4917,10 @@ packages:
     resolution: {integrity: sha512-JsazSrpdKrUEz0RkZcNzHHO9EaoJsWnjzi8Lk3hyI3e2T0M0d/EZTaYwLU+zZXr9VRJBulv8DhRfmBx+gbY2jw==}
     engines: {node: '>=18.20.0'}
 
+  '@wdio/reporter@9.27.1':
+    resolution: {integrity: sha512-2ueVjd5hOCclfC+GV3yhaN/4Tids1mXMcpPtNTPushHIQY4gLmBqqKDe5RSXAED3bNU+DRdHq2uBiZTBd4QDJg==}
+    engines: {node: '>=18.20.0'}
+
   '@wdio/runner@9.27.0':
     resolution: {integrity: sha512-PAuvuq0GaziutDXO8pZkUmca/qFGnGY2O3e4mQtqDUZbkyxYF4W68WJWhkvwuDAvN5GH1V+K/FBmiwL8m+roxw==}
     engines: {node: '>=18.20.0'}
@@ -4925,6 +4942,10 @@ packages:
 
   '@wdio/types@9.27.0':
     resolution: {integrity: sha512-DQJ+OdRBqUBcQ30DN2Z651hEVh3OoxnlDUSRqlWy9An2AY6v9rYWTj825B6zsj5pLLEToYO1tfwWq0ab183pXg==}
+    engines: {node: '>=18.20.0'}
+
+  '@wdio/types@9.27.1':
+    resolution: {integrity: sha512-EHBNCvLmvpYerln4mb/OBxzKtnavL2wdenjhwuYjzkZMOWHgm/uLXH6sLThM0y6DIbCU72Asth16fo1eDcsofA==}
     engines: {node: '>=18.20.0'}
 
   '@wdio/utils@9.27.0':
@@ -5305,6 +5326,10 @@ packages:
 
   builder-util@26.9.0:
     resolution: {integrity: sha512-+eocmbdisnyb40B9nAp/KREfYLXvGagxV50KZv/Zh4aflsr1fdY9Qxs6QG1Jtx1vH5d5NQ3hIcemUi4RSlFK/Q==}
+
+  buildkite-test-collector@1.9.5:
+    resolution: {integrity: sha512-xb1jLDKDEAI/FfJ2X/br2SfJviI7kH5PqPLn1PC5F+XRA95d0IxN7EcUH6PsEt21nZmmXFohyl4JpWRz8cCAeg==}
+    engines: {npm: '>=7.0.0'}
 
   bundle-name@4.1.0:
     resolution: {integrity: sha512-tjwM5exMg6BGRI+kNmTntNsvdZS1X8BFYS6tnJ2hdH0kVxM6/eVZ2xy+FqStSWvYmtfFMDLIxurorHwDKfDz5Q==}
@@ -6963,6 +6988,10 @@ packages:
   jszip@3.10.1:
     resolution: {integrity: sha512-xXDvecyTpGLrqFrvkrUSoxxfJI5AH7U8zxxtVclpsUtMCq4JQ290LY8AW5c7Ggnr/Y/oK+bQMbqK2qmtk3pN4g==}
 
+  junit-report-builder@5.1.2:
+    resolution: {integrity: sha512-HzvLbEQcoqN2LmGnloShxu2hLadi/rkOTU3zt61UeMICLS0wGDvbf8neIi6+bGkxMnAePIcFMFnbqV+r6YvwxA==}
+    engines: {node: '>=16'}
+
   junk@4.0.1:
     resolution: {integrity: sha512-Qush0uP+G8ZScpGMZvHUiRfI0YBWuB3gVBYlI0v0vvOJt5FLicco+IkP0a50LqTTQhmts/m6tP5SWE+USyIvcQ==}
     engines: {node: '>=12.20'}
@@ -7179,6 +7208,10 @@ packages:
 
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
+
+  make-dir@3.1.0:
+    resolution: {integrity: sha512-g3FeP20LNwhALb/6Cz6Dd4F2ngze0jz7tbzrD2wAV+o9FeNHe4rL+yK2md0J/fiSf1sa1ADhXqi5+oVwOM/eGw==}
+    engines: {node: '>=8'}
 
   make-error@1.3.6:
     resolution: {integrity: sha512-s8UhlNe7vPKomQhC1qFelMokr/Sc3AgNbso3n74mVPA5LTZwkB9NlXf4XPamLxJE8h0gh73rM94xvwRT2CVInw==}
@@ -7412,6 +7445,9 @@ packages:
 
   module-details-from-path@1.0.4:
     resolution: {integrity: sha512-EGWKgxALGMgzvxYF1UyGTy0HXX/2vHLkw6+NvDKW2jypWbHpjQuj4UMcqQWXHERJhVGKikolT06G3bcKe4fi7w==}
+
+  monkeypatch@1.0.0:
+    resolution: {integrity: sha512-6tG0IrCUUIBuAspnbdmOAd+D/AptB/ya9JLujp88NIAuFuTGdGvCKtDkc6pwNOcIJ6nKLm3FjJlaCdx8vr3r2w==}
 
   mri@1.2.0:
     resolution: {integrity: sha512-tzzskb3bG8LvYGFF/mDTpq3jpI6Q9wc3LEmBaghu+DdCssd1FakN7Bc0hVNmEyGq1bq3RgfkCb3cmQLpNPOroA==}
@@ -8319,6 +8355,9 @@ packages:
 
   remark-stringify@11.0.0:
     resolution: {integrity: sha512-1OSmLd3awB/t8qdoEOMazZkNsfVTeY4fTsgzcQFdXNq8ToTN4ZGwrMnlda4K6smTFKD+GRV6O48i6Z4iKgPPpw==}
+
+  request-spy@0.0.10:
+    resolution: {integrity: sha512-va+4vLamK9Pwu/WJnJrQcTjCjYdIcl0KDKOKEkfvNmer4f+K+OhgbpU4DCiPyzBGnTpYXbrVLrnD8O5fS/cmKA==}
 
   require-directory@2.1.1:
     resolution: {integrity: sha512-fGxEI7+wsG9xrvdjsrlmL22OMTTiHRwAMroiEeMgq8gzoLC/PQr7RsRDSTLUg/bZAZtF+TVIkHc6/4RIKrui+Q==}
@@ -9273,6 +9312,11 @@ packages:
 
   util@0.10.4:
     resolution: {integrity: sha512-0Pm9hTQ3se5ll1XihRic3FDIku70C+iHUdT/W926rSgHV5QgXsYbKZN8MSC3tJtSkhuROzvsQjAaFENRXr+19A==}
+
+  uuid@8.3.2:
+    resolution: {integrity: sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==}
+    deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+    hasBin: true
 
   uuid@9.0.1:
     resolution: {integrity: sha512-b+1eJOlsR9K8HJpow9Ok3fiWOWSIcIzXodvv0rQjVoOVNpWMpxf1wZNpt4y9h10odCNrqnYp1OBzRktckBe3sA==}
@@ -13745,6 +13789,13 @@ snapshots:
       expect-webdriverio: 5.6.5(@wdio/globals@9.27.0)(@wdio/logger@9.18.0)(webdriverio@9.27.0)
       webdriverio: 9.27.0
 
+  '@wdio/junit-reporter@9.27.1':
+    dependencies:
+      '@wdio/reporter': 9.27.1
+      '@wdio/types': 9.27.1
+      json-stringify-safe: 5.0.1
+      junit-report-builder: 5.1.2
+
   '@wdio/local-runner@9.27.0(@wdio/globals@9.27.0)(webdriverio@9.27.0)':
     dependencies:
       '@types/node': 20.19.37
@@ -13819,6 +13870,14 @@ snapshots:
       diff: 8.0.3
       object-inspect: 1.13.4
 
+  '@wdio/reporter@9.27.1':
+    dependencies:
+      '@types/node': 20.19.37
+      '@wdio/logger': 9.18.0
+      '@wdio/types': 9.27.1
+      diff: 8.0.3
+      object-inspect: 1.13.4
+
   '@wdio/runner@9.27.0(expect-webdriverio@5.6.5)(webdriverio@9.27.0)':
     dependencies:
       '@types/node': 20.19.37
@@ -13857,6 +13916,10 @@ snapshots:
       '@types/node': 20.19.37
 
   '@wdio/types@9.27.0':
+    dependencies:
+      '@types/node': 20.19.37
+
+  '@wdio/types@9.27.1':
     dependencies:
       '@types/node': 20.19.37
 
@@ -14354,6 +14417,16 @@ snapshots:
       tiny-async-pool: 1.3.0
     transitivePeerDependencies:
       - supports-color
+
+  buildkite-test-collector@1.9.5:
+    dependencies:
+      axios: 1.13.5
+      dotenv: 16.6.1
+      request-spy: 0.0.10
+      strip-ansi: 6.0.1
+      uuid: 8.3.2
+    transitivePeerDependencies:
+      - debug
 
   bundle-name@4.1.0:
     dependencies:
@@ -16272,8 +16345,7 @@ snapshots:
 
   json-stable-stringify-without-jsonify@1.0.1: {}
 
-  json-stringify-safe@5.0.1:
-    optional: true
+  json-stringify-safe@5.0.1: {}
 
   json5@2.2.3: {}
 
@@ -16293,6 +16365,12 @@ snapshots:
       pako: 1.0.11
       readable-stream: 2.3.8
       setimmediate: 1.0.5
+
+  junit-report-builder@5.1.2:
+    dependencies:
+      lodash: 4.17.23
+      make-dir: 3.1.0
+      xmlbuilder: 15.1.1
 
   junk@4.0.1: {}
 
@@ -16498,6 +16576,10 @@ snapshots:
   magic-string@0.30.21:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
+
+  make-dir@3.1.0:
+    dependencies:
+      semver: 6.3.1
 
   make-error@1.3.6: {}
 
@@ -16908,6 +16990,8 @@ snapshots:
   modern-tar@0.7.2: {}
 
   module-details-from-path@1.0.4: {}
+
+  monkeypatch@1.0.0: {}
 
   mri@1.2.0: {}
 
@@ -17849,6 +17933,10 @@ snapshots:
       '@types/mdast': 4.0.4
       mdast-util-to-markdown: 2.1.2
       unified: 11.0.5
+
+  request-spy@0.0.10:
+    dependencies:
+      monkeypatch: 1.0.0
 
   require-directory@2.1.1: {}
 
@@ -18878,6 +18966,8 @@ snapshots:
   util@0.10.4:
     dependencies:
       inherits: 2.0.3
+
+  uuid@8.3.2: {}
 
   uuid@9.0.1: {}
 

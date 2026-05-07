@@ -75,6 +75,8 @@ export default defineConfig({
 		exclude: ["node_modules/**/*", "e2e/**/*"],
 		environment: "jsdom",
 		setupFiles: ["./vitest-setup.js"],
+		reporters: process.env.CI ? ["default", "buildkite-test-collector/vitest/reporter"] : "default",
+		includeTaskLocation: true,
 	},
 	preview: {
 		// preview port for the e2e tests
