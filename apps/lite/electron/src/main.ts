@@ -79,6 +79,30 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDirPath = path.dirname(currentFilePath);
 
+// Permissions in this array are allowed by default for trusted origins, without prompting the user for input.
+const trustedOriginDefaultPermissions: Array<
+	| "clipboard-read"
+	| "clipboard-sanitized-write"
+	| "display-capture"
+	| "fullscreen"
+	| "geolocation"
+	| "idle-detection"
+	| "media"
+	| "mediaKeySystem"
+	| "midi"
+	| "midiSysex"
+	| "notifications"
+	| "pointerLock"
+	| "keyboardLock"
+	| "openExternal"
+	| "speaker-selection"
+	| "storage-access"
+	| "top-level-storage-access"
+	| "window-management"
+	| "unknown"
+	| "fileSystem"
+> = ["clipboard-sanitized-write"] as const;
+
 const liteProtocolScheme = "lite";
 const liteProtocolHost = "app";
 const contentRootURL = pathToFileURL(path.join(currentDirPath, "../ui"));
@@ -478,6 +502,16 @@ void app.whenReady().then(async () => {
 			});
 		});
 	}
+
+	session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+		const url = newUrlOrNull(webContents.getURL());
+		if (isTrustedLocalOrigin(url) && trustedOriginDefaultPermissions.includes(permission))
+			return callback(true);
+
+		// oxlint-disable-next-line no-console
+		console.error(`Blocked permission request for ${permission} from ${url?.href ?? "<unknown>"}`);
+		return callback(false);
+	});
 
 	registerIpcHandlers();
 	await createMainWindow();
