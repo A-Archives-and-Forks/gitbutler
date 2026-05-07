@@ -162,6 +162,7 @@
 			case "UpdateWorkspaceBase":
 				return { text: "Update workspace base", icon: "refresh" };
 			case "RestoreFromSnapshot":
+			case "RestoreFromSnapshotViaUndo":
 				return { text: "Revert snapshot" };
 			case "OnDemandSnapshot":
 				return {
@@ -175,7 +176,11 @@
 		}
 	}
 
-	const isRestoreSnapshot = untrack(() => entry.details?.operation === "RestoreFromSnapshot");
+	const isRestoreSnapshot = untrack(
+		() =>
+			entry.details?.operation === "RestoreFromSnapshot" ||
+			entry.details?.operation === "RestoreFromSnapshotViaUndo",
+	);
 	const error = untrack(() => entry.details?.trailers.find((t) => t.key === "error")?.value);
 
 	const operation = mapOperation(untrack(() => entry.details));

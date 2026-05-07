@@ -26,13 +26,14 @@ use tracing::instrument;
 
 /// List snapshots in the oplog.
 ///
-/// - `project_id`: The ID of the project to list snapshots for.
 /// - `limit`: Maximum number of snapshots to return.
-/// - `sha`: Optional SHA to filter snapshots starting from a specific commit.
+/// - `sha`: Optional SHA to filter snapshots starting after a specific commit.
 /// - `exclude_kind`: Optional list of operation kinds to exclude from the results.
 /// - `include_kind`: Optional list of operation kinds to include (if set, only these kinds are returned).
 ///
 /// Returns a vector of `Snapshot` entries.
+///
+/// Prefer using [`snapshots_iter`] if possible.
 ///
 /// # Errors
 /// Returns an error if the project cannot be found or if there is an issue accessing the oplog.
@@ -45,9 +46,77 @@ pub fn list_snapshots(
     exclude_kind: Option<Vec<OperationKind>>,
     include_kind: Option<Vec<OperationKind>>,
 ) -> Result<Vec<Snapshot>> {
-    let snapshots =
-        ctx.list_snapshots(limit, sha, exclude_kind.unwrap_or_default(), include_kind)?;
+    let snapshots = ctx
+        .snapshots_iter(sha, exclude_kind.unwrap_or_default(), include_kind)?
+        .take(limit)
+        .collect::<anyhow::Result<Vec<_>>>()?;
     Ok(snapshots)
+}
+
+/// Iterate snapshots in the oplog.
+///
+/// - `sha`: Optional SHA to filter snapshots starting after a specific commit.
+/// - `exclude_kind`: Optional list of operation kinds to exclude from the results.
+/// - `include_kind`: Optional list of operation kinds to include (if set, only these kinds are returned).
+///
+/// Returns an iterator of `Snapshot` entries.
+///
+/// # Errors
+/// Returns an error if the project cannot be found or if there is an issue accessing the oplog.
+#[instrument(err(Debug))]
+pub fn snapshots_iter(
+    ctx: &but_ctx::Context,
+    sha: Option<gix::ObjectId>,
+    exclude_kind: Option<Vec<OperationKind>>,
+    include_kind: Option<Vec<OperationKind>>,
+) -> Result<impl Iterator<Item = Result<Snapshot>>> {
+    ctx.snapshots_iter(sha, exclude_kind.unwrap_or_default(), include_kind)
+}
+
+/// Get the snapshot that an undo operation should restore to.
+///
+/// This handles multiple consecutive undos by walking backwards in the oplog.
+#[but_api]
+#[instrument(err(Debug))]
+pub fn get_undo_target_snapshot(ctx: &but_ctx::Context) -> Result<Option<Snapshot>> {
+    // Undo snapshots are bookkeeping entries, not operations we should restore to directly. Walk
+    // newest-to-oldest and let each undo entry cancel one older real operation.
+    //
+    // This handles both repeated undos:
+    //
+    //     [UNDO]   <- skip one real operation
+    //     [UNDO]   <- skip one real operation
+    //     [REWORD] <- skipped
+    //     [REWORD] <- skipped
+    //     [REWORD] <- target
+    //
+    // And a new operation after an undo:
+    //
+    //     [UNDO]   <- skip one real operation
+    //     [REWORD] <- skipped
+    //     [UNDO]   <- skip one more real operation, not a valid target itself
+    //     [REWORD] <- skipped
+    //     [REWORD] <- target
+    let snapshots = ctx.snapshots_iter(None, Vec::new(), None)?;
+    let mut real_operations_to_skip = 0_usize;
+
+    for snapshot in snapshots {
+        let snapshot = snapshot?;
+
+        if snapshot.details.as_ref().is_some_and(|details| {
+            matches!(details.operation, OperationKind::RestoreFromSnapshotViaUndo)
+        }) {
+            real_operations_to_skip += 1;
+            continue;
+        }
+
+        if real_operations_to_skip == 0 {
+            return Ok(Some(snapshot));
+        }
+        real_operations_to_skip -= 1;
+    }
+
+    Ok(None)
 }
 
 /// Gets a specific snapshot by its commit SHA.
@@ -88,6 +157,8 @@ pub fn create_snapshot(
     Ok(oid)
 }
 
+pub use gitbutler_oplog::RestoreKind;
+
 /// Restores the project to a specific snapshot. This operation also creates a new snapshot in the oplog.
 ///
 /// - `project_id`: The ID of the project to restore.
@@ -103,8 +174,19 @@ pub fn create_snapshot(
 #[but_api]
 #[instrument(err(Debug))]
 pub fn restore_snapshot(ctx: &mut but_ctx::Context, sha: gix::ObjectId) -> Result<()> {
+    restore_snapshot_with_kind(ctx, RestoreKind::ExplicitRestoreFromSnapshot, sha)
+}
+
+/// Restores the project to a specific snapshot using a specific kind of restore. This operation
+/// also creates a new snapshot in the oplog.
+#[instrument(err(Debug))]
+pub fn restore_snapshot_with_kind(
+    ctx: &mut but_ctx::Context,
+    restore_kind: RestoreKind,
+    sha: gix::ObjectId,
+) -> Result<()> {
     let mut guard = ctx.exclusive_worktree_access();
-    ctx.restore_snapshot(sha, guard.write_permission())?;
+    ctx.restore_snapshot(sha, restore_kind, guard.write_permission())?;
     Ok(())
 }
 

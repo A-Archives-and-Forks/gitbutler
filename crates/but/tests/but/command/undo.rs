@@ -54,6 +54,24 @@ where
     Ok(())
 }
 
+#[track_caller]
+fn reword(
+    env: &Sandbox,
+    commit_before: &str,
+    commit_after: &str,
+    new_message: &str,
+) -> anyhow::Result<std::process::Output> {
+    env.but("reword")
+        .args([commit_before, "-m", new_message])
+        .assert()
+        .success()
+        .stdout_eq(format!(
+            "Updated commit message for {commit_before} (now {commit_after})\n"
+        ))
+        .stderr_eq("");
+    Ok(env.but("status").output()?)
+}
+
 #[test]
 fn can_undo_discard() -> anyhow::Result<()> {
     let env = Sandbox::init_scenario_with_target_and_default_settings("one-stack")?;
@@ -170,6 +188,386 @@ fn can_undo_rewording_branch() -> anyhow::Result<()> {
 
         Ok(())
     })?;
+
+    Ok(())
+}
+
+#[test]
+fn can_undo_repeatedly() -> anyhow::Result<()> {
+    let env = Sandbox::init_scenario_with_target_and_default_settings("one-stack-two-commits")?;
+    env.setup_metadata(&["A"])?;
+
+    let status_one = reword(&env, "9ac4652", "9f9095e", "one")?;
+    let status_two = reword(&env, "9f9095e", "baa6a31", "two")?;
+    let status_three = reword(&env, "baa6a31", "a1fa8e0", "three")?;
+    reword(&env, "a1fa8e0", "c5d642c", "four")?;
+
+    env.but("oplog")
+        .args(["list"])
+        .assert()
+        .success()
+        .stdout_eq(
+            r#"Operations History
+──────────────────────────────────────────────────
+74dbb64 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+d3394b6 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+850a5fa 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+7665ea7 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+"#,
+        );
+
+    env.but("undo").assert().success().stdout_eq(
+        r#"Undoing operation...
+  Reverting to: UpdateCommitMessage (2000-01-02 00:00:00)
+✓ Undo completed successfully! Restored to snapshot: 74dbb64
+"#,
+    );
+    env.but("status")
+        .assert()
+        .success()
+        .stdout_eq(status_three.stdout)
+        .stderr_eq(status_three.stderr);
+
+    env.but("oplog")
+        .args(["list"])
+        .assert()
+        .success()
+        .stdout_eq(
+            r#"Operations History
+──────────────────────────────────────────────────
+a68383b 2000-01-02 00:00:00 [UNDO] Restored from snapshot
+74dbb64 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+d3394b6 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+850a5fa 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+7665ea7 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+"#,
+        );
+
+    env.but("undo").assert().success().stdout_eq(
+        r#"Undoing operation...
+  Reverting to: UpdateCommitMessage (2000-01-02 00:00:00)
+✓ Undo completed successfully! Restored to snapshot: d3394b6
+"#,
+    );
+    env.but("status")
+        .assert()
+        .success()
+        .stdout_eq(status_two.stdout)
+        .stderr_eq(status_two.stderr);
+
+    env.but("oplog")
+        .args(["list"])
+        .assert()
+        .success()
+        .stdout_eq(
+            r#"Operations History
+──────────────────────────────────────────────────
+4852c7f 2000-01-02 00:00:00 [UNDO] Restored from snapshot
+a68383b 2000-01-02 00:00:00 [UNDO] Restored from snapshot
+74dbb64 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+d3394b6 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+850a5fa 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+7665ea7 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+"#,
+        );
+
+    env.but("undo").assert().success().stdout_eq(
+        r#"Undoing operation...
+  Reverting to: UpdateCommitMessage (2000-01-02 00:00:00)
+✓ Undo completed successfully! Restored to snapshot: 850a5fa
+"#,
+    );
+    env.but("status")
+        .assert()
+        .success()
+        .stdout_eq(status_one.stdout)
+        .stderr_eq(status_one.stderr);
+
+    env.but("oplog")
+        .args(["list"])
+        .assert()
+        .success()
+        .stdout_eq(
+            r#"Operations History
+──────────────────────────────────────────────────
+0fabcd0 2000-01-02 00:00:00 [UNDO] Restored from snapshot
+4852c7f 2000-01-02 00:00:00 [UNDO] Restored from snapshot
+a68383b 2000-01-02 00:00:00 [UNDO] Restored from snapshot
+74dbb64 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+d3394b6 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+850a5fa 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+7665ea7 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+"#,
+        );
+
+    Ok(())
+}
+
+#[test]
+fn can_undo_explicit_restore() -> anyhow::Result<()> {
+    let env = Sandbox::init_scenario_with_target_and_default_settings("one-stack-two-commits")?;
+    env.setup_metadata(&["A"])?;
+
+    reword(&env, "9ac4652", "9f9095e", "one")?;
+    let status_two = reword(&env, "9f9095e", "baa6a31", "two")?;
+    reword(&env, "baa6a31", "a1fa8e0", "three")?;
+    let status_four = reword(&env, "a1fa8e0", "c5d642c", "four")?;
+
+    env.but("oplog")
+        .args(["list"])
+        .assert()
+        .success()
+        .stdout_eq(
+            r#"Operations History
+──────────────────────────────────────────────────
+74dbb64 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+d3394b6 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+850a5fa 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+7665ea7 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+"#,
+        );
+
+    env.but("oplog")
+        .args(["restore", "d3394b6"])
+        .assert()
+        .success()
+        .stdout_eq(
+            r#"
+✓ Restore completed successfully!
+
+Workspace has been restored to the selected snapshot.
+"#,
+        );
+    env.but("status")
+        .assert()
+        .success()
+        .stdout_eq(status_two.stdout.clone())
+        .stderr_eq(status_two.stderr.clone());
+
+    env.but("oplog")
+        .args(["list"])
+        .assert()
+        .success()
+        .stdout_eq(
+            r#"Operations History
+──────────────────────────────────────────────────
+fb3fac3 2000-01-02 00:00:00 [RESTORE] Restored from snapshot
+74dbb64 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+d3394b6 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+850a5fa 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+7665ea7 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+"#,
+        );
+
+    env.but("undo").assert().success().stdout_eq(
+        r#"Undoing operation...
+  Reverting to: Restored from snapshot (2000-01-02 00:00:00)
+✓ Undo completed successfully! Restored to snapshot: fb3fac3
+"#,
+    );
+
+    env.but("status")
+        .assert()
+        .success()
+        .stdout_eq(status_four.stdout)
+        .stderr_eq(status_four.stderr);
+
+    env.but("oplog")
+        .args(["list"])
+        .assert()
+        .success()
+        .stdout_eq(
+            r#"Operations History
+──────────────────────────────────────────────────
+d363393 2000-01-02 00:00:00 [UNDO] Restored from snapshot
+fb3fac3 2000-01-02 00:00:00 [RESTORE] Restored from snapshot
+74dbb64 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+d3394b6 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+850a5fa 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+7665ea7 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+"#,
+        );
+
+    Ok(())
+}
+
+#[test]
+fn can_undo_perform_operation_then_undo_again() -> anyhow::Result<()> {
+    let env = Sandbox::init_scenario_with_target_and_default_settings("one-stack-two-commits")?;
+    env.setup_metadata(&["A"])?;
+
+    reword(&env, "9ac4652", "9f9095e", "one")?;
+    let status_two = reword(&env, "9f9095e", "baa6a31", "two")?;
+    let status_three = reword(&env, "baa6a31", "a1fa8e0", "three")?;
+    reword(&env, "a1fa8e0", "c5d642c", "four")?;
+
+    env.but("oplog")
+        .args(["list"])
+        .assert()
+        .success()
+        .stdout_eq(
+            r#"Operations History
+──────────────────────────────────────────────────
+74dbb64 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+d3394b6 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+850a5fa 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+7665ea7 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+"#,
+        );
+
+    env.but("undo").assert().success().stdout_eq(
+        r#"Undoing operation...
+  Reverting to: UpdateCommitMessage (2000-01-02 00:00:00)
+✓ Undo completed successfully! Restored to snapshot: 74dbb64
+"#,
+    );
+    env.but("status")
+        .assert()
+        .success()
+        .stdout_eq(status_three.stdout.clone())
+        .stderr_eq(status_three.stderr.clone());
+
+    reword(&env, "a1fa8e0", "022806e", "three-new")?;
+
+    env.but("oplog")
+        .args(["list"])
+        .assert()
+        .success()
+        .stdout_eq(
+            r#"Operations History
+──────────────────────────────────────────────────
+944fd88 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+a68383b 2000-01-02 00:00:00 [UNDO] Restored from snapshot
+74dbb64 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+d3394b6 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+850a5fa 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+7665ea7 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+"#,
+        );
+
+    env.but("undo").assert().success().stdout_eq(
+        r#"Undoing operation...
+  Reverting to: UpdateCommitMessage (2000-01-02 00:00:00)
+✓ Undo completed successfully! Restored to snapshot: 944fd88
+"#,
+    );
+    env.but("status")
+        .assert()
+        .success()
+        .stdout_eq(status_three.stdout.clone())
+        .stderr_eq(status_three.stderr);
+
+    env.but("oplog")
+        .args(["list"])
+        .assert()
+        .success()
+        .stdout_eq(
+            r#"Operations History
+──────────────────────────────────────────────────
+b31b8c7 2000-01-02 00:00:00 [UNDO] Restored from snapshot
+944fd88 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+a68383b 2000-01-02 00:00:00 [UNDO] Restored from snapshot
+74dbb64 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+d3394b6 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+850a5fa 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+7665ea7 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+"#,
+        );
+
+    env.but("undo").assert().success().stdout_eq(
+        r#"Undoing operation...
+  Reverting to: UpdateCommitMessage (2000-01-02 00:00:00)
+✓ Undo completed successfully! Restored to snapshot: d3394b6
+"#,
+    );
+
+    env.but("status")
+        .assert()
+        .success()
+        .stdout_eq(status_two.stdout.clone())
+        .stderr_eq(status_two.stderr.clone());
+
+    Ok(())
+}
+
+#[test]
+fn undoing_past_end_of_oplog() -> anyhow::Result<()> {
+    let env = Sandbox::init_scenario_with_target_and_default_settings("one-stack-two-commits")?;
+    env.setup_metadata(&["A"])?;
+
+    let status_zero = env.but("status").output()?;
+    let status_one = reword(&env, "9ac4652", "9f9095e", "one")?;
+    reword(&env, "9f9095e", "baa6a31", "two")?;
+
+    env.but("oplog")
+        .args(["list"])
+        .assert()
+        .success()
+        .stdout_eq(
+            r#"Operations History
+──────────────────────────────────────────────────
+850a5fa 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+7665ea7 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+"#,
+        );
+
+    env.but("undo").assert().success().stdout_eq(
+        r#"Undoing operation...
+  Reverting to: UpdateCommitMessage (2000-01-02 00:00:00)
+✓ Undo completed successfully! Restored to snapshot: 850a5fa
+"#,
+    );
+
+    env.but("status")
+        .assert()
+        .success()
+        .stdout_eq(status_one.stdout.clone())
+        .stderr_eq(status_one.stderr.clone());
+
+    env.but("oplog")
+        .args(["list"])
+        .assert()
+        .success()
+        .stdout_eq(
+            r#"Operations History
+──────────────────────────────────────────────────
+cace4c0 2000-01-02 00:00:00 [UNDO] Restored from snapshot
+850a5fa 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+7665ea7 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+"#,
+        );
+
+    env.but("undo").assert().success().stdout_eq(
+        r#"Undoing operation...
+  Reverting to: UpdateCommitMessage (2000-01-02 00:00:00)
+✓ Undo completed successfully! Restored to snapshot: 7665ea7
+"#,
+    );
+
+    env.but("oplog")
+        .args(["list"])
+        .assert()
+        .success()
+        .stdout_eq(
+            r#"Operations History
+──────────────────────────────────────────────────
+5cc4a31 2000-01-02 00:00:00 [UNDO] Restored from snapshot
+cace4c0 2000-01-02 00:00:00 [UNDO] Restored from snapshot
+850a5fa 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+7665ea7 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
+"#,
+        );
+
+    env.but("status")
+        .assert()
+        .success()
+        .stdout_eq(status_zero.stdout.clone())
+        .stderr_eq(status_zero.stderr.clone());
+
+    env.but("undo").assert().success().stdout_eq(
+        r#"No previous operations to undo.
+"#,
+    );
 
     Ok(())
 }

@@ -22,7 +22,6 @@ use gix::{
     ObjectId,
     bstr::{BString, ByteSlice, ByteVec},
     object::tree::EntryKind,
-    prelude::ObjectIdExt,
 };
 use tracing::instrument;
 
@@ -67,7 +66,7 @@ pub trait OplogExt {
     /// which yielded the `snapshot_tree_id` for the entire snapshot state.
     /// Use `details` to provide metadata about the snapshot.
     ///
-    /// Committing it makes the snapshot discoverable in [`list_snapshots`](Self::list_snapshots) as well as
+    /// Committing it makes the snapshot discoverable in [`snapshots_iter`](Self::snapshots_iter) as well as
     /// restorable with [`restore_snapshot`](Self::restore_snapshot).
     ///
     /// Returns `Some(snapshot_commit_id)` if it was created or `None` if nothing changed between the previous oplog
@@ -93,23 +92,22 @@ pub trait OplogExt {
         perm: &mut RepoExclusive,
     ) -> Result<gix::ObjectId>;
 
-    /// Lists the snapshots that have been created for the given repository, up to the given limit,
-    /// and with the most recent snapshot first, and at the end of the vec.
+    /// Returns an iterator over snapshots, with the most recent snapshot first.
     ///
-    /// Use `oplog_commit_id` if the traversal root for snapshot discovery should be the specified commit, which
-    /// is usually obtained from a previous iteration. Useful along with `limit` to allow starting where the iteration
-    /// left off. Note that the `oplog_commit_id` is always returned as first item in the result vec.
+    /// Use `oplog_commit_id` if the traversal root for snapshot discovery should be the specified
+    /// commit, which is usually obtained from a previous iteration. The iterator starts after the
+    /// provided `oplog_commit_id`, making it useful as a pagination cursor.
     ///
-    /// An alternative way of retrieving the snapshots would be to manually the oplog head `git log <oplog_head>` available in `.git/gitbutler/operations-log.toml`.
+    /// An alternative way of retrieving the snapshots would be to manually inspect the oplog head
+    /// using `git log <oplog_head>` available in `.git/gitbutler/operations-log.toml`.
     ///
-    /// If there are no snapshots, an empty list is returned.
-    fn list_snapshots(
+    /// If there are no snapshots, an empty iterator is returned.
+    fn snapshots_iter(
         &self,
-        limit: usize,
         oplog_commit_id: Option<gix::ObjectId>,
         exclude_kind: Vec<OperationKind>,
         include_kind: Option<Vec<OperationKind>>,
-    ) -> Result<Vec<Snapshot>>;
+    ) -> Result<impl Iterator<Item = Result<Snapshot>>>;
 
     /// Reverts to a previous state of the working directory, virtual branches and commits.
     /// The provided `snapshot_commit_id` must refer to a valid snapshot commit, as returned by [`create_snapshot`](Self::create_snapshot).
@@ -125,6 +123,7 @@ pub trait OplogExt {
     fn restore_snapshot(
         &self,
         snapshot_commit_id: gix::ObjectId,
+        restore_kind: RestoreKind,
         guard: &mut RepoExclusive,
     ) -> Result<gix::ObjectId>;
 
@@ -195,96 +194,38 @@ impl OplogExt for Context {
     }
 
     #[instrument(skip(self), err(Debug))]
-    fn list_snapshots(
+    fn snapshots_iter(
         &self,
-        limit: usize,
         oplog_commit_id: Option<gix::ObjectId>,
         exclude_kind: Vec<OperationKind>,
         include_kind: Option<Vec<OperationKind>>,
-    ) -> Result<Vec<Snapshot>> {
-        let repo = self.repo.get()?;
-        let traversal_root_id = match oplog_commit_id {
-            Some(id) => id,
+    ) -> Result<impl Iterator<Item = Result<Snapshot>>> {
+        let repo = self.repo.get()?.clone();
+        let next_commit_id = match oplog_commit_id {
+            Some(id) => Some(id),
             None => {
                 let oplog_state = OplogHandle::new(&self.project_data_dir());
-                if let Some(id) = oplog_state.oplog_head()? {
-                    id
-                } else {
-                    return Ok(vec![]);
-                }
+                oplog_state.oplog_head()?
             }
-        }
-        .attach(&repo);
+        };
 
-        let mut snapshots = Vec::new();
-
-        for commit_info in traversal_root_id.ancestors().all()? {
-            if snapshots.len() == limit {
-                break;
-            }
-            let commit_id = commit_info?.id();
-            if oplog_commit_id.is_some() && commit_id == traversal_root_id {
-                continue;
-            }
-            let commit = commit_id.object()?.into_commit();
-            let mut parents = commit.parent_ids();
-            let (first_parent, second_parent) = (parents.next(), parents.next());
-            if second_parent.is_some() {
-                break;
-            }
-
-            let tree = commit.tree()?;
-            if tree
-                .lookup_entry_by_path("virtual_branches.toml")?
-                .is_none()
-            {
-                // We reached a tree that is not a snapshot
-                tracing::warn!("Commit {commit_id} didn't seem to be an oplog commit - skipping");
-                continue;
-            }
-
-            let details = commit
-                .message_raw()?
-                .to_str()
-                .ok()
-                .and_then(|msg| SnapshotDetails::from_str(msg).ok());
-            let commit_time = commit.time()?;
-            if let Some(details) = &details {
-                // Skip if this kind is excluded
-                if exclude_kind.contains(&details.operation) {
-                    continue;
-                }
-                // Skip if include filter is set and this kind is not included
-                if let Some(ref include) = include_kind
-                    && !include.contains(&details.operation)
-                {
-                    continue;
-                }
-            } else if include_kind.is_some() {
-                // If we require specific kinds but have no details, skip
-                continue;
-            }
-
-            snapshots.push(Snapshot {
-                commit_id: commit_id.detach(),
-                details,
-                created_at: commit_time,
-            });
-            if first_parent.is_none() {
-                break;
-            }
-        }
-
-        Ok(snapshots)
+        Ok(SnapshotIter {
+            repo,
+            next_commit_id,
+            skip_initial_commit: oplog_commit_id.is_some(),
+            exclude_kind,
+            include_kind,
+        })
     }
 
     fn restore_snapshot(
         &self,
         snapshot_commit_id: gix::ObjectId,
+        restore_kind: RestoreKind,
         guard: &mut RepoExclusive,
     ) -> Result<gix::ObjectId> {
         // let mut guard = self.exclusive_worktree_access();
-        restore_snapshot(self, snapshot_commit_id, guard)
+        restore_snapshot(self, snapshot_commit_id, restore_kind, guard)
     }
 
     fn snapshot_diff(
@@ -718,9 +659,23 @@ fn commit_snapshot(
     Ok(snapshot_commit_id)
 }
 
+/// The kind of restore to perform.
+#[derive(Debug, Copy, Clone, serde::Serialize, serde::Deserialize)]
+pub enum RestoreKind {
+    /// An explicit restore that restores to a specific point in the oplog.
+    ///
+    /// Used by `but oplog restore` among others.
+    ExplicitRestoreFromSnapshot,
+    /// An implicit restore that simply restores the previous snapshot.
+    ///
+    /// Used by `but undo` among others.
+    RestoreFromSnapshotViaUndo,
+}
+
 fn restore_snapshot(
     ctx: &Context,
     snapshot_commit_id: gix::ObjectId,
+    restore_kind: RestoreKind,
     exclusive_access: &mut RepoExclusive,
 ) -> Result<gix::ObjectId> {
     // Use a separate repo without caching so we are sure the 'has commit' checks pick up all changes.
@@ -855,9 +810,13 @@ fn restore_snapshot(
     // create new snapshot
     let before_restore_snapshot_tree_id = before_restore_snapshot_result?;
     let restored_date_ms = snapshot_commit.time()?.seconds * 1000;
+    let operation = match restore_kind {
+        RestoreKind::RestoreFromSnapshotViaUndo => OperationKind::RestoreFromSnapshotViaUndo,
+        RestoreKind::ExplicitRestoreFromSnapshot => OperationKind::RestoreFromSnapshot,
+    };
     let details = SnapshotDetails {
         version: Default::default(),
-        operation: OperationKind::RestoreFromSnapshot,
+        operation,
         title: "Restored from snapshot".to_string(),
         body: None,
         trailers: vec![
@@ -1059,6 +1018,86 @@ fn find_oplog_child(
             Some(pid) if pid == target_id => return Ok(Some(current)),
             Some(pid) => current = pid,
             None => return Ok(None),
+        }
+    }
+}
+
+struct SnapshotIter {
+    repo: gix::Repository,
+    next_commit_id: Option<gix::ObjectId>,
+    skip_initial_commit: bool,
+    exclude_kind: Vec<OperationKind>,
+    include_kind: Option<Vec<OperationKind>>,
+}
+
+impl Iterator for SnapshotIter {
+    type Item = Result<Snapshot>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let commit_id = self.next_commit_id.take()?;
+            let commit = match self.repo.find_commit(commit_id) {
+                Ok(commit) => commit,
+                Err(err) => return Some(Err(err.into())),
+            };
+            let mut parents = commit.parent_ids();
+            let (first_parent, second_parent) = (parents.next(), parents.next());
+            if second_parent.is_some() {
+                return None;
+            }
+            self.next_commit_id = first_parent.map(|id| id.detach());
+
+            if self.skip_initial_commit {
+                self.skip_initial_commit = false;
+                continue;
+            }
+
+            let tree = match commit.tree() {
+                Ok(tree) => tree,
+                Err(err) => return Some(Err(err.into())),
+            };
+            let has_legacy_metadata = match tree.lookup_entry_by_path("virtual_branches.toml") {
+                Ok(entry) => entry.is_some(),
+                Err(err) => return Some(Err(err.into())),
+            };
+            if !has_legacy_metadata {
+                // We reached a tree that is not a snapshot
+                tracing::warn!("Commit {commit_id} didn't seem to be an oplog commit - skipping");
+                continue;
+            }
+
+            let details = match commit.message_raw() {
+                Ok(message) => message
+                    .to_str()
+                    .ok()
+                    .and_then(|msg| SnapshotDetails::from_str(msg).ok()),
+                Err(err) => return Some(Err(err.into())),
+            };
+            let commit_time = match commit.time() {
+                Ok(time) => time,
+                Err(err) => return Some(Err(err.into())),
+            };
+            if let Some(details) = &details {
+                // Skip if this kind is excluded
+                if self.exclude_kind.contains(&details.operation) {
+                    continue;
+                }
+                // Skip if include filter is set and this kind is not included
+                if let Some(ref include) = self.include_kind
+                    && !include.contains(&details.operation)
+                {
+                    continue;
+                }
+            } else if self.include_kind.is_some() {
+                // If we require specific kinds but have no details, skip
+                continue;
+            }
+
+            return Some(Ok(Snapshot {
+                commit_id,
+                details,
+                created_at: commit_time,
+            }));
         }
     }
 }
