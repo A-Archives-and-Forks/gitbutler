@@ -97,6 +97,14 @@ impl Headers {
         }
     }
 
+    /// Create a new instance from a specified change_id
+    pub fn from_change_id(change_id: ChangeId) -> Self {
+        Headers {
+            change_id: Some(change_id),
+            conflicted: None,
+        }
+    }
+
     /// Extract header information from the given `commit`, or return `None` if not present.
     pub fn try_from_commit(commit: &gix::objs::Commit) -> Option<Self> {
         Self::try_from_commit_headers(|| commit.extra_headers())
