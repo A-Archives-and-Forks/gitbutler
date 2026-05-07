@@ -181,10 +181,13 @@ export const OperationTooltip: FC<
 							return <>{operationLabel(operation)}</>;
 						},
 						Cut: ({ source }) => (
-							<CutOperationControls
-								projectId={projectId}
-								operations={getOperations(source, operand)}
-							/>
+							<>
+								{operandEquals(operationMode.source, operand) && <>Select a target</>}
+								<CutOperationControls
+									projectId={projectId}
+									operations={getOperations(source, operand)}
+								/>
+							</>
 						),
 					}),
 					Match.orElse(() => {
