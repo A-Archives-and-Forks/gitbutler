@@ -508,4 +508,10 @@ app.on("web-contents-created", (_, contents) => {
 		console.error(`Blocked opening new window for ${url}`);
 		return { action: "deny" };
 	});
+
+	contents.on("will-attach-webview", (event, webPreferences, _) => {
+		// oxlint-disable-next-line no-console
+		console.error(`Blocked attaching webview ${JSON.stringify(webPreferences)}`);
+		event.preventDefault();
+	});
 });
