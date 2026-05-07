@@ -923,12 +923,8 @@ const Changes: FC<{
 		});
 	});
 
-	const [branchState, setBranch] = useState<CommitBranchComboboxItem | null>(null);
-
-	if (branchState && !branchComboboxItems.some((item) => item.id === branchState.id))
-		setBranch(null);
-
-	const branch = branchState ?? branchComboboxItems[0];
+	const [branchId, setBranchId] = useState<string | null>(null);
+	const branch = branchComboboxItems.find((item) => item.id === branchId) ?? branchComboboxItems[0];
 
 	const commit = () => {
 		if (!branch) return;
@@ -962,7 +958,7 @@ const Changes: FC<{
 	const [open, setOpen] = useState(false);
 
 	const selectBranch = (option: CommitBranchComboboxItem | null) => {
-		setBranch(option);
+		setBranchId(option?.id ?? null);
 		setOpen(false);
 	};
 	const openBranchCombobox = () => setOpen(true);
