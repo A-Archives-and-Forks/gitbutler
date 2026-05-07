@@ -177,72 +177,110 @@ const buildNativeMenuTemplate = (
 		};
 	});
 
+// Returns true if the `url` is from an origin we trust to perform privileged actions such as executing IPC commands.
+const isTrustedLocalOrigin = (url: URL | null) =>
+	url !== null &&
+	(app.isPackaged
+		? url.protocol === `${liteProtocolScheme}:` && url.host === liteProtocolHost
+		: url.protocol === "http:" && url.host === "127.0.0.1:5173");
+
+const newUrlOrNull = (url: string): URL | null => {
+	try {
+		return new URL(url);
+	} catch {
+		return null;
+	}
+};
+
 const registerIpcHandlers = (): void => {
-	ipcMain.handle(
+	const senderValidatingHandle: typeof ipcMain.handle = (channel, listener) => {
+		const senderValidatingListener: typeof listener = (event, ...args) => {
+			// Validate that the frame is from a trusted origin. This is crucial to prevent unauthorized
+			// access to the IPC bridge if we ever render non-local content.
+			//
+			// See https://www.electronjs.org/docs/latest/tutorial/security#17-validate-the-sender-of-all-ipc-messages
+			const isSenderFrameTrusted =
+				event.senderFrame !== null && isTrustedLocalOrigin(newUrlOrNull(event.senderFrame.url));
+			if (isSenderFrameTrusted)
+				// eslint-disable-next-line @typescript-eslint/no-unsafe-argument @typescript-eslint/no-unsafe-return
+				return listener(event, ...args);
+
+			// oxlint-disable-next-line no-console
+			console.error(`Rejecting untrusted sender frame ${event.senderFrame?.url ?? "<unknown>"}`);
+			return null;
+		};
+
+		ipcMain.handle(channel, senderValidatingListener);
+	};
+
+	senderValidatingHandle(
 		liteIpcChannels.absorptionPlan,
 		(_e, { projectId, target }: AbsorptionPlanParams) => absorptionPlan(projectId, target),
 	);
-	ipcMain.handle(liteIpcChannels.absorb, (_e, { projectId, absorptionPlan }: AbsorbParams) =>
-		absorb(projectId, absorptionPlan),
+	senderValidatingHandle(
+		liteIpcChannels.absorb,
+		(_e, { projectId, absorptionPlan }: AbsorbParams) => absorb(projectId, absorptionPlan),
 	);
-	ipcMain.handle(liteIpcChannels.apply, (_e, { projectId, existingBranch }: ApplyParams) =>
+	senderValidatingHandle(liteIpcChannels.apply, (_e, { projectId, existingBranch }: ApplyParams) =>
 		apply(projectId, existingBranch),
 	);
-	ipcMain.handle(liteIpcChannels.assignHunk, (_e, { projectId, assignments }: AssignHunkParams) =>
-		assignHunk(projectId, assignments),
+	senderValidatingHandle(
+		liteIpcChannels.assignHunk,
+		(_e, { projectId, assignments }: AssignHunkParams) => assignHunk(projectId, assignments),
 	);
-	ipcMain.handle(
+	senderValidatingHandle(
 		liteIpcChannels.branchDetails,
 		(_e, { projectId, branchName, remote }: BranchDetailsParams) =>
 			branchDetails(projectId, branchName, remote),
 	);
-	ipcMain.handle(liteIpcChannels.branchDiff, (_e, { projectId, branch }: BranchDiffParams) =>
-		branchDiff(projectId, branch),
+	senderValidatingHandle(
+		liteIpcChannels.branchDiff,
+		(_e, { projectId, branch }: BranchDiffParams) => branchDiff(projectId, branch),
 	);
-	ipcMain.handle(liteIpcChannels.changesInWorktree, (_e, projectId: string) =>
+	senderValidatingHandle(liteIpcChannels.changesInWorktree, (_e, projectId: string) =>
 		changesInWorktree(projectId),
 	);
-	ipcMain.handle(
+	senderValidatingHandle(
 		liteIpcChannels.commitAmend,
 		(_e, { projectId, commitId, changes, dryRun }: CommitAmendParams) =>
 			commitAmend(projectId, commitId, changes, dryRun),
 	);
-	ipcMain.handle(
+	senderValidatingHandle(
 		liteIpcChannels.commitCreate,
 		(_e, { projectId, relativeTo, side, changes, message, dryRun }: CommitCreateParams) =>
 			commitCreate(projectId, relativeTo, side, changes, message, dryRun),
 	);
-	ipcMain.handle(
+	senderValidatingHandle(
 		liteIpcChannels.commitDiscard,
 		(_e, { projectId, subjectCommitId, dryRun }: CommitDiscardParams) =>
 			commitDiscard(projectId, subjectCommitId, dryRun),
 	);
-	ipcMain.handle(
+	senderValidatingHandle(
 		liteIpcChannels.commitDetailsWithLineStats,
 		(_e, { projectId, commitId }: CommitDetailsWithLineStatsParams) =>
 			commitDetailsWithLineStats(projectId, commitId),
 	);
-	ipcMain.handle(
+	senderValidatingHandle(
 		liteIpcChannels.commitInsertBlank,
 		(_e, { projectId, relativeTo, side, dryRun }: CommitInsertBlankParams) =>
 			commitInsertBlank(projectId, relativeTo, side, dryRun),
 	);
-	ipcMain.handle(
+	senderValidatingHandle(
 		liteIpcChannels.commitMove,
 		(_e, { projectId, subjectCommitIds, relativeTo, side, dryRun }: CommitMoveParams) =>
 			commitMove(projectId, subjectCommitIds, relativeTo, side, dryRun),
 	);
-	ipcMain.handle(
+	senderValidatingHandle(
 		liteIpcChannels.commitSquash,
 		(_e, { projectId, sourceCommitIds, destinationCommitId, dryRun }: CommitSquashParams) =>
 			commitSquash(projectId, sourceCommitIds, destinationCommitId, "KeepBoth", dryRun),
 	);
-	ipcMain.handle(
+	senderValidatingHandle(
 		liteIpcChannels.commitReword,
 		(_e, { projectId, commitId, message, dryRun }: CommitRewordParams) =>
 			commitReword(projectId, commitId, message, dryRun),
 	);
-	ipcMain.handle(
+	senderValidatingHandle(
 		liteIpcChannels.commitMoveChangesBetween,
 		(
 			_e,
@@ -255,47 +293,47 @@ const registerIpcHandlers = (): void => {
 			}: CommitMoveChangesBetweenParams,
 		) => commitMoveChangesBetween(projectId, sourceCommitId, destinationCommitId, changes, dryRun),
 	);
-	ipcMain.handle(
+	senderValidatingHandle(
 		liteIpcChannels.commitUncommit,
 		(_e, { projectId, subjectCommitIds: commitIds, assignTo, dryRun }: CommitUncommitParams) =>
 			commitUncommit(projectId, commitIds, assignTo, dryRun),
 	);
-	ipcMain.handle(
+	senderValidatingHandle(
 		liteIpcChannels.commitUncommitChanges,
 		(_e, { projectId, commitId, changes, assignTo, dryRun }: CommitUncommitChangesParams) =>
 			commitUncommitChanges(projectId, commitId, changes, assignTo, dryRun),
 	);
-	ipcMain.handle(liteIpcChannels.getVersion, () => Promise.resolve(app.getVersion()));
-	ipcMain.handle(liteIpcChannels.headInfo, (_e, projectId: string) => headInfo(projectId));
-	ipcMain.handle(
+	senderValidatingHandle(liteIpcChannels.getVersion, () => Promise.resolve(app.getVersion()));
+	senderValidatingHandle(liteIpcChannels.headInfo, (_e, projectId: string) => headInfo(projectId));
+	senderValidatingHandle(
 		liteIpcChannels.listBranches,
 		(_e, projectId: string, filter: BranchListingFilter | null) => listBranches(projectId, filter),
 	);
-	ipcMain.handle(liteIpcChannels.listProjects, () => listProjectsStateless());
-	ipcMain.handle(
+	senderValidatingHandle(liteIpcChannels.listProjects, () => listProjectsStateless());
+	senderValidatingHandle(
 		liteIpcChannels.moveBranch,
 		(_e, { projectId, subjectBranch, targetBranch, dryRun }: MoveBranchParams) =>
 			moveBranch(projectId, subjectBranch, targetBranch, dryRun),
 	);
-	ipcMain.handle(
+	senderValidatingHandle(
 		liteIpcChannels.updateBranchName,
 		(_e, { projectId, stackId, branchName, newName }: UpdateBranchNameParams) =>
 			updateBranchName(projectId, stackId, branchName, newName),
 	);
-	ipcMain.handle(
+	senderValidatingHandle(
 		liteIpcChannels.tearOffBranch,
 		(_e, { projectId, subjectBranch, dryRun }: TearOffBranchParams) =>
 			tearOffBranch(projectId, subjectBranch, dryRun),
 	);
-	ipcMain.handle(liteIpcChannels.ping, (_event, input: string) =>
+	senderValidatingHandle(liteIpcChannels.ping, (_event, input: string) =>
 		Promise.resolve(`pong: ${input}`),
 	);
-	ipcMain.handle(
+	senderValidatingHandle(
 		liteIpcChannels.pushStackLegacy,
 		(_e, { projectId, stackId, branch }: PushStackLegacyParams) =>
 			pushStackLegacy(projectId, stackId, false, false, branch, true),
 	);
-	ipcMain.handle(
+	senderValidatingHandle(
 		liteIpcChannels.showNativeMenu,
 		async (event, { items, position }: ShowNativeMenuParams) => {
 			const window = BrowserWindow.fromWebContents(event.sender);
@@ -320,24 +358,25 @@ const registerIpcHandlers = (): void => {
 			return selectedItemId;
 		},
 	);
-	ipcMain.handle(
+	senderValidatingHandle(
 		liteIpcChannels.treeChangeDiffs,
 		(_e, { projectId, change }: TreeChangeDiffParams) => treeChangeDiffs(projectId, change),
 	);
-	ipcMain.handle(liteIpcChannels.unapplyStack, (_e, { projectId, stackId }: UnapplyStackParams) =>
-		unapplyStack(projectId, stackId),
+	senderValidatingHandle(
+		liteIpcChannels.unapplyStack,
+		(_e, { projectId, stackId }: UnapplyStackParams) => unapplyStack(projectId, stackId),
 	);
-	ipcMain.handle(
+	senderValidatingHandle(
 		liteIpcChannels.watcherSubscribe,
 		async (event, { projectId }: WatcherSubscribeParams) =>
 			WatcherManager.getInstance().subscribeToProject(projectId, event),
 	);
-	ipcMain.handle(
+	senderValidatingHandle(
 		liteIpcChannels.watcherUnsubscribe,
 		(_e, { subscriptionId }: WatcherUnsubscribeParams) =>
 			WatcherManager.getInstance().removeSubscription(subscriptionId),
 	);
-	ipcMain.handle(liteIpcChannels.watcherStopAll, () =>
+	senderValidatingHandle(liteIpcChannels.watcherStopAll, () =>
 		WatcherManager.getInstance().stopAllWatchersForShutdown(),
 	);
 };
