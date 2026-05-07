@@ -26,7 +26,7 @@ export default defineConfig({
 	/* Opt out of parallel tests on CI. */
 	workers: AMOUNT_OF_WORKERS,
 	/* Reporter to use. See https://playwright.dev/docs/test-reporters */
-	reporter: process.env.CI ? "github" : "dot",
+	reporter: process.env.CI ? [["github"], ["buildkite-test-collector/playwright/reporter"]] : "dot",
 	/* Per-test timeout. The default 30s is too tight for tests that perform
 	   multiple commits in CI, where backend operations are slower. */
 	timeout: 60_000,

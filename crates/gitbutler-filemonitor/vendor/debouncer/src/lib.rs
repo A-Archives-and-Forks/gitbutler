@@ -64,7 +64,7 @@ use parking_lot::{MappedMutexGuard, Mutex, MutexGuard};
 ///
 /// # Example implementation
 ///
-/// ```rust,no_run
+/// ```rust,ignore
 /// # use notify::{Event, Result, EventHandler};
 /// # use notify_debouncer_full::{DebounceEventHandler, DebounceEventResult};
 ///

@@ -135,6 +135,8 @@ jobs:
       - run: pnpm ui:playwright:install:unit
         if: ${{ steps.playwright-cache.outputs.cache-hit != 'true' }}
       - run: pnpm test
+        env:
+          BUILDKITE_ANALYTICS_TOKEN: ${{ secrets.BUILDKITE_SUITE_TOKEN_VITEST }}
 
   but-sdk-build-check:
     needs: changes
@@ -282,7 +284,37 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/master' }}
       - name: Dependencies for 'keyring'
         run: sudo ./scripts/install-minimal-debian-dependencies.sh
-      - run: cargo test --workspace --exclude gitbutler-tauri --exclude but-api-macros-tests
+      - name: Install cargo-nextest
+        run: curl -LsSf https://get.nexte.st/0.9.133/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
+      - name: Run workspace tests
+        run: cargo nextest run --workspace --exclude gitbutler-tauri --exclude but-api-macros-tests --profile ci
+      - name: Run doctests
+        run: cargo test --doc --workspace --exclude gitbutler-tauri --exclude but-api-macros-tests
+      - name: Upload results to Buildkite Test Engine
+        if: ${{ always() && !cancelled() }}
+        continue-on-error: true
+        env:
+          BUILDKITE_ANALYTICS_TOKEN: ${{ secrets.BUILDKITE_SUITE_TOKEN_CARGO }}
+          RUN_BRANCH: ${{ github.head_ref || github.ref_name }}
+          RUN_COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          RUN_KEY: ${{ github.run_id }}-${{ github.run_attempt }}
+          RUN_NUMBER: ${{ github.run_number }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          curl --fail-with-body -X POST \
+            -H "Authorization: Token $BUILDKITE_ANALYTICS_TOKEN" \
+            -F "data=@target/nextest/ci/junit.xml" \
+            -F "format=junit" \
+            -F "run_env[CI]=github_actions" \
+            -F "run_env[key]=$RUN_KEY" \
+            -F "run_env[number]=$RUN_NUMBER" \
+            -F "run_env[branch]=$RUN_BRANCH" \
+            -F "run_env[commit_sha]=$RUN_COMMIT_SHA" \
+            -F "run_env[url]=$RUN_URL" \
+            -F "tags[framework]=nextest" \
+            -F "tags[language]=rust" \
+            -F "tags[type]=unit" \
+            https://analytics-api.buildkite.com/v1/uploads
       # It's intentional to use 'name equals run-script' so it's easy to re-run locally on failure.
       - run: make test-modern-but
       - name: test vendored

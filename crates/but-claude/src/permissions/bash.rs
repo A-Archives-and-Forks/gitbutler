@@ -10,7 +10,7 @@
 /// let result = split_bash_commands("git add . && git commit -m 'test commit' && git push");
 /// assert_eq!(result, vec!["git add .", "git commit -m 'test commit'", "git push"]);
 /// ```
-pub(super) fn split_bash_commands(command: &str) -> Vec<String> {
+pub fn split_bash_commands(command: &str) -> Vec<String> {
     #[derive(Debug, Clone, PartialEq)]
     enum State {
         Normal,

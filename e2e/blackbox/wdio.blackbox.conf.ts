@@ -20,7 +20,16 @@ export const config = {
 			},
 		},
 	],
-	reporters: ["spec"],
+	reporters: [
+		"spec",
+		[
+			"junit",
+			{
+				outputDir: path.join(import.meta.dirname, "test-results"),
+				outputFileFormat: () => "results.xml",
+			},
+		],
+	],
 	framework: "mocha",
 	mochaOpts: {
 		ui: "bdd",

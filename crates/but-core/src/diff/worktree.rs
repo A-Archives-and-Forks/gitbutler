@@ -955,7 +955,7 @@ impl TreeChange {
     /// ```
     ///
     /// Note that the file header is missing, so the following is *not* present.
-    /// ```
+    /// ```text
     /// --- a/README.md
     /// +++ b/README.md
     /// ```

@@ -1,4 +1,4 @@
-mod bash;
+pub mod bash;
 mod patterns;
 mod settings;
 

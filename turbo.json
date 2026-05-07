@@ -37,10 +37,12 @@
 		"playwright:install:unit": {},
 		"playwright:install:ct": {},
 		"test": {
-			"dependsOn": ["package", "playwright:install:unit"]
+			"dependsOn": ["package", "playwright:install:unit"],
+			"passThroughEnv": ["BUILDKITE_ANALYTICS_TOKEN"]
 		},
 		"test:e2e:playwright": {
 			"env": ["PLAYWRIGHT_BROWSERS_PATH"],
+			"passThroughEnv": ["BUILDKITE_ANALYTICS_TOKEN"],
 			"dependsOn": ["package"]
 		},
 		"test:ct": {
