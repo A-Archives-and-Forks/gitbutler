@@ -165,8 +165,8 @@ fn multiple_commits_created_during_edit_mode() -> Result<()> {
     save_and_return_to_workspace(&mut ctx)?;
 
     let repo = &*ctx.repo.get()?;
-    insta::assert_snapshot!(visualize_commit_graph(repo, "refs/heads/gitbutler/workspace")?, @r"
-    * 59ab552 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    insta::assert_snapshot!(visualize_commit_graph(repo, "refs/heads/gitbutler/workspace")?, @"
+    * 33e3bfc (HEAD -> gitbutler/workspace) GitButler Workspace Commit
     * f6d3539 (branchy) second commit added
     * d39dd61 first commit added
     * 26804c3 foobar
@@ -220,8 +220,8 @@ fn apply_commit_on_itself() -> Result<()> {
 
     let repo = &*ctx.repo.get()?;
     // It works.
-    insta::assert_snapshot!(visualize_commit_graph(repo, "refs/heads/gitbutler/workspace")?, @r"
-    * 85cd48c (HEAD -> gitbutler/workspace, gitbutler/edit) GitButler Workspace Commit
+    insta::assert_snapshot!(visualize_commit_graph(repo, "refs/heads/gitbutler/workspace")?, @"
+    * 16b549b (HEAD -> gitbutler/workspace, gitbutler/edit) GitButler Workspace Commit
     * 6eb9642 (branchy) GitButler Workspace Commit
     * 26804c3 foobar
     * 7950f06 (origin/main, origin/HEAD, main, gitbutler/target) init

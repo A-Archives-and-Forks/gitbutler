@@ -49,9 +49,9 @@ fn reword_a_commit() -> Result<()> {
     insta::assert_snapshot!(overlayed, @"
 
     └── 👉►:0[0]:with-inner-merge[🌳]
-        └── ·b475cbc (⌂|1)
+        └── ·78aaae2 (⌂|1)
             └── ►:1[1]:anon:
-                └── ·3d1e2c5 (⌂|1)
+                └── ·53af95a (⌂|1)
                     ├── ►:2[2]:A
                     │   └── ·6de6b92 (⌂|1)
                     │       └── ►:4[3]:main
@@ -66,8 +66,8 @@ fn reword_a_commit() -> Result<()> {
     assert_eq!(head_tree, repo.head_tree()?.id);
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    * b475cbc (HEAD -> with-inner-merge) on top of inner merge
-    *   3d1e2c5 Merge branch 'B' into with-inner-merge
+    * 78aaae2 (HEAD -> with-inner-merge) on top of inner merge
+    *   53af95a Merge branch 'B' into with-inner-merge
     |\  
     | * 984fd1c (B) C: new file with 10 lines
     * | 6de6b92 (A) A: a second coming
@@ -77,8 +77,8 @@ fn reword_a_commit() -> Result<()> {
     insta::assert_snapshot!(git_status(&repo)?, @"");
     insta::assert_debug_snapshot!(outcome.history.commit_mappings(), @"
     {
-        Sha1(2fc288c36c8bb710c78203f78ea9883724ce142b): Sha1(3d1e2c5e12ac74bec07707581688e576ec7643a0),
-        Sha1(e8ee978dac10e6a85006543ef08be07c5824b4f7): Sha1(b475cbc480a447b44d56b703665d2b57ef19a5d0),
+        Sha1(2fc288c36c8bb710c78203f78ea9883724ce142b): Sha1(53af95adeaf78258ee71c74fe4daa6628d750ff1),
+        Sha1(e8ee978dac10e6a85006543ef08be07c5824b4f7): Sha1(78aaae2b4d822ed0cc7e0e83767b5dec2c88791b),
     }
     ");
 
@@ -144,9 +144,9 @@ fn amend_a_commit() -> Result<()> {
     insta::assert_snapshot!(overlayed, @"
 
     └── 👉►:0[0]:with-inner-merge[🌳]
-        └── ·4772ab7 (⌂|1)
+        └── ·e7221b5 (⌂|1)
             └── ►:1[1]:anon:
-                └── ·e7d8400 (⌂|1)
+                └── ·8101192 (⌂|1)
                     ├── ►:2[2]:A
                     │   └── ·f1905a8 (⌂|1)
                     │       └── ►:4[3]:main
@@ -159,8 +159,8 @@ fn amend_a_commit() -> Result<()> {
     assert_eq!(overlayed, graph_tree(&outcome.workspace.graph).to_string());
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    * 4772ab7 (HEAD -> with-inner-merge) on top of inner merge
-    *   e7d8400 Merge branch 'B' into with-inner-merge
+    * e7221b5 (HEAD -> with-inner-merge) on top of inner merge
+    *   8101192 Merge branch 'B' into with-inner-merge
     |\  
     | * 984fd1c (B) C: new file with 10 lines
     * | f1905a8 (A) A: a second coming
@@ -170,8 +170,8 @@ fn amend_a_commit() -> Result<()> {
     insta::assert_snapshot!(git_status(&repo)?, @"");
     insta::assert_debug_snapshot!(outcome.history.commit_mappings(), @"
     {
-        Sha1(2fc288c36c8bb710c78203f78ea9883724ce142b): Sha1(e7d8400bb33d6e4a947da3485c38193ca3964b81),
-        Sha1(e8ee978dac10e6a85006543ef08be07c5824b4f7): Sha1(4772ab72b13718f64fb387e7e7f2bc124e2c6e13),
+        Sha1(2fc288c36c8bb710c78203f78ea9883724ce142b): Sha1(810119232dd43ad1edc6b3d1a9cc2cd507d92a4e),
+        Sha1(e8ee978dac10e6a85006543ef08be07c5824b4f7): Sha1(e7221b5ace99ba38e222e19e5da9c6966955e37b),
     }
     ");
 

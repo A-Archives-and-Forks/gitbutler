@@ -55,10 +55,10 @@ fn move_top_branch_to_top_of_another_stack() -> anyhow::Result<()> {
     ws.refresh_from_head(&repo, &meta)?;
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    *   26fdd46 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    *   bdcbf64 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
     |\  
     | * c813d8d (B) B
-    * | 3db8c14 (C) C
+    * | f2cc60d (C) C
     * | 09d8e52 (A) A
     |/  
     * 85efbe4 (origin/main, main) M
@@ -71,7 +71,7 @@ fn move_top_branch_to_top_of_another_stack() -> anyhow::Result<()> {
     │       └── ·c813d8d (🏘️)
     └── ≡📙:3:C on 85efbe4 {1}
         ├── 📙:3:C
-        │   └── ·3db8c14 (🏘️)
+        │   └── ·f2cc60d (🏘️)
         └── 📙:4:A
             └── ·09d8e52 (🏘️)
     ");
@@ -126,10 +126,10 @@ fn move_bottom_branch_to_top_of_another_stack() -> anyhow::Result<()> {
     ws.refresh_from_head(&repo, &meta)?;
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    *   ac869ab (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    *   1229630 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
     |\  
-    | * 9f14615 (C) C
-    * | 698ccd3 (B) B
+    | * 8e00332 (C) C
+    * | f9061ed (B) B
     * | 09d8e52 (A) A
     |/  
     * 85efbe4 (origin/main, main) M
@@ -139,10 +139,10 @@ fn move_bottom_branch_to_top_of_another_stack() -> anyhow::Result<()> {
     📕🏘️:0:gitbutler/workspace[🌳] <> ✓refs/remotes/origin/main on 85efbe4
     ├── ≡📙:5:C on 85efbe4 {2}
     │   └── 📙:5:C
-    │       └── ·9f14615 (🏘️)
+    │       └── ·8e00332 (🏘️)
     └── ≡📙:3:B on 85efbe4 {1}
         ├── 📙:3:B
-        │   └── ·698ccd3 (🏘️)
+        │   └── ·f9061ed (🏘️)
         └── 📙:4:A
             └── ·09d8e52 (🏘️)
     ");
@@ -198,8 +198,8 @@ fn move_single_branch_to_top_of_another_stack() -> anyhow::Result<()> {
     ws.refresh_from_head(&repo, &meta)?;
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @"
-    * 263392f (HEAD -> gitbutler/workspace) GitButler Workspace Commit
-    * 8dbfefa (A) A
+    * 4c58dd4 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    * 148f8f3 (A) A
     * 09bc93e (C) C
     * c813d8d (B) B
     * 85efbe4 (origin/main, main) M
@@ -209,7 +209,7 @@ fn move_single_branch_to_top_of_another_stack() -> anyhow::Result<()> {
     📕🏘️:0:gitbutler/workspace[🌳] <> ✓refs/remotes/origin/main on 85efbe4
     └── ≡📙:3:A on 85efbe4 {2}
         ├── 📙:3:A
-        │   └── ·8dbfefa (🏘️)
+        │   └── ·148f8f3 (🏘️)
         ├── 📙:4:C
         │   └── ·09bc93e (🏘️)
         └── 📙:5:B
@@ -267,10 +267,10 @@ fn reorder_branch_in_stack() -> anyhow::Result<()> {
     ws.refresh_from_head(&repo, &meta)?;
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    *   82661e2 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    *   268bc90 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
     |\  
-    | * 2c58ac6 (B) B
-    | * 9f14615 (C) C
+    | * de0581e (B) B
+    | * 8e00332 (C) C
     * | 09d8e52 (A) A
     |/  
     * 85efbe4 (origin/main, main) M
@@ -280,9 +280,9 @@ fn reorder_branch_in_stack() -> anyhow::Result<()> {
     📕🏘️:0:gitbutler/workspace[🌳] <> ✓refs/remotes/origin/main on 85efbe4
     ├── ≡📙:4:B on 85efbe4 {2}
     │   ├── 📙:4:B
-    │   │   └── ·2c58ac6 (🏘️)
+    │   │   └── ·de0581e (🏘️)
     │   └── 📙:5:C
-    │       └── ·9f14615 (🏘️)
+    │       └── ·8e00332 (🏘️)
     └── ≡📙:3:A on 85efbe4 {1}
         └── 📙:3:A
             └── ·09d8e52 (🏘️)
@@ -339,9 +339,9 @@ fn insert_branch_in_the_middle_of_a_stack() -> anyhow::Result<()> {
     ws.refresh_from_head(&repo, &meta)?;
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @"
-    * 35a28f3 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
-    * 531d8aa (C) C
-    * 3df48f1 (A) A
+    * 0c5cde5 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    * 3e7ff55 (C) C
+    * 4dfe841 (A) A
     * c813d8d (B) B
     * 85efbe4 (origin/main, main) M
     ");
@@ -350,9 +350,9 @@ fn insert_branch_in_the_middle_of_a_stack() -> anyhow::Result<()> {
     📕🏘️:0:gitbutler/workspace[🌳] <> ✓refs/remotes/origin/main on 85efbe4
     └── ≡📙:3:C on 85efbe4 {2}
         ├── 📙:3:C
-        │   └── ·531d8aa (🏘️)
+        │   └── ·3e7ff55 (🏘️)
         ├── 📙:4:A
-        │   └── ·3df48f1 (🏘️)
+        │   └── ·4dfe841 (🏘️)
         └── 📙:5:B
             └── ·c813d8d (🏘️)
     ");
@@ -400,7 +400,7 @@ fn move_empty_branch() -> anyhow::Result<()> {
     ws.refresh_from_head(&repo, &meta)?;
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @"
-    * ee3cff8 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    * 2c820f0 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
     * 09d8e52 (B, A) A
     * 85efbe4 (origin/main, main) M
     ");
@@ -455,7 +455,7 @@ fn move_branch_on_top_of_empty_branch() -> anyhow::Result<()> {
     ws.refresh_from_head(&repo, &meta)?;
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @"
-    * ee3cff8 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    * 2c820f0 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
     * 09d8e52 (A) A
     * 85efbe4 (origin/main, main, B) M
     ");
@@ -651,17 +651,17 @@ fn move_branch_when_base_segment_has_no_ref_name() -> anyhow::Result<()> {
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @"
     * 148c87a (origin/main) M2
-    | * 3f2f4c5 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
-    | * 698ccd3 (B) B
+    | * 0db3c2f (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    | * f9061ed (B) B
     | * 09d8e52 (A) A
     |/  
     * 85efbe4 (main) M
     ");
-    insta::assert_snapshot!(graph_workspace(&ws), @r"
+    insta::assert_snapshot!(graph_workspace(&ws), @"
     📕🏘️:0:gitbutler/workspace[🌳] <> ✓refs/remotes/origin/main⇣1 on 85efbe4
     └── ≡📙:3:B on 85efbe4 {1}
         ├── 📙:3:B
-        │   └── ·698ccd3 (🏘️)
+        │   └── ·f9061ed (🏘️)
         └── 📙:4:A
             └── ·09d8e52 (🏘️)
     ");

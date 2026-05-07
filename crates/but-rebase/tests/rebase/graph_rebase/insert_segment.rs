@@ -49,9 +49,9 @@ fn insert_single_node_segment_above() -> Result<()> {
     insta::assert_snapshot!(overlayed, @"
 
     └── 👉►:0[0]:main[🌳]
-        └── ·5ae394a (⌂|1)
+        └── ·b78a484 (⌂|1)
             ├── ►:1[1]:A
-            │   └── ·77b07be (⌂|1)
+            │   └── ·706b5e8 (⌂|1)
             │       ├── ►:3[3]:anon:
             │       │   └── ·8f0d338 (⌂|1) ►tags/base
             │       └── ►:4[2]:B
@@ -68,12 +68,12 @@ fn insert_single_node_segment_above() -> Result<()> {
     assert_eq!(overlayed, graph_tree(&outcome.workspace.graph).to_string());
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    *   5ae394a (HEAD -> main) Merge branches 'A', 'B' and 'C'
+    *   b78a484 (HEAD -> main) Merge branches 'A', 'B' and 'C'
     |\  
     | * 930563a (C) C: add another 10 lines to new file
     | * 68a2fc3 C: add 10 lines to new file
     | * 984fd1c C: new file with 10 lines
-    * |   77b07be (A) A: 10 lines on top
+    * |   706b5e8 (A) A: 10 lines on top
     |\ \  
     | |/  
     |/|   
@@ -130,16 +130,16 @@ fn insert_single_node_segment_below() -> Result<()> {
     insta::assert_snapshot!(overlayed, @"
 
     └── 👉►:0[0]:main[🌳]
-        └── ·e22f751 (⌂|1)
+        └── ·32e9d3a (⌂|1)
             ├── ►:1[2]:A
-            │   └── ·507ce96 (⌂|1)
+            │   └── ·032ef08 (⌂|1)
             │       ├── ►:4[4]:anon:
             │       │   └── ·8f0d338 (⌂|1) ►tags/base
             │       └── ►:5[3]:anon:
             │           └── ·62e05ba (⌂|1)
             │               └── →:4:
             ├── ►:2[1]:B
-            │   └── ·743ea2e (⌂|1)
+            │   └── ·2d43620 (⌂|1)
             │       └── →:1: (A)
             └── ►:3[1]:C
                 ├── ·930563a (⌂|1)
@@ -151,14 +151,14 @@ fn insert_single_node_segment_below() -> Result<()> {
     assert_eq!(overlayed, graph_tree(&outcome.workspace.graph).to_string());
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    *-.   e22f751 (HEAD -> main) Merge branches 'A', 'B' and 'C'
+    *-.   32e9d3a (HEAD -> main) Merge branches 'A', 'B' and 'C'
     |\ \  
     | | * 930563a (C) C: add another 10 lines to new file
     | | * 68a2fc3 C: add 10 lines to new file
     | | * 984fd1c C: new file with 10 lines
-    | * | 743ea2e (B) B: another 10 lines at the bottom
+    | * | 2d43620 (B) B: another 10 lines at the bottom
     |/ /  
-    * |   507ce96 (A) A: 10 lines on top
+    * |   032ef08 (A) A: 10 lines on top
     |\ \  
     | |/  
     |/|   
@@ -218,11 +218,11 @@ fn insert_multi_node_segment_above() -> Result<()> {
     insta::assert_snapshot!(overlayed, @"
 
     └── 👉►:0[0]:main[🌳]
-        └── ·b7346f3 (⌂|1)
+        └── ·85677e6 (⌂|1)
             ├── ►:1[1]:anon:
-            │   └── ·4670c6d (⌂|1) ►A, ►B
+            │   └── ·9da738d (⌂|1) ►A, ►B
             │       └── ►:3[2]:anon:
-            │           └── ·1470cfe (⌂|1)
+            │           └── ·8e18b4e (⌂|1)
             │               ├── ►:4[4]:anon:
             │               │   └── ·8f0d338 (⌂|1) ►tags/base
             │               └── ►:5[3]:anon:
@@ -238,13 +238,13 @@ fn insert_multi_node_segment_above() -> Result<()> {
     assert_eq!(overlayed, graph_tree(&outcome.workspace.graph).to_string());
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    *   b7346f3 (HEAD -> main) Merge branches 'A', 'B' and 'C'
+    *   85677e6 (HEAD -> main) Merge branches 'A', 'B' and 'C'
     |\  
     | * 930563a (C) C: add another 10 lines to new file
     | * 68a2fc3 C: add 10 lines to new file
     | * 984fd1c C: new file with 10 lines
-    * | 4670c6d (B, A) B: another 10 lines at the bottom
-    * |   1470cfe B: 10 lines at the bottom
+    * | 9da738d (B, A) B: another 10 lines at the bottom
+    * |   8e18b4e B: 10 lines at the bottom
     |\ \  
     | |/  
     |/|   
@@ -304,9 +304,9 @@ fn insert_multi_node_segment_below() -> Result<()> {
     insta::assert_snapshot!(overlayed, @"
 
     └── 👉►:0[0]:main[🌳]
-        └── ·78624ea (⌂|1)
+        └── ·4db28a9 (⌂|1)
             ├── ►:1[1]:A
-            │   └── ·e4c78ba (⌂|1)
+            │   └── ·71dfc8f (⌂|1)
             │       └── ►:2[2]:B
             │           ├── ·a748762 (⌂|1)
             │           └── ·62e05ba (⌂|1)
@@ -323,12 +323,12 @@ fn insert_multi_node_segment_below() -> Result<()> {
     assert_eq!(overlayed, graph_tree(&outcome.workspace.graph).to_string());
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    *-.   78624ea (HEAD -> main) Merge branches 'A', 'B' and 'C'
+    *-.   4db28a9 (HEAD -> main) Merge branches 'A', 'B' and 'C'
     |\ \  
     | | * 930563a (C) C: add another 10 lines to new file
     | | * 68a2fc3 C: add 10 lines to new file
     | | * 984fd1c C: new file with 10 lines
-    * | | e4c78ba (A) A: 10 lines on top
+    * | | 71dfc8f (A) A: 10 lines on top
     |/ /  
     * | a748762 (B) B: another 10 lines at the bottom
     * | 62e05ba B: 10 lines at the bottom
@@ -392,9 +392,9 @@ fn insert_single_node_segment_above_with_explicit_children() -> Result<()> {
     insta::assert_snapshot!(overlayed, @"
 
     └── 👉►:0[0]:main[🌳]
-        └── ·a14ecd6 (⌂|1)
+        └── ·caf3957 (⌂|1)
             ├── ►:1[2]:A
-            │   └── ·77b07be (⌂|1)
+            │   └── ·706b5e8 (⌂|1)
             │       ├── ►:4[4]:anon:
             │       │   └── ·8f0d338 (⌂|1) ►tags/base
             │       └── ►:2[3]:B
@@ -403,7 +403,7 @@ fn insert_single_node_segment_above_with_explicit_children() -> Result<()> {
             │               └── →:4:
             ├── →:2: (B)
             └── ►:3[1]:C
-                └── ·53c45c8 (⌂|1)
+                └── ·23b76e7 (⌂|1)
                     ├── ►:5[2]:anon:
                     │   ├── ·68a2fc3 (⌂|1)
                     │   └── ·984fd1c (⌂|1)
@@ -414,13 +414,13 @@ fn insert_single_node_segment_above_with_explicit_children() -> Result<()> {
     assert_eq!(overlayed, graph_tree(&outcome.workspace.graph).to_string());
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    *-.   a14ecd6 (HEAD -> main) Merge branches 'A', 'B' and 'C'
+    *-.   caf3957 (HEAD -> main) Merge branches 'A', 'B' and 'C'
     |\ \  
-    | | *   53c45c8 (C) C: add another 10 lines to new file
+    | | *   23b76e7 (C) C: add another 10 lines to new file
     | | |\  
     | |_|/  
     |/| |   
-    * | | 77b07be (A) A: 10 lines on top
+    * | | 706b5e8 (A) A: 10 lines on top
     |\| | 
     | * | a748762 (B) B: another 10 lines at the bottom
     | * | 62e05ba B: 10 lines at the bottom
@@ -487,13 +487,13 @@ fn insert_single_node_segment_below_with_explicit_parents() -> Result<()> {
     insta::assert_snapshot!(overlayed, @"
 
     └── 👉►:0[0]:main[🌳]
-        └── ·9cf36b2 (⌂|1)
+        └── ·c1cb047 (⌂|1)
             ├── ►:1[1]:A
-            │   └── ·37fb54d (⌂|1)
+            │   └── ·275b149 (⌂|1)
             │       ├── ►:4[4]:anon:
             │       │   └── ·8f0d338 (⌂|1) ►tags/base
             │       └── ►:2[2]:B
-            │           └── ·d202f84 (⌂|1)
+            │           └── ·9c9c689 (⌂|1)
             │               ├── ►:5[3]:anon:
             │               │   └── ·62e05ba (⌂|1)
             │               │       └── →:4:
@@ -509,11 +509,11 @@ fn insert_single_node_segment_below_with_explicit_parents() -> Result<()> {
     assert_eq!(overlayed, graph_tree(&outcome.workspace.graph).to_string());
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    *-.   9cf36b2 (HEAD -> main) Merge branches 'A', 'B' and 'C'
+    *-.   c1cb047 (HEAD -> main) Merge branches 'A', 'B' and 'C'
     |\ \  
-    * | | 37fb54d (A) A: 10 lines on top
+    * | | 275b149 (A) A: 10 lines on top
     |\| | 
-    | * | d202f84 (B) B: another 10 lines at the bottom
+    | * | 9c9c689 (B) B: another 10 lines at the bottom
     | |\| 
     | | * 930563a (C) C: add another 10 lines to new file
     | | * 68a2fc3 C: add 10 lines to new file
