@@ -1,5 +1,9 @@
 .popup {
 	display: flex;
-	column-gap: 8px;
-	align-items: center;
+	row-gap: 4px;
+	flex-direction: column;
+
+	button {
+		text-align: center;
+	}
 }

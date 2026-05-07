@@ -238,7 +238,7 @@ export const OperationTooltip: FC<
 		>
 			<Tooltip.Trigger render={trigger} />
 			<Tooltip.Portal>
-				<Tooltip.Positioner sideOffset={8}>
+				<Tooltip.Positioner sideOffset={8} side="right">
 					<Tooltip.Popup className={classes(uiStyles.popup, uiStyles.tooltip, styles.popup)}>
 						{tooltip}
 					</Tooltip.Popup>
