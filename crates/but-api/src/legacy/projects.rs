@@ -6,8 +6,6 @@ use but_ctx::{Context, ProjectHandleOrLegacyProjectId};
 use but_error::Code;
 use tracing::instrument;
 
-use super::legacy_project;
-
 #[but_api]
 #[instrument(err(Debug))]
 pub fn update_project(
@@ -43,8 +41,13 @@ pub fn get_project(
     match project_id {
         ProjectHandleOrLegacyProjectId::ProjectHandle(handle) => {
             if no_validation {
-                let ctx = Context::new_from_project_handle(handle)?;
-                Ok(ctx.legacy_project.migrated()?.into())
+                Ok(
+                    gitbutler_project::get_raw(ProjectHandleOrLegacyProjectId::ProjectHandle(
+                        handle,
+                    ))?
+                    .migrated()?
+                    .into(),
+                )
             } else {
                 Ok(gitbutler_project::get_validated(
                     ProjectHandleOrLegacyProjectId::ProjectHandle(handle),
@@ -76,10 +79,26 @@ pub fn list_projects_stateless() -> Result<Vec<ProjectForFrontend>> {
 pub fn list_projects(
     opened_projects: Vec<ProjectHandleOrLegacyProjectId>,
 ) -> Result<Vec<ProjectForFrontend>> {
+    // Skip handles that can no longer be resolved — e.g. the project was just deleted
+    // from storage but the frontend's `opened_projects` set hasn't caught up yet.
+    // Failing the whole listing on a stale entry would break the post-deletion refresh
+    // flow. Mirrors the warn-and-skip pattern used below for migration failures.
     let opened_projects: std::collections::HashSet<_> = opened_projects
         .into_iter()
-        .map(|project_id| legacy_project(project_id).map(|project| project.id))
-        .collect::<Result<_>>()?;
+        .filter_map(
+            |project_id| match gitbutler_project::get_raw(project_id.clone()) {
+                Ok(project) => Some(project.id),
+                Err(err) => {
+                    tracing::warn!(
+                        ?err,
+                        ?project_id,
+                        "Skipping over opened project as its handle could not be resolved"
+                    );
+                    None
+                }
+            },
+        )
+        .collect();
 
     gitbutler_project::assure_app_can_startup_or_fix_it(
         gitbutler_project::dangerously_list_projects_without_migration(),
@@ -107,7 +126,7 @@ pub fn list_projects(
 #[but_api]
 #[instrument(err(Debug))]
 pub fn delete_project(project_id: ProjectHandleOrLegacyProjectId) -> Result<()> {
-    let project = legacy_project(project_id)?;
+    let project = gitbutler_project::get_raw(project_id)?;
     gitbutler_project::delete(project.id)
 }
 
