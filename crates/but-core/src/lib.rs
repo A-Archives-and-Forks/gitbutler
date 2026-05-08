@@ -180,9 +180,7 @@ pub trait RefMetadata {
     ///
     /// If not, they are dangling, and can then be downcast to their actual type to deal with them in some way,
     /// either by [removing](Self::remove) them, or by re-associating them with an existing reference.
-    fn iter(
-        &self,
-    ) -> impl Iterator<Item = anyhow::Result<(gix::refs::FullName, Box<dyn Any>)>> + '_;
+    fn iter(&self) -> impl Iterator<Item = anyhow::Result<(gix::refs::FullName, Box<dyn Any>)>>;
 
     /// Retrieve workspace metadata for `ref_name` or create it if it wasn't present yet.
     fn workspace(

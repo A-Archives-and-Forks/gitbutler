@@ -53,9 +53,7 @@ impl<T> ValueInfo for EmptyRefMetadataHandle<T> {
 impl RefMetadata for EmptyRefMetadata {
     type Handle<T> = EmptyRefMetadataHandle<T>;
 
-    fn iter(
-        &self,
-    ) -> impl Iterator<Item = anyhow::Result<(gix::refs::FullName, Box<dyn Any>)>> + '_ {
+    fn iter(&self) -> impl Iterator<Item = anyhow::Result<(gix::refs::FullName, Box<dyn Any>)>> {
         std::iter::empty()
     }
 
