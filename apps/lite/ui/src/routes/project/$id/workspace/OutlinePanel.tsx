@@ -8,7 +8,11 @@ import {
 	unapplyStackMutationOptions,
 	updateBranchNameMutationOptions,
 } from "#ui/api/mutations.ts";
-import { changesInWorktreeQueryOptions, headInfoQueryOptions } from "#ui/api/queries.ts";
+import {
+	absorptionPlanQueryOptions,
+	changesInWorktreeQueryOptions,
+	headInfoQueryOptions,
+} from "#ui/api/queries.ts";
 import { getCommonBaseCommitId } from "#ui/api/ref-info.ts";
 import { encodeRefName } from "#ui/api/ref-name.ts";
 import { commitTitle, shortCommitId } from "#ui/commit.ts";
@@ -187,11 +191,7 @@ const useNavigationIndex = (projectId: string) => {
 	return navigationIndex;
 };
 
-export const OutlinePanel: FC<
-	{
-		onAbsorbChanges: (target: AbsorptionTarget) => void;
-	} & PanelProps
-> = ({ onAbsorbChanges, ...panelProps }) => (
+export const OutlinePanel: FC<{} & PanelProps> = ({ ...panelProps }) => (
 	<Suspense
 		fallback={
 			<Panel {...panelProps} className={classes(panelProps.className, styles.panelPadding)}>
@@ -199,15 +199,11 @@ export const OutlinePanel: FC<
 			</Panel>
 		}
 	>
-		<OutlineTreePanel onAbsorbChanges={onAbsorbChanges} {...panelProps} />
+		<OutlineTreePanel {...panelProps} />
 	</Suspense>
 );
 
-const OutlineTreePanel: FC<
-	{
-		onAbsorbChanges: (target: AbsorptionTarget) => void;
-	} & PanelProps
-> = ({ onAbsorbChanges, ...panelProps }) => {
+const OutlineTreePanel: FC<{} & PanelProps> = ({ ...panelProps }) => {
 	const { id: projectId } = useParams({ from: "/project/$id/workspace" });
 	const dispatch = useAppDispatch();
 
@@ -241,11 +237,7 @@ const OutlineTreePanel: FC<
 			className={classes(panelProps.className, styles.panel)}
 		>
 			<div className={styles.panelPadding}>
-				<Changes
-					projectId={projectId}
-					onAbsorbChanges={onAbsorbChanges}
-					navigationIndex={navigationIndex}
-				/>
+				<Changes projectId={projectId} navigationIndex={navigationIndex} />
 			</div>
 
 			<div className={styles.scroller}>
@@ -746,16 +738,25 @@ const CommitC: FC<{
 const ChangesSectionRow: FC<{
 	changes: Array<TreeChange>;
 	navigationIndex: NavigationIndex;
-	onAbsorbChanges: (target: AbsorptionTarget) => void;
+
 	projectId: string;
-}> = ({ changes, navigationIndex, onAbsorbChanges, projectId }) => {
+}> = ({ changes, navigationIndex, projectId }) => {
 	const operand = changesSectionOperand;
 	const isSelected = useIsSelected({ projectId, operand });
 	const focusedPanel = useFocusedProjectPanel(projectId);
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
+	const dispatch = useAppDispatch();
+	const queryClient = useQueryClient();
+	const openAbsorptionDialog = (target: AbsorptionTarget) => {
+		// [ref:absorption-dialog-prefetch]
+		void queryClient.prefetchQuery(absorptionPlanQueryOptions({ projectId, target })).then(() => {
+			dispatch(projectActions.openAbsorptionDialog({ projectId, target }));
+		});
+	};
+
 	const absorb = () => {
-		onAbsorbChanges({ type: "all" });
+		openAbsorptionDialog({ type: "all" });
 	};
 
 	const { contextMenu: absorbContextMenuItem } = useCommand(absorb, {
@@ -873,9 +874,9 @@ const CommitBranchComboboxPopup: FC = () => (
 
 const Changes: FC<{
 	projectId: string;
-	onAbsorbChanges: (target: AbsorptionTarget) => void;
+
 	navigationIndex: NavigationIndex;
-}> = ({ projectId, onAbsorbChanges, navigationIndex }) => {
+}> = ({ projectId, navigationIndex }) => {
 	const toastManager = Toast.useToastManager();
 
 	const commitCreate = useMutation({
@@ -1029,7 +1030,6 @@ const Changes: FC<{
 			<ChangesSectionRow
 				changes={worktreeChanges.changes}
 				navigationIndex={navigationIndex}
-				onAbsorbChanges={onAbsorbChanges}
 				projectId={projectId}
 			/>
 
