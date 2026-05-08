@@ -157,12 +157,9 @@ jobs:
           echo BUT=$PWD/target/debug/but >> $GITHUB_ENV
       - name: Setup node environment
         uses: ./.github/actions/init-env-node
-        if: ${{ github.ref != 'refs/heads/master' }}
       - id: get_playwright_version
         uses: eviden-actions/get-playwright-version@dbf7574765e85d04661ac1717f3cb8a99474ffd7 # v1
-        if: ${{ github.ref != 'refs/heads/master' }}
       - name: Cache playwright binaries
-        if: ${{ github.ref != 'refs/heads/master' }}
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         id: playwright-cache
         with:
@@ -170,7 +167,6 @@ jobs:
             ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ steps.get_playwright_version.outputs.playwright-version }}
       - name: Build Rust binaries, SvelteKit, and install Playwright
-        if: ${{ github.ref != 'refs/heads/master' }}
         env:
           PLAYWRIGHT_CACHE_HIT: ${{ steps.playwright-cache.outputs.cache-hit }}
         run: |
@@ -188,12 +184,8 @@ jobs:
           wait "$pnpm_pid" || status=1
           [ -n "$pw_pid" ] && { wait "$pw_pid" || status=1; }
           exit "$status"
-      - name: Build Rust binaries
-        if: ${{ github.ref == 'refs/heads/master' }}
-        run: cargo build -p gitbutler-git -p but-server -p but
       - name: Run Playwright tests
         run: pnpm exec turbo run test:e2e:playwright
-        if: ${{ github.ref != 'refs/heads/master' }}
         env:
           BUILDKITE_ANALYTICS_TOKEN: ${{ secrets.BUILDKITE_SUITE_TOKEN_PLAYWRIGHT }}
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

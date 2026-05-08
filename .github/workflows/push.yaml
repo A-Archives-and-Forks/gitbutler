@@ -667,7 +667,8 @@ jobs:
         if: ${{ steps.playwright-cache.outputs.cache-hit != 'true' }}
       - name: run playwright tests
         run: pnpm test:ct
-        if: ${{ github.ref != 'refs/heads/master' }}
+        env:
+          BUILDKITE_ANALYTICS_TOKEN: ${{ secrets.BUILDKITE_SUITE_TOKEN_PLAYWRIGHT_CT }}
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ !cancelled() }}
         with:
