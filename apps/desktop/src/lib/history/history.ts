@@ -45,8 +45,7 @@ class SnapshotPager {
 		if (!this.cursor) throw new Error("Not without a cursor");
 		if (get(this.isAllLoaded)) return; // Nothing to do.
 
-		// TODO: Update API so we don't have to .slice()
-		const more = (await this.fetch(this.cursor)).slice(1);
+		const more = await this.fetch(this.cursor);
 
 		if (more.length === 0) {
 			this.isAllLoaded.set(true);

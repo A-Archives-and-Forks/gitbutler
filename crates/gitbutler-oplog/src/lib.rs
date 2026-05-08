@@ -1,6 +1,7 @@
 pub mod entry;
 mod oplog;
 pub use oplog::OplogExt;
+pub use oplog::RestoreKind;
 mod reflog;
 mod snapshot;
 pub use snapshot::SnapshotExt;

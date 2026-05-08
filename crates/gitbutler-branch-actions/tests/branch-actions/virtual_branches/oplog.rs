@@ -8,8 +8,8 @@ use std::{io::Write, path::Path};
 use bstr::ByteSlice as _;
 use but_core::{GitConfigSettings, RepositoryExt as _};
 use gitbutler_branch::BranchCreateRequest;
-use gitbutler_oplog::OplogExt;
 use gitbutler_oplog::entry::{OperationKind, SnapshotDetails};
+use gitbutler_oplog::{OplogExt, RestoreKind};
 use gitbutler_stack::VirtualBranchesHandle;
 use itertools::Itertools;
 
@@ -60,7 +60,10 @@ fn workdir_vbranch_restore() -> anyhow::Result<()> {
     )?;
     drop(guard);
 
-    let snapshots = ctx.list_snapshots(10, None, Vec::new(), None)?;
+    let snapshots = ctx
+        .snapshots_iter(None, Vec::new(), None)?
+        .take(10)
+        .collect::<anyhow::Result<Vec<_>>>()?;
     assert_eq!(
         snapshots.len(),
         7,
@@ -70,11 +73,18 @@ fn workdir_vbranch_restore() -> anyhow::Result<()> {
     let previous_files_count = wd_file_count(&worktree_dir)?;
     assert_eq!(previous_files_count, 3, "one file per round");
     let mut guard = ctx.exclusive_worktree_access();
-    ctx.restore_snapshot(snapshots[0].commit_id, guard.write_permission())
-        .expect("restoration succeeds");
+    ctx.restore_snapshot(
+        snapshots[0].commit_id,
+        RestoreKind::RestoreFromSnapshotViaUndo,
+        guard.write_permission(),
+    )
+    .expect("restoration succeeds");
 
     assert_eq!(
-        ctx.list_snapshots(10, None, Vec::new(), None)?.len(),
+        ctx.snapshots_iter(None, Vec::new(), None)?
+            .take(10)
+            .collect::<anyhow::Result<Vec<_>>>()?
+            .len(),
         8,
         "all the previous + 1 restore commit"
     );
@@ -209,7 +219,10 @@ fn basic_oplog() -> anyhow::Result<()> {
         3
     );
 
-    let snapshots = ctx.list_snapshots(10, None, Vec::new(), None)?;
+    let snapshots = ctx
+        .snapshots_iter(None, Vec::new(), None)?
+        .take(10)
+        .collect::<anyhow::Result<Vec<_>>>()?;
 
     let ops = snapshots
         .iter()
@@ -229,7 +242,11 @@ fn basic_oplog() -> anyhow::Result<()> {
 
     {
         let mut guard = ctx.exclusive_worktree_access();
-        ctx.restore_snapshot(snapshots[1].clone().commit_id, guard.write_permission())?;
+        ctx.restore_snapshot(
+            snapshots[1].clone().commit_id,
+            RestoreKind::RestoreFromSnapshotViaUndo,
+            guard.write_permission(),
+        )?;
     }
 
     // restores the conflict files
@@ -240,7 +257,11 @@ fn basic_oplog() -> anyhow::Result<()> {
 
     {
         let mut guard = ctx.exclusive_worktree_access();
-        ctx.restore_snapshot(snapshots[2].clone().commit_id, guard.write_permission())?;
+        ctx.restore_snapshot(
+            snapshots[2].clone().commit_id,
+            RestoreKind::RestoreFromSnapshotViaUndo,
+            guard.write_permission(),
+        )?;
     }
 
     // the restore removed our new branch
@@ -269,7 +290,11 @@ fn basic_oplog() -> anyhow::Result<()> {
     {
         let mut guard = ctx.exclusive_worktree_access();
         // The ctx stores the `git2` repo
-        ctx.restore_snapshot(snapshots[1].commit_id, guard.write_permission())?;
+        ctx.restore_snapshot(
+            snapshots[1].commit_id,
+            RestoreKind::RestoreFromSnapshotViaUndo,
+            guard.write_permission(),
+        )?;
     }
 
     // test missing commits are recreated
@@ -377,7 +402,10 @@ fn restores_gitbutler_workspace() -> anyhow::Result<()> {
     }
 
     // restore the first
-    let snapshots = ctx.list_snapshots(10, None, Vec::new(), None)?;
+    let snapshots = ctx
+        .snapshots_iter(None, Vec::new(), None)?
+        .take(10)
+        .collect::<anyhow::Result<Vec<_>>>()?;
     assert_eq!(
         snapshots.len(),
         3,
@@ -385,8 +413,12 @@ fn restores_gitbutler_workspace() -> anyhow::Result<()> {
     );
 
     let mut guard = ctx.exclusive_worktree_access();
-    ctx.restore_snapshot(snapshots[0].commit_id, guard.write_permission())
-        .expect("can restore the most recent snapshot, to undo commit 2, resetting to commit 1");
+    ctx.restore_snapshot(
+        snapshots[0].commit_id,
+        RestoreKind::RestoreFromSnapshotViaUndo,
+        guard.write_permission(),
+    )
+    .expect("can restore the most recent snapshot, to undo commit 2, resetting to commit 1");
     drop(guard);
 
     assert_eq!(
@@ -401,28 +433,32 @@ fn restores_gitbutler_workspace() -> anyhow::Result<()> {
         1,
         "vbranches aren't affected by this (only the head commit)"
     );
-    let all_snapshots = ctx.list_snapshots(10, None, Vec::new(), None)?;
+    let all_snapshots = ctx
+        .snapshots_iter(None, Vec::new(), None)?
+        .take(10)
+        .collect::<anyhow::Result<Vec<_>>>()?;
     assert_eq!(
         all_snapshots.len(),
         4,
         "the restore is tracked as separate snapshot"
     );
 
-    assert_eq!(
-        ctx.list_snapshots(0, None, Vec::new(), None)?.len(),
-        0,
-        "it respects even non-sensical limits"
-    );
-
-    let snapshots = ctx.list_snapshots(1, None, Vec::new(), None)?;
+    let snapshots = ctx
+        .snapshots_iter(None, Vec::new(), None)?
+        .take(1)
+        .collect::<anyhow::Result<Vec<_>>>()?;
     assert_eq!(snapshots.len(), 1);
     assert_eq!(
-        ctx.list_snapshots(1, None, Vec::new(), None)?,
+        ctx.snapshots_iter(None, Vec::new(), None)?
+            .take(1)
+            .collect::<anyhow::Result<Vec<_>>>()?,
         snapshots,
-        "traversal from oplog head is the same as if it wasn't specified, and the given head is returned first"
+        "traversal from the oplog head is the same as when no cursor is specified"
     );
     assert_eq!(
-        ctx.list_snapshots(10, Some(all_snapshots[2].commit_id), Vec::new(), None)?,
+        ctx.snapshots_iter(Some(all_snapshots[2].commit_id), Vec::new(), None)?
+            .take(10)
+            .collect::<anyhow::Result<Vec<_>>>()?,
         &all_snapshots[3..],
     );
 
@@ -466,7 +502,10 @@ fn restore_snapshot_with_empty_branch_in_workspace() -> anyhow::Result<()> {
     )?;
     drop(guard);
 
-    let snapshots = ctx.list_snapshots(10, None, Vec::new(), None)?;
+    let snapshots = ctx
+        .snapshots_iter(None, Vec::new(), None)?
+        .take(10)
+        .collect::<anyhow::Result<Vec<_>>>()?;
     // CreateBranch (empty), CreateCommit, CreateBranch (has-commits)
     assert_eq!(snapshots.len(), 3);
 
@@ -474,12 +513,19 @@ fn restore_snapshot_with_empty_branch_in_workspace() -> anyhow::Result<()> {
     // This forces the restore code to walk the snapshot tree that contains
     // the empty branch entry (no `commits` subtree).
     let mut guard = ctx.exclusive_worktree_access();
-    ctx.restore_snapshot(snapshots[1].commit_id, guard.write_permission())
-        .expect("restore must succeed even with an empty branch in the workspace");
+    ctx.restore_snapshot(
+        snapshots[1].commit_id,
+        RestoreKind::RestoreFromSnapshotViaUndo,
+        guard.write_permission(),
+    )
+    .expect("restore must succeed even with an empty branch in the workspace");
     drop(guard);
 
     // Verify the restore was recorded.
-    let snapshots_after = ctx.list_snapshots(10, None, Vec::new(), None)?;
+    let snapshots_after = ctx
+        .snapshots_iter(None, Vec::new(), None)?
+        .take(10)
+        .collect::<anyhow::Result<Vec<_>>>()?;
     assert_eq!(
         snapshots_after.len(),
         snapshots.len() + 1,
@@ -511,7 +557,12 @@ fn head_corrupt_is_recreated_automatically() {
     .unwrap();
     drop(guard);
 
-    let snapshots = ctx.list_snapshots(10, None, Vec::new(), None).unwrap();
+    let snapshots = ctx
+        .snapshots_iter(None, Vec::new(), None)
+        .unwrap()
+        .take(10)
+        .collect::<anyhow::Result<Vec<_>>>()
+        .unwrap();
     assert_eq!(
         snapshots.len(),
         1,
@@ -534,7 +585,12 @@ fn head_corrupt_is_recreated_automatically() {
     )
     .expect("the snapshot doesn't fail despite the corrupt head");
 
-    let snapshots = ctx.list_snapshots(10, None, Vec::new(), None).unwrap();
+    let snapshots = ctx
+        .snapshots_iter(None, Vec::new(), None)
+        .unwrap()
+        .take(10)
+        .collect::<anyhow::Result<Vec<_>>>()
+        .unwrap();
     assert_eq!(
         snapshots.len(),
         1,
@@ -566,7 +622,10 @@ fn first_snapshot_diff_works() -> anyhow::Result<()> {
     fs::write(repo.path().join("file.txt"), "content")?;
     let _commit_id = super::create_commit(ctx, stack_entry.id, "first commit")?;
 
-    let snapshots = ctx.list_snapshots(10, None, Vec::new(), None)?;
+    let snapshots = ctx
+        .snapshots_iter(None, Vec::new(), None)?
+        .take(10)
+        .collect::<anyhow::Result<Vec<_>>>()?;
     assert!(!snapshots.is_empty(), "Should have at least one snapshot");
 
     // Test snapshot_diff on all snapshots to make sure none fail (including the first one)

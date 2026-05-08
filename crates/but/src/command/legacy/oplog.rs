@@ -1,3 +1,4 @@
+use but_api::legacy::oplog::RestoreKind;
 use but_core::RepositoryExt;
 use gitbutler_oplog::entry::{OperationKind, Snapshot};
 use gix::{date::time::CustomFormat, prelude::ObjectIdExt};
@@ -45,7 +46,9 @@ pub(crate) fn show_oplog(
         None
     };
 
-    let snapshots = but_api::legacy::oplog::list_snapshots(ctx, 20, since_sha, None, include_kind)?;
+    let snapshots = but_api::legacy::oplog::snapshots_iter(ctx, since_sha, None, include_kind)?
+        .take(20)
+        .collect::<anyhow::Result<Vec<_>>>()?;
 
     if snapshots.is_empty() {
         if let Some(out) = out.for_json() {
@@ -118,7 +121,7 @@ pub(crate) fn show_oplog(
             let operation_colored = match operation_type {
                 "COMMIT" => t.success.paint(operation_type),
                 "AMEND" | "REWORD" => t.attention.paint(operation_type),
-                "UNDO_COMMIT" | "RESTORE" => t.error.paint(operation_type),
+                "UNDO_COMMIT" | "RESTORE" | "UNDO" => t.error.paint(operation_type),
                 "DISCARD" => t.error.paint(operation_type),
                 "BRANCH" | "CHECKOUT" => t.local_branch.paint(operation_type),
                 "MOVE" | "REORDER" | "MOVE_HUNK" => t.info.paint(operation_type),
@@ -199,7 +202,11 @@ pub(crate) fn restore_to_oplog(
     }
 
     // Restore to the target snapshot using the but-api crate
-    but_api::legacy::oplog::restore_snapshot(ctx, commit_id)?;
+    but_api::legacy::oplog::restore_snapshot_with_kind(
+        ctx,
+        RestoreKind::ExplicitRestoreFromSnapshot,
+        commit_id,
+    )?;
 
     if let Some(out) = out.for_human() {
         let t = theme::get();
@@ -220,23 +227,10 @@ pub(crate) fn undo_last_operation(
     ctx: &mut but_ctx::Context,
     out: &mut OutputChannel,
 ) -> anyhow::Result<()> {
-    // As we snapshot before mutation, undoing the last operation is equivalent to restoring the
-    // latest snapshot.
-    let snapshots = but_api::legacy::oplog::list_snapshots(ctx, 1, None, None, None)?;
-
-    if snapshots.is_empty() {
-        if let Some(out) = out.for_human() {
-            let t = theme::get();
-            writeln!(
-                out,
-                "{}",
-                t.attention.paint("No previous operations to undo.")
-            )?;
-        }
+    let Some(target_snapshot) = but_api::legacy::oplog::get_undo_target_snapshot(ctx)? else {
+        print_no_snapshot_to_restore_to(out)?;
         return Ok(());
-    }
-
-    let target_snapshot = &snapshots[0];
+    };
 
     let target_operation = target_snapshot
         .details
@@ -244,7 +238,7 @@ pub(crate) fn undo_last_operation(
         .map(|d| d.title.as_str())
         .unwrap_or("Unknown operation");
 
-    let target_time = snapshot_time_string(target_snapshot);
+    let target_time = snapshot_time_string(&target_snapshot);
 
     if let Some(out) = out.for_human() {
         let t = theme::get();
@@ -259,7 +253,11 @@ pub(crate) fn undo_last_operation(
 
     // Restore to the previous snapshot using the but_api
     // TODO: Why does this not require force? It will also overwrite user changes (I think).
-    but_api::legacy::oplog::restore_snapshot(ctx, target_snapshot.commit_id)?;
+    but_api::legacy::oplog::restore_snapshot_with_kind(
+        ctx,
+        RestoreKind::RestoreFromSnapshotViaUndo,
+        target_snapshot.commit_id,
+    )?;
 
     if let Some(out) = out.for_human() {
         let t = theme::get();
@@ -274,6 +272,18 @@ pub(crate) fn undo_last_operation(
         )?;
     }
 
+    Ok(())
+}
+
+fn print_no_snapshot_to_restore_to(out: &mut OutputChannel) -> anyhow::Result<()> {
+    if let Some(out) = out.for_human() {
+        let t = theme::get();
+        writeln!(
+            out,
+            "{}",
+            t.attention.paint("No previous operations to undo.")
+        )?;
+    }
     Ok(())
 }
 

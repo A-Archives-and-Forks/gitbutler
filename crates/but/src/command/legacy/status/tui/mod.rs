@@ -11,7 +11,7 @@ use std::{
 
 use anyhow::Context as _;
 use bstr::{BString, ByteSlice};
-use but_api::diff::ComputeLineStats;
+use but_api::{diff::ComputeLineStats, legacy::oplog::RestoreKind};
 use but_core::ref_metadata::StackId;
 use but_core::tree::create_tree::RejectionReason;
 use but_ctx::Context;
@@ -2531,13 +2531,9 @@ impl App {
     }
 
     fn handle_undo(&mut self, ctx: &mut Context) -> anyhow::Result<()> {
-        let snapshots = but_api::legacy::oplog::list_snapshots(ctx, 1, None, None, None)?;
-
-        if snapshots.is_empty() {
+        let Some(target_snapshot) = but_api::legacy::oplog::get_undo_target_snapshot(ctx)? else {
             return Ok(());
-        }
-
-        let target_snapshot = snapshots.first().unwrap();
+        };
 
         let text = {
             let time = target_snapshot
@@ -2566,7 +2562,11 @@ impl App {
 
         let commit = target_snapshot.commit_id;
         self.confirm = Some(Confirm::new(text, self.theme, move |ctx, messages| {
-            but_api::legacy::oplog::restore_snapshot(ctx, commit)?;
+            but_api::legacy::oplog::restore_snapshot_with_kind(
+                ctx,
+                RestoreKind::RestoreFromSnapshotViaUndo,
+                commit,
+            )?;
             messages.push(Message::Reload(None));
             Ok(())
         }));

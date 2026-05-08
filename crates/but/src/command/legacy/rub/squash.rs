@@ -310,7 +310,12 @@ fn squash_commits_internal(
     let final_commit_oid = match squash_result {
         Ok(final_commit_oid) => final_commit_oid,
         Err(err) => {
-            ctx.restore_snapshot(snapshot, perm).with_context(|| {
+            ctx.restore_snapshot(
+                snapshot,
+                gitbutler_oplog::RestoreKind::ExplicitRestoreFromSnapshot,
+                perm,
+            )
+            .with_context(|| {
                 format!("Failed to restore snapshot {snapshot} after squash failure")
             })?;
             return Err(err);
