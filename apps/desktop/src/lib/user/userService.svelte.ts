@@ -36,7 +36,13 @@ export class UserService {
 		this.userQuery = this.backendApi.endpoints.getUser.useQuery(undefined);
 
 		$effect(() => {
-			if (this.userQuery.result.isSuccess && !this.userQuery.response) {
+			if (!this.userQuery.result.isSuccess) return;
+
+			const user = this.userQuery.response;
+			if (user) {
+				this.tokenMemoryService.setToken(user.access_token);
+				this.setUserTelemetry(user);
+			} else {
 				this.posthog.setAnonymousPostHogUser();
 			}
 		});
