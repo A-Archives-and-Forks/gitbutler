@@ -1,4 +1,4 @@
-import { createRoute, notFound } from "@tanstack/react-router";
+import { createRoute, notFound, Outlet } from "@tanstack/react-router";
 
 import { Route as rootRoute } from "#ui/routes/__root.tsx";
 import { handleWatcher } from "#ui/watcher.ts";
@@ -6,6 +6,9 @@ import { handleWatcher } from "#ui/watcher.ts";
 export const Route = createRoute({
 	getParentRoute: () => rootRoute,
 	path: "project/$id",
+	remountDeps: ({ params }) => params.id,
+	// Needed for `remountDeps` to work.
+	component: () => <Outlet />,
 	beforeLoad: ({ matches, routeId }) => {
 		// We don't want an index route.
 		if (matches.at(-1)?.routeId === routeId) throw notFound();
