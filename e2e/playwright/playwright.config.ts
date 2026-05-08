@@ -29,7 +29,7 @@ export default defineConfig({
 	reporter: process.env.CI ? [["github"], ["buildkite-test-collector/playwright/reporter"]] : "dot",
 	/* Per-test timeout. The default 30s is too tight for tests that perform
 	   multiple commits in CI, where backend operations are slower. */
-	timeout: 60_000,
+	timeout: 120_000,
 	/* Assertion timeout. The default 5s is too tight for CI where backend
 	   operations (commits, rebases, upstream integration) are slower. */
 	expect: { timeout: 15_000 },
