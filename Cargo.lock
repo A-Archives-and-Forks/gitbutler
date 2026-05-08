@@ -862,6 +862,7 @@ dependencies = [
  "gitbutler-oplog",
  "gitbutler-project",
  "gitbutler-repo",
+ "gitbutler-watcher",
  "gix",
  "indexmap 2.14.0",
  "insta",

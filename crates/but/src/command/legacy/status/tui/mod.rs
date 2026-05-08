@@ -5,7 +5,7 @@ use std::{
     ffi::OsString,
     process::Command,
     rc::Rc,
-    sync::{Arc, mpsc::Receiver},
+    sync::{Arc, atomic::AtomicBool, mpsc::Receiver},
     time::{Duration, Instant},
 };
 
@@ -16,6 +16,7 @@ use but_core::ref_metadata::StackId;
 use but_core::tree::create_tree::RejectionReason;
 use but_ctx::Context;
 use but_rebase::graph_rebase::mutate::InsertSide;
+use but_settings::AppSettingsWithDiskSync;
 use but_workspace::commit::squash_commits::MessageCombinationStrategy;
 use crossterm::event::{self, Event, KeyCode, KeyEvent};
 use gitbutler_operating_modes::OperatingMode;
@@ -99,6 +100,16 @@ const DETAILS_SIZE_ADJUSTMENT_PERCENTAGE: u16 = 5;
 const DETAILS_MIN_SIZE_PERCENTAGE: u16 = 30;
 const DETAILS_MAX_SIZE_PERCENTAGE: u16 = 90;
 
+/// How long to ignore watcher reloads after a TUI mutation.
+///
+/// Covers the watcher's normal idle debounce, with extra time for Windows'
+/// slower watcher tick. Intentionally shorter than the max debounce timeout.
+const WATCHER_SELF_ECHO_SUPPRESSION: Duration = if cfg!(windows) {
+    Duration::from_secs(1)
+} else {
+    Duration::from_millis(500)
+};
+
 pub(super) async fn render_tui(
     ctx: &mut Context,
     out: &mut OutputChannel,
@@ -124,12 +135,16 @@ pub(super) async fn render_tui(
             event_polling,
             &mut messages,
             &mut other_messages,
+            <Arc<AtomicBool>>::default(),
             ctx,
             out,
             mode,
         )
         .await?;
     } else {
+        let (_watcher_handle, received_watcher_event) =
+            start_watcher(ctx).context("failed to start filesystem watcher")?;
+
         let mut terminal_guard = CrosstermTerminalGuard::new(true)?;
         let event_polling = CrosstermEventPolling;
 
@@ -139,6 +154,7 @@ pub(super) async fn render_tui(
             event_polling,
             &mut messages,
             &mut other_messages,
+            received_watcher_event,
             ctx,
             out,
             mode,
@@ -155,6 +171,7 @@ async fn render_loop<T, E>(
     event_polling: E,
     messages: &mut Vec<Message>,
     other_messages: &mut Vec<Message>,
+    received_watcher_event: Arc<AtomicBool>,
     ctx: &mut Context,
     out: &mut OutputChannel,
     mode: &OperatingMode,
@@ -181,6 +198,7 @@ where
             event_polling,
             messages,
             other_messages,
+            &received_watcher_event,
             ctx,
             out,
             mode,
@@ -200,6 +218,7 @@ async fn render_loop_once<T, E>(
     event_polling: E,
     messages: &mut Vec<Message>,
     other_messages: &mut Vec<Message>,
+    received_watcher_event: &AtomicBool,
     ctx: &mut Context,
     out: &mut OutputChannel,
     mode: &OperatingMode,
@@ -215,6 +234,7 @@ where
         event_polling,
         messages,
         other_messages,
+        received_watcher_event,
         ctx,
         out,
         mode,
@@ -235,6 +255,7 @@ async fn update<T, E>(
     event_polling: E,
     messages: &mut Vec<Message>,
     other_messages: &mut Vec<Message>,
+    received_watcher_event: &AtomicBool,
     ctx: &mut Context,
     out: &mut OutputChannel,
     mode: &OperatingMode,
@@ -276,6 +297,22 @@ where
             },
         });
 
+    // check for events from the watcher
+    if received_watcher_event
+        .compare_exchange(
+            true,
+            false,
+            std::sync::atomic::Ordering::SeqCst,
+            std::sync::atomic::Ordering::SeqCst,
+        )
+        .is_ok_and(|value| value)
+        && app
+            .previous_reload_caused_by_mutation_timestamp
+            .is_none_or(|timestamp| timestamp.elapsed() > WATCHER_SELF_ECHO_SUPPRESSION)
+    {
+        messages.push(Message::Reload(None, ReloadCause::Watcher));
+    }
+
     // handle messages
     let mut did_reload = false;
     messages.append(&mut app.delayed_messages);
@@ -284,7 +321,7 @@ where
             break;
         }
         for msg in messages.drain(..) {
-            if matches!(msg, Message::Reload(_)) {
+            if matches!(msg, Message::Reload(..)) {
                 if did_reload && cfg!(feature = "tui-profiling") && !cfg!(test) {
                     app.toasts
                         .insert(ToastKind::Error, "Double reload".to_owned());
@@ -379,6 +416,7 @@ struct App {
     help: Option<Help>,
     has_focus: bool,
     backstack: Backstack,
+    previous_reload_caused_by_mutation_timestamp: Option<Instant>,
 }
 
 #[derive(Debug)]
@@ -438,6 +476,7 @@ impl App {
             to_be_discarded: Default::default(),
             branch_picker: Default::default(),
             backstack: Default::default(),
+            previous_reload_caused_by_mutation_timestamp: Default::default(),
             fps: FpsCounter::new(),
             confirm: None,
             details,
@@ -630,8 +669,8 @@ impl App {
                     self.handle_files_toggle_files_for_commit(ctx, messages)?
                 }
             },
-            Message::Reload(select_after_reload) => {
-                self.handle_reload(ctx, out, mode, select_after_reload)
+            Message::Reload(select_after_reload, cause) => {
+                self.handle_reload(ctx, out, mode, select_after_reload, cause)
                     .await?
             }
             Message::ShowError(err) => self.handle_show_error(err, messages),
@@ -834,7 +873,7 @@ impl App {
             }
             BackstackEntry::ShowFileList => {
                 self.flags.show_files = FilesStatusFlag::None;
-                messages.push(Message::Reload(None));
+                messages.push(Message::Reload(None, ReloadCause::ViewOnly));
             }
             BackstackEntry::Mark => match self
                 .mode
@@ -1108,7 +1147,7 @@ impl App {
                 FilesStatusFlag::None
             }
         };
-        messages.push(Message::Reload(None));
+        messages.push(Message::Reload(None, ReloadCause::ViewOnly));
     }
 
     fn handle_files_toggle_files_for_commit(
@@ -1133,12 +1172,12 @@ impl App {
                         Some(SelectAfterReload::Commit(*commit_id))
                     }
                 };
-                messages.push(Message::Reload(select_after_reload));
+                messages.push(Message::Reload(select_after_reload, ReloadCause::ViewOnly));
             }
         } else {
             self.flags.show_files = FilesStatusFlag::None;
             self.backstack.remove_show_file_list();
-            messages.push(Message::Reload(None));
+            messages.push(Message::Reload(None, ReloadCause::ViewOnly));
         };
 
         Ok(())
@@ -1186,72 +1225,62 @@ impl App {
         ctx: &mut Context,
         messages: &mut Vec<Message>,
     ) -> anyhow::Result<()> {
-        let reload_message = match &*self.mode {
-            Mode::Rub(RubMode {
-                source,
-                how_to_combine_messages,
-                available_targets: _,
-                _unlock_details: _,
-            }) => {
-                if let Some(selected_line) = self.cursor.selected_line(&self.status_lines)
-                    && let Some(target) = selected_line.data.cli_id()
+        let Mode::Rub(RubMode {
+            source,
+            how_to_combine_messages,
+            available_targets: _,
+            _unlock_details: _,
+        }) = &*self.mode
+        else {
+            return Ok(());
+        };
+
+        let Some(target) = self
+            .cursor
+            .selected_line(&self.status_lines)
+            .and_then(|line| line.data.cli_id())
+        else {
+            return Ok(());
+        };
+
+        let reload_message = match source {
+            RubSource::CliId(source) => {
+                if let Some(operation) =
+                    rub::route_operation(NonEmpty::new(source), target, *how_to_combine_messages)
                 {
-                    match source {
-                        RubSource::CliId(source) => {
-                            if let Some(operation) = rub::route_operation(
-                                NonEmpty::new(source),
-                                target,
-                                *how_to_combine_messages,
-                            ) {
-                                operations::rub(ctx, &operation)?
-                                    .map(|what_to_select| Message::Reload(Some(what_to_select)))
-                            } else {
-                                None
-                            }
-                        }
-                        RubSource::CommittedHunk(hunk) => {
-                            if let Some(operation) =
-                                rub_from_detail_view::route_operation(hunk, target)
-                            {
-                                Some(Message::Reload(Some(operation.execute(ctx)?)))
-                            } else {
-                                None
-                            }
-                        }
-                        RubSource::Marks(marks) => {
-                            let sources = marks
-                                .iter()
-                                .cloned()
-                                .map(|markable| match markable {
-                                    Markable::Commit { commit_id, id } => {
-                                        CliId::Commit { commit_id, id }
-                                    }
-                                })
-                                .filter(|source| source != &**target)
-                                .collect::<Vec<_>>();
-                            let mut iter = sources.iter();
-                            if let Some(sources) =
-                                iter.next().map(|first| nonempty_from_refs(first, iter))
-                                && let Some(operation) =
-                                    rub::route_operation(sources, target, *how_to_combine_messages)
-                            {
-                                operations::rub(ctx, &operation)?
-                                    .map(|what_to_select| Message::Reload(Some(what_to_select)))
-                            } else {
-                                None
-                            }
-                        }
-                    }
+                    let what_to_select = operations::rub(ctx, &operation)?;
+                    Message::Reload(what_to_select, ReloadCause::Mutation)
                 } else {
-                    None
+                    return Ok(());
                 }
             }
-            Mode::Normal(..)
-            | Mode::Details
-            | Mode::InlineReword(..)
-            | Mode::Command(..)
-            | Mode::Commit(..)
-            | Mode::Move(..) => None,
+            RubSource::CommittedHunk(hunk) => {
+                if let Some(operation) = rub_from_detail_view::route_operation(hunk, target) {
+                    Message::Reload(Some(operation.execute(ctx)?), ReloadCause::Mutation)
+                } else {
+                    return Ok(());
+                }
+            }
+            RubSource::Marks(marks) => {
+                let sources = marks
+                    .iter()
+                    .cloned()
+                    .map(|markable| match markable {
+                        Markable::Commit { commit_id, id } => CliId::Commit { commit_id, id },
+                    })
+                    .filter(|source| source != &**target)
+                    .collect::<Vec<_>>();
+                let mut iter = sources.iter();
+                if let Some(sources) = iter.next().map(|first| nonempty_from_refs(first, iter))
+                    && let Some(operation) =
+                        rub::route_operation(sources, target, *how_to_combine_messages)
+                {
+                    let what_to_select = operations::rub(ctx, &operation)?;
+                    Message::Reload(what_to_select, ReloadCause::Mutation)
+                } else {
+                    return Ok(());
+                }
+            }
         };
 
         match self.flags.show_files {
@@ -1264,7 +1293,7 @@ impl App {
 
         messages.extend([
             Message::EnterNormalModeAfterConfirmingOperation,
-            reload_message.unwrap_or(Message::Reload(None)),
+            reload_message,
         ]);
 
         Ok(())
@@ -1277,6 +1306,7 @@ impl App {
         out: &mut OutputChannel,
         mode: &OperatingMode,
         select_after_reload: Option<SelectAfterReload>,
+        cause: ReloadCause,
     ) -> anyhow::Result<()> {
         let new_lines = operations::reload_legacy(ctx, out, mode, self.flags, self.options).await?;
 
@@ -1319,6 +1349,14 @@ impl App {
         .unwrap_or_else(|| Cursor::new(&new_lines));
 
         self.status_lines = new_lines;
+
+        match cause {
+            ReloadCause::Watcher | ReloadCause::ViewOnly | ReloadCause::Manual => {}
+            ReloadCause::Mutation => {
+                self.previous_reload_caused_by_mutation_timestamp = Some(Instant::now());
+            }
+        }
+
         Ok(())
     }
 
@@ -1369,7 +1407,10 @@ impl App {
                     self.theme,
                     move |ctx, messages| {
                         operations::discard_unassigned_legacy(ctx)?;
-                        messages.push(Message::Reload(Some(SelectAfterReload::Unassigned)));
+                        messages.push(Message::Reload(
+                            Some(SelectAfterReload::Unassigned),
+                            ReloadCause::Mutation,
+                        ));
                         drop(drop_to_be_discarded);
                         Ok(())
                     },
@@ -1409,7 +1450,10 @@ impl App {
                             .cloned()
                             .collect::<Vec<_>>();
                         operations::discard_uncommitted_legacy(ctx, hunk_assignments)?;
-                        messages.push(Message::Reload(Some(select_after_reload)));
+                        messages.push(Message::Reload(
+                            Some(select_after_reload),
+                            ReloadCause::Mutation,
+                        ));
                         drop(drop_to_be_discarded);
                         Ok(())
                     },
@@ -1428,7 +1472,10 @@ impl App {
                     self.theme,
                     move |ctx, messages| {
                         operations::discard_stack(ctx, stack_id)?;
-                        messages.push(Message::Reload(Some(select_after_reload)));
+                        messages.push(Message::Reload(
+                            Some(select_after_reload),
+                            ReloadCause::Mutation,
+                        ));
                         drop(drop_to_be_discarded);
                         Ok(())
                     },
@@ -1460,7 +1507,7 @@ impl App {
                                 }
                                 other => other,
                             });
-                        messages.push(Message::Reload(select_after_reload));
+                        messages.push(Message::Reload(select_after_reload, ReloadCause::Mutation));
                         drop(drop_to_be_discarded);
                         Ok(())
                     },
@@ -1483,7 +1530,7 @@ impl App {
                     self.theme,
                     move |ctx, messages| {
                         operations::remove_branch_legacy(ctx, stack_id, name)?;
-                        messages.push(Message::Reload(select_after_reload));
+                        messages.push(Message::Reload(select_after_reload, ReloadCause::Mutation));
                         drop(drop_to_be_discarded);
                         Ok(())
                     },
@@ -1511,9 +1558,10 @@ impl App {
 
                 let commit_result = operations::create_empty_commit_relative_to_branch(ctx, name)?;
 
-                messages.push(Message::Reload(Some(SelectAfterReload::Commit(
-                    commit_result.new_commit,
-                ))));
+                messages.push(Message::Reload(
+                    Some(SelectAfterReload::Commit(commit_result.new_commit)),
+                    ReloadCause::Mutation,
+                ));
             }
             StatusOutputLineData::Commit { cli_id, .. } => {
                 let CliId::Commit { commit_id, .. } = &**cli_id else {
@@ -1523,9 +1571,10 @@ impl App {
                 let commit_result =
                     operations::create_empty_commit_relative_to_commit(ctx, *commit_id)?;
 
-                messages.push(Message::Reload(Some(SelectAfterReload::Commit(
-                    commit_result.new_commit,
-                ))));
+                messages.push(Message::Reload(
+                    Some(SelectAfterReload::Commit(commit_result.new_commit)),
+                    ReloadCause::Mutation,
+                ));
             }
             StatusOutputLineData::UpdateNotice
             | StatusOutputLineData::Connector
@@ -1751,6 +1800,7 @@ impl App {
                     commit_create_result
                         .new_commit
                         .map(SelectAfterReload::Commit),
+                    ReloadCause::Mutation,
                 ),
             ]
             .into_iter()
@@ -1955,7 +2005,7 @@ impl App {
 
         messages.extend([
             Message::EnterNormalModeAfterConfirmingOperation,
-            Message::Reload(selection_after_reload),
+            Message::Reload(selection_after_reload, ReloadCause::Mutation),
         ]);
 
         Ok(())
@@ -1995,7 +2045,10 @@ impl App {
             | StatusOutputLineData::NoAssignmentsUnstaged => return Ok(()),
         };
 
-        messages.push(Message::Reload(Some(SelectAfterReload::Branch(new_name))));
+        messages.push(Message::Reload(
+            Some(SelectAfterReload::Branch(new_name)),
+            ReloadCause::Mutation,
+        ));
 
         Ok(())
     }
@@ -2051,9 +2104,10 @@ impl App {
             return Ok(());
         };
 
-        messages.push(Message::Reload(Some(SelectAfterReload::Commit(
-            reword_result.new_commit,
-        ))));
+        messages.push(Message::Reload(
+            Some(SelectAfterReload::Commit(reword_result.new_commit)),
+            ReloadCause::Mutation,
+        ));
 
         Ok(())
     }
@@ -2178,7 +2232,10 @@ impl App {
 
                 messages.extend([
                     Message::EnterNormalModeAfterConfirmingOperation,
-                    Message::Reload(Some(SelectAfterReload::Commit(reword_result.new_commit))),
+                    Message::Reload(
+                        Some(SelectAfterReload::Commit(reword_result.new_commit)),
+                        ReloadCause::Mutation,
+                    ),
                 ]);
             }
             InlineRewordMode::Branch { name, stack_id, .. } => {
@@ -2191,7 +2248,10 @@ impl App {
 
                 messages.extend([
                     Message::EnterNormalModeAfterConfirmingOperation,
-                    Message::Reload(Some(SelectAfterReload::Branch(new_name))),
+                    Message::Reload(
+                        Some(SelectAfterReload::Branch(new_name)),
+                        ReloadCause::Mutation,
+                    ),
                 ]);
             }
         }
@@ -2246,7 +2306,7 @@ impl App {
 
         messages.extend([
             Message::EnterNormalModeAfterConfirmingOperation,
-            Message::Reload(Some(what_to_select)),
+            Message::Reload(Some(what_to_select), ReloadCause::Mutation),
         ]);
 
         Ok(())
@@ -2323,7 +2383,7 @@ impl App {
         if status.success() {
             messages.extend([
                 Message::EnterNormalModeAfterConfirmingOperation,
-                Message::Reload(None),
+                Message::Reload(None, ReloadCause::Mutation),
             ]);
         } else {
             self.push_transient_error(anyhow::Error::msg(format!(
@@ -2592,7 +2652,7 @@ impl App {
                 },
                 commit,
             )?;
-            messages.push(Message::Reload(None));
+            messages.push(Message::Reload(None, ReloadCause::Mutation));
             Ok(())
         }));
 
@@ -2663,7 +2723,7 @@ fn event_to_messages(
             }
         },
         Event::FocusGained => {
-            messages.extend([Message::Reload(None), Message::SetHasFocus(true)]);
+            messages.push(Message::SetHasFocus(true));
         }
         Event::FocusLost => {
             messages.push(Message::SetHasFocus(false));
@@ -2818,7 +2878,7 @@ enum Message {
     JustRender,
     Quit,
     EnterNormalModeAfterConfirmingOperation,
-    Reload(Option<SelectAfterReload>),
+    Reload(Option<SelectAfterReload>, ReloadCause),
     ShowError(Arc<anyhow::Error>),
     ShowToast {
         kind: ToastKind,
@@ -2887,6 +2947,23 @@ impl Message {
             rhs: Box::new(other),
         }
     }
+}
+
+/// The cause for a reload.
+///
+/// Used to surpress watcher triggered reloads that happen after an operation from the TUI. Otherwise
+/// we'd get double reloads after performing an operation from the TUI since that changes the git
+/// repo which triggers the watcher.
+#[derive(Debug, Clone, Copy)]
+enum ReloadCause {
+    /// Reloading because some mutation was made by the TUI.
+    Mutation,
+    /// Reloading because the watcher came back with an event.
+    Watcher,
+    /// Reloading only because some TUI view state changed, not because any real data changed.
+    ViewOnly,
+    /// The user manually triggered a reload.
+    Manual,
 }
 
 #[derive(Debug, Clone)]
@@ -3001,4 +3078,47 @@ fn nonempty_from_refs<'a, T>(head: &'a T, tail: impl Iterator<Item = &'a T>) -> 
     let mut nonempty = NonEmpty::new(head);
     nonempty.extend(tail);
     nonempty
+}
+
+fn start_watcher(
+    ctx: &mut Context,
+) -> anyhow::Result<(gitbutler_watcher::WatcherHandle, Arc<AtomicBool>)> {
+    let app_settings = app_settings_sync()?;
+    let watch_mode = gitbutler_watcher::WatchMode::from_env_or_settings(
+        &app_settings.get()?.feature_flags.watch_mode,
+        |key| std::env::var(key).ok(),
+    );
+
+    let received_watcher_event = Arc::new(AtomicBool::new(false));
+
+    let handler = gitbutler_watcher::Handler::new({
+        let received_watcher_event = Arc::clone(&received_watcher_event);
+        move |_change| {
+            received_watcher_event.store(true, std::sync::atomic::Ordering::SeqCst);
+            Ok(())
+        }
+    });
+
+    let project_id = ctx.legacy_project.id.clone();
+
+    let watcher = gitbutler_watcher::watch_in_background(
+        handler,
+        ctx.workdir_or_fail()?,
+        project_id,
+        app_settings,
+        watch_mode,
+    )?;
+
+    Ok((watcher, received_watcher_event))
+}
+
+fn app_settings_sync() -> anyhow::Result<AppSettingsWithDiskSync> {
+    let config_dir = but_path::app_config_dir().context("missing app config dir")?;
+    std::fs::create_dir_all(&config_dir).with_context(|| {
+        format!(
+            "failed to create app config dir at '{}'",
+            config_dir.display()
+        )
+    })?;
+    AppSettingsWithDiskSync::new_with_customization(config_dir, None)
 }

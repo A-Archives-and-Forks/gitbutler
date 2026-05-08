@@ -3,7 +3,7 @@ use crossterm::event::*;
 use snapbox::{file, str};
 
 use crate::command::legacy::status::tui::{
-    Message,
+    Message, ReloadCause,
     tests::utils::{test_tui, test_tui_with_size},
 };
 
@@ -164,7 +164,7 @@ fn move_branch_to_merge_base_tears_off_branch() {
         None,
         Vec::from([
             Message::EnterNormalModeAfterConfirmingOperation,
-            Message::Reload(None),
+            Message::Reload(None, ReloadCause::Mutation),
         ]),
     )
     .assert_rendered_term_svg_eq(file![
