@@ -443,6 +443,17 @@ impl KeyBindsBuilder<'_> {
             .long_description("Undo the last operation")
     }
 
+    fn redo(&mut self) -> KeyBindsInModesBuilder<'_> {
+        self.key_bind(
+            "redo",
+            press().shift().code(KeyCode::Char('U')),
+            Message::Redo,
+        )
+        .show_only_in_normal_mode_help_section()
+        .hide_from_hotbar()
+        .long_description("Redo the last undo")
+    }
+
     fn mark(&mut self) -> KeyBindsInModesBuilder<'_> {
         self.key_bind("mark", press().code(KeyCode::Char(' ')), Message::Mark)
             .show_only_in_normal_mode_help_section()
@@ -837,6 +848,7 @@ fn register_normal_mode_key_binds(builder: &mut KeyBindsBuilder<'_>, without_mar
     builder.mark().register();
 
     builder.undo().register();
+    builder.redo().register();
 
     builder.branch_picker().register();
     builder.unassigned().register();

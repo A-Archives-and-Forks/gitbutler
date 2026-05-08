@@ -542,14 +542,17 @@ pub enum Subcommands {
     #[clap(verbatim_doc_comment)]
     Oplog(oplog::Platform),
 
-    /// Undo the last operation by reverting to the previous snapshot.
-    ///
-    /// This is a shorthand for restoring to the last oplog entry before the
-    /// current one. It allows you to quickly undo the most recent operation.
+    /// Undo the last operation.
     ///
     #[cfg(feature = "legacy")]
     #[clap(verbatim_doc_comment)]
     Undo,
+
+    /// Redo the last undo.
+    ///
+    #[cfg(feature = "legacy")]
+    #[clap(verbatim_doc_comment)]
+    Redo,
 
     /// Amends changes into the appropriate commits where they belong.
     ///

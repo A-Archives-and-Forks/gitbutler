@@ -1041,7 +1041,12 @@ async fn match_subcommand(
         #[cfg(feature = "legacy")]
         Subcommands::Undo => {
             let mut ctx = setup::init_ctx(&args, InitCtxOptions::default(), out)?;
-            command::legacy::oplog::undo_last_operation(&mut ctx, out).emit_metrics(metrics_ctx)
+            command::legacy::oplog::handle_undo(&mut ctx, out).emit_metrics(metrics_ctx)
+        }
+        #[cfg(feature = "legacy")]
+        Subcommands::Redo => {
+            let mut ctx = setup::init_ctx(&args, InitCtxOptions::default(), out)?;
+            command::legacy::oplog::handle_redo(&mut ctx, out).emit_metrics(metrics_ctx)
         }
         #[cfg(feature = "legacy")]
         Subcommands::Absorb { source, dry_run } => {

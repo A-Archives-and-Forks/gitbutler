@@ -61,7 +61,8 @@
 		const ranges = snapshots.flatMap((snapshot, startIndex) => {
 			if (
 				snapshot.details?.operation === "RestoreFromSnapshot" ||
-				snapshot.details?.operation === "RestoreFromSnapshotViaUndo"
+				snapshot.details?.operation === "RestoreFromSnapshotViaUndo" ||
+				snapshot.details?.operation === "RestoreFromSnapshotViaRedo"
 			) {
 				const restoredId = snapshot.details?.trailers.find((t) => t.key === "restored_from")?.value;
 				if (restoredId !== undefined) {

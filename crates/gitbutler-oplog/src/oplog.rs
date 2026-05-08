@@ -666,10 +666,20 @@ pub enum RestoreKind {
     ///
     /// Used by `but oplog restore` among others.
     ExplicitRestoreFromSnapshot,
-    /// An implicit restore that simply restores the previous snapshot.
+    /// An implicit restore that undoes the last snapshot.
+    ///
+    /// Its implicit in the sense that the user doesn't provide the exact snapshot to restore to.
+    /// We figure that out.
     ///
     /// Used by `but undo` among others.
     RestoreFromSnapshotViaUndo,
+    /// An implicit restore that redos the last undo.
+    ///
+    /// Its implicit in the sense that the user doesn't provide the exact snapshot to restore to.
+    /// We figure that out.
+    ///
+    /// Used by `but undo` among others.
+    RestoreFromSnapshotViaRedo,
 }
 
 fn restore_snapshot(
@@ -812,6 +822,7 @@ fn restore_snapshot(
     let restored_date_ms = snapshot_commit.time()?.seconds * 1000;
     let operation = match restore_kind {
         RestoreKind::RestoreFromSnapshotViaUndo => OperationKind::RestoreFromSnapshotViaUndo,
+        RestoreKind::RestoreFromSnapshotViaRedo => OperationKind::RestoreFromSnapshotViaRedo,
         RestoreKind::ExplicitRestoreFromSnapshot => OperationKind::RestoreFromSnapshot,
     };
     let details = SnapshotDetails {

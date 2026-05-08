@@ -29,6 +29,7 @@ export type Operation =
 	| "MoveBranch"
 	| "TearOffBranch"
 	| "RestoreFromSnapshotViaUndo"
+	| "RestoreFromSnapshotViaRedo"
 	| "RestoreFromSnapshot"
 	| "ReorderCommit"
 	| "InsertBlankCommit"

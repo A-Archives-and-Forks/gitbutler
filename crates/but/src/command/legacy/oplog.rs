@@ -121,7 +121,7 @@ pub(crate) fn show_oplog(
             let operation_colored = match operation_type {
                 "COMMIT" => t.success.paint(operation_type),
                 "AMEND" | "REWORD" => t.attention.paint(operation_type),
-                "UNDO_COMMIT" | "RESTORE" | "UNDO" => t.error.paint(operation_type),
+                "UNDO_COMMIT" | "RESTORE" | "UNDO" | "REDO" => t.error.paint(operation_type),
                 "DISCARD" => t.error.paint(operation_type),
                 "BRANCH" | "CHECKOUT" => t.local_branch.paint(operation_type),
                 "MOVE" | "REORDER" | "MOVE_HUNK" => t.info.paint(operation_type),
@@ -223,7 +223,7 @@ pub(crate) fn restore_to_oplog(
     Ok(())
 }
 
-pub(crate) fn undo_last_operation(
+pub(crate) fn handle_undo(
     ctx: &mut but_ctx::Context,
     out: &mut OutputChannel,
 ) -> anyhow::Result<()> {
@@ -232,6 +232,40 @@ pub(crate) fn undo_last_operation(
         return Ok(());
     };
 
+    restore_to_target_snapshot(ctx, target_snapshot, UndoOrRedo::Undo, out)?;
+
+    Ok(())
+}
+
+pub(crate) fn handle_redo(
+    ctx: &mut but_ctx::Context,
+    out: &mut OutputChannel,
+) -> anyhow::Result<()> {
+    let Some(target_snapshot) = but_api::legacy::oplog::get_redo_target_snapshot(ctx)? else {
+        if let Some(out) = out.for_human() {
+            let t = theme::get();
+            writeln!(out, "{}", t.attention.paint("No previous undo to redo."))?;
+        }
+        return Ok(());
+    };
+
+    restore_to_target_snapshot(ctx, target_snapshot, UndoOrRedo::Redo, out)?;
+
+    Ok(())
+}
+
+#[derive(Copy, Clone)]
+enum UndoOrRedo {
+    Undo,
+    Redo,
+}
+
+fn restore_to_target_snapshot(
+    ctx: &mut but_ctx::Context,
+    target_snapshot: Snapshot,
+    kind: UndoOrRedo,
+    out: &mut OutputChannel,
+) -> anyhow::Result<()> {
     let target_operation = target_snapshot
         .details
         .as_ref()
@@ -242,7 +276,14 @@ pub(crate) fn undo_last_operation(
 
     if let Some(out) = out.for_human() {
         let t = theme::get();
-        writeln!(out, "{}", t.progress.paint("Undoing operation..."))?;
+        writeln!(
+            out,
+            "{}",
+            t.progress.paint(match kind {
+                UndoOrRedo::Undo => "Undoing operation...",
+                UndoOrRedo::Redo => "Redoing operation...",
+            })
+        )?;
         writeln!(
             out,
             "  Reverting to: {} ({})",
@@ -255,7 +296,10 @@ pub(crate) fn undo_last_operation(
     // TODO: Why does this not require force? It will also overwrite user changes (I think).
     but_api::legacy::oplog::restore_snapshot_with_kind(
         ctx,
-        RestoreKind::RestoreFromSnapshotViaUndo,
+        match kind {
+            UndoOrRedo::Undo => RestoreKind::RestoreFromSnapshotViaUndo,
+            UndoOrRedo::Redo => RestoreKind::RestoreFromSnapshotViaRedo,
+        },
         target_snapshot.commit_id,
     )?;
 
@@ -264,12 +308,24 @@ pub(crate) fn undo_last_operation(
         let repo = ctx.repo.get()?;
         let short = shorten_object_id(&repo, target_snapshot.commit_id);
 
-        writeln!(
-            out,
-            "{} Undo completed successfully! Restored to snapshot: {}",
-            t.sym().success,
-            t.cli_id.paint(&short)
-        )?;
+        match kind {
+            UndoOrRedo::Undo => {
+                writeln!(
+                    out,
+                    "{} Undo completed successfully! Restored to snapshot: {}",
+                    t.sym().success,
+                    t.cli_id.paint(&short)
+                )?;
+            }
+            UndoOrRedo::Redo => {
+                writeln!(
+                    out,
+                    "{} Redo completed successfully! Restored to snapshot: {}",
+                    t.sym().success,
+                    t.cli_id.paint(&short)
+                )?;
+            }
+        }
     }
 
     Ok(())

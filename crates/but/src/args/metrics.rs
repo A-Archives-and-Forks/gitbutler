@@ -22,6 +22,7 @@ pub enum CommandName {
     OplogSnapshot,
     Restore,
     Undo,
+    Redo,
     Gui,
     BaseFetch,
     BaseCheck,

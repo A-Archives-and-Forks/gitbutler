@@ -131,6 +131,8 @@ impl Subcommands {
             #[cfg(feature = "legacy")]
             Subcommands::Undo => Undo,
             #[cfg(feature = "legacy")]
+            Subcommands::Redo => Redo,
+            #[cfg(feature = "legacy")]
             Subcommands::Claude(claude::Platform { cmd }) => match cmd {
                 claude::Subcommands::PreTool => ClaudePreTool,
                 claude::Subcommands::PostTool => ClaudePostTool,
