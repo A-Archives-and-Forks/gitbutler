@@ -540,9 +540,12 @@ test("should update the stale selection of an unexisting branch", async ({
 	await expect(header).toContainText("origin/master");
 	// The previously selected branch1 should not be selected anymore
 	branchListCards = getByTestId(page, "branch-list-card");
-	await expect(branchListCards).toHaveCount(2);
+	// We don't prune anymore, hence 3 branches are still present.
+	await expect(branchListCards).toHaveCount(3);
 	firstBranchCard = branchListCards.filter({ hasText: "branch1" });
-	await expect(firstBranchCard).not.toBeVisible();
+	await expect(firstBranchCard).toBeVisible();
+	await expect(firstBranchCard).not.toHaveClass(/\bselected\b/);
+	await expect(getByTestId(page, "current-origin-list-card")).toHaveClass(/\bselected\b/);
 });
 
 test("should be able to delete a local branch", async ({ page, context }, testInfo) => {

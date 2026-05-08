@@ -395,7 +395,7 @@ where
     F: FnMut(String) -> Fut,
     Fut: std::future::Future<Output = Option<String>>,
 {
-    let mut args = vec!["fetch", "--quiet", "--prune"];
+    let mut args = vec!["fetch", "--quiet"];
 
     let refspec = refspec.to_string();
 
