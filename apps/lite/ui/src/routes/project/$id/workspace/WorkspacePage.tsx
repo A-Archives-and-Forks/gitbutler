@@ -29,14 +29,14 @@ import { isInputElement } from "#ui/commands/hotkeys.ts";
 import { AbsorptionTarget, BranchListing, Segment, Stack } from "@gitbutler/but-sdk";
 import {
 	formatForDisplay,
-	getHotkeyManager,
-	useHotkey,
-	useHotkeyRegistrations,
-	type HotkeyRegistrationView,
+	Hotkey,
+	HotkeyOptions,
+	HotkeySequence,
+	normalizeRegisterableHotkey,
 } from "@tanstack/react-hotkeys";
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import { Match, pipe } from "effect";
+import { Match, Order } from "effect";
 import { FC, useState } from "react";
 import { Group, Separator, useDefaultLayout } from "react-resizable-panels";
 import { branchOperand, type BranchOperand } from "#ui/operands.ts";
@@ -46,52 +46,67 @@ import styles from "./WorkspacePage.module.css";
 import type { CommandGroup } from "#ui/commands/groups.ts";
 import { OutlinePanel } from "#ui/routes/project/$id/workspace/OutlinePanel.tsx";
 import { classes } from "#ui/ui/classes.ts";
-
-declare module "@tanstack/react-hotkeys" {
-	interface HotkeyMeta {
-		/**
-		 * The component where the hotkey is registered.
-		 */
-		group: CommandGroup;
-		/**
-		 * @default true
-		 *
-		 * Whether or not to display the command and/or hotkey in the command palette.
-		 */
-		commandPalette?: boolean | "hideHotkey";
-		/**
-		 * @default true
-		 *
-		 * Whether or not to display the command and associated hotkey in the shortcuts bar.
-		 */
-		shortcutsBar?: boolean;
-	}
-}
+import {
+	CommandLayer,
+	CommandLayerOrder,
+	CommandOptions,
+	useCommand,
+	useCommandFn,
+} from "#ui/commands/manager.ts";
+import type { CommandRegistrationId } from "#ui/commands/state.ts";
+import { optionalOrder } from "#ui/lib/order.ts";
 
 type CommandPaletteItem = {
 	id: string;
+	layer: CommandLayer;
 	name: string;
-	group: CommandGroup;
-	hotkey?: string;
+	hotkeys?: Array<Hotkey | HotkeySequence>;
 };
 
 const groupCommandPaletteItems = (
-	commands: Array<CommandPaletteItem>,
+	regs: Record<CommandRegistrationId, CommandOptions>,
 ): Array<PickerDialogGroup<CommandPaletteItem>> => {
-	const groups = new Map<string, Array<CommandPaletteItem>>();
+	const grouped: Map<CommandGroup, [Array<CommandPaletteItem>, topmostLayer?: CommandLayer]> =
+		new Map();
 
-	for (const command of commands) {
-		const groupName = command.group;
-		const group = groups.get(groupName);
-		if (group) group.push(command);
-		else groups.set(groupName, [command]);
+	for (const [id, cmd] of Object.entries(regs)) {
+		if (cmd.enabled === false || cmd.commandPalette === undefined) continue;
+
+		const [mitems, mlayer] = grouped.get(cmd.commandPalette.group) ?? [];
+		grouped.set(cmd.commandPalette.group, [
+			[
+				...(mitems ?? []),
+				{
+					id,
+					layer: cmd.layer,
+					name: cmd.commandPalette.label,
+					hotkeys:
+						cmd.commandPalette.hotkeys !== false
+							? cmd.hotkeys?.map((hk) =>
+									"sequence" in hk ? hk.sequence : normalizeRegisterableHotkey(hk.hotkey),
+								)
+							: undefined,
+				},
+			],
+			Order.max(optionalOrder(CommandLayerOrder))(mlayer, cmd.layer),
+		]);
 	}
 
-	return globalThis.Array.from(groups.entries())
-		.toSorted(([a], [b]) => a.localeCompare(b))
-		.map(([value, items]) => ({
-			value,
-			items: items.toSorted((a, b) => a.name.localeCompare(b.name)),
+	return Array.from(grouped.entries())
+		.toSorted(
+			Order.combineAll([
+				Order.reverse(Order.mapInput(optionalOrder(CommandLayerOrder), ([_g, [_is, tl]]) => tl)),
+				Order.mapInput(Order.string, ([g]) => g),
+			]),
+		)
+		.map(([group, [cmds]]) => ({
+			value: group,
+			items: cmds.toSorted(
+				Order.combineAll([
+					Order.reverse(Order.mapInput(CommandLayerOrder, (cmd) => cmd.layer)),
+					Order.mapInput(Order.string, (cmd) => cmd.name),
+				]),
+			),
 		}));
 };
 
@@ -99,29 +114,14 @@ const CommandPalette: FC<{
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 }> = ({ open, onOpenChange }) => {
-	const { hotkeys } = useHotkeyRegistrations();
-	const items = pipe(
-		hotkeys
-			.flatMap((hotkey): CommandPaletteItem | [] =>
-				hotkey.options.enabled !== false &&
-				hotkey.options.meta?.name !== undefined &&
-				hotkey.options.meta.commandPalette !== false
-					? {
-							id: hotkey.id,
-							name: hotkey.options.meta.name,
-							group: hotkey.options.meta.group,
-							hotkey:
-								hotkey.options.meta.commandPalette === "hideHotkey" ? undefined : hotkey.hotkey,
-						}
-					: [],
-			)
-			.toSorted((a, b) => a.name.localeCompare(b.name)),
-		groupCommandPaletteItems,
-	);
+	const regs = useAppSelector((state) => state.commands.registrations);
+	const items = groupCommandPaletteItems(regs);
+	const getCommandFn = useCommandFn();
 
 	const runCommand = (hotkey: CommandPaletteItem) => {
 		onOpenChange(false);
-		getHotkeyManager().triggerRegistration(hotkey.id);
+		// oxlint-disable-next-line typescript/no-non-null-assertion: Let it loudly fail.
+		getCommandFn(hotkey.id)!("commandPalette");
 	};
 
 	return (
@@ -131,7 +131,11 @@ const CommandPalette: FC<{
 			emptyLabel="No commands found."
 			getItemKey={(x) => x.id}
 			getItemLabel={(x) => x.name}
-			getItemType={(x) => (x.hotkey !== undefined ? <Keys hotkey={x.hotkey} /> : undefined)}
+			getItemType={(x) => {
+				// TODO: Render all hotkeys.
+				const firstViable = x.hotkeys?.find((hk) => typeof hk === "string");
+				return firstViable !== undefined && <Keys hotkey={firstViable} />;
+			}}
 			items={items}
 			open={open}
 			onOpenChange={onOpenChange}
@@ -298,28 +302,36 @@ const TopBarActions: FC = () => {
 
 		dispatch(projectActions.togglePanel({ projectId, panel: "details" }));
 	};
+	const detailsLabel = isPanelVisible(panelsState, "details") ? "Close" : "Open";
+
+	const applyBranchCommand = useCommand(openApplyBranchPicker, {
+		layer: "global",
+		commandPalette: { group: "Branches", label: "Apply" },
+		shortcutsBar: { label: "Apply" },
+		hotkeys: [{ hotkey: "Shift+A" }],
+	});
+
+	const toggleDetailsCommand = useCommand(toggleDetails, {
+		layer: "global",
+		commandPalette: { group: "Details", label: detailsLabel },
+		shortcutsBar: { label: detailsLabel },
+		hotkeys: [{ hotkey: "D" }],
+	});
 
 	return (
 		<>
 			<ShortcutButton
 				className={uiStyles.button}
-				hotkey="Shift+A"
-				hotkeyOptions={{ meta: { group: "Branches", name: "Apply" } }}
-				onClick={openApplyBranchPicker}
+				hotkeys={applyBranchCommand.hotkeys}
+				onClick={applyBranchCommand.commandFn}
 			>
 				Apply branch
 			</ShortcutButton>
 			<ShortcutButton
 				className={uiStyles.button}
-				hotkey="D"
+				hotkeys={toggleDetailsCommand.hotkeys}
 				aria-pressed={isPanelVisible(panelsState, "details")}
-				hotkeyOptions={{
-					meta: {
-						group: "Details",
-						name: isPanelVisible(panelsState, "details") ? "Close" : "Open",
-					},
-				}}
-				onClick={toggleDetails}
+				onClick={toggleDetailsCommand.commandFn}
 			>
 				Details
 			</ShortcutButton>
@@ -329,27 +341,41 @@ const TopBarActions: FC = () => {
 
 const isInputIgnoredHotkey = ({
 	activeElement,
-	hotkey,
+	hotkeyOpts,
 }: {
 	activeElement: Element | null;
-	hotkey: HotkeyRegistrationView;
+	hotkeyOpts: HotkeyOptions;
 }): boolean =>
-	hotkey.options.ignoreInputs !== false &&
+	hotkeyOpts.ignoreInputs !== false &&
 	isInputElement(activeElement) &&
-	activeElement !== hotkey.target;
+	activeElement !== document.documentElement;
 
 const ShortcutsBar: FC = () => {
 	const { id: projectId } = useParams({ from: "/project/$id/workspace" });
 	const focusedPanel = useFocusedProjectPanel(projectId);
 	const activeElement = useActiveElement();
-	const { hotkeys } = useHotkeyRegistrations();
-	const visibleHotkeys = hotkeys.filter(
-		(hotkey) =>
-			hotkey.options.enabled !== false &&
-			!isInputIgnoredHotkey({ activeElement, hotkey }) &&
-			hotkey.options.meta?.name !== undefined &&
-			hotkey.options.meta.shortcutsBar !== false,
-	);
+	const regs = useAppSelector((state) => state.commands.registrations);
+	const visibleHotkeys = Object.values(regs)
+		.flatMap(({ enabled, hotkeys, layer, shortcutsBar }) =>
+			enabled !== false && shortcutsBar !== undefined && hotkeys !== undefined
+				? hotkeys.flatMap((hk) =>
+						// TODO: Render sequences too.
+						"sequence" in hk || isInputIgnoredHotkey({ activeElement, hotkeyOpts: hk })
+							? []
+							: {
+									layer,
+									label: shortcutsBar.label,
+									hotkey: formatForDisplay(hk.hotkey),
+								},
+					)
+				: [],
+		)
+		.toSorted(
+			Order.combineAll([
+				Order.reverse(Order.mapInput(CommandLayerOrder, (hk) => hk.layer)),
+				Order.mapInput(Order.string, (hk) => hk.hotkey),
+			]),
+		);
 
 	if (visibleHotkeys.length === 0) return null;
 
@@ -357,9 +383,9 @@ const ShortcutsBar: FC = () => {
 		<div className={styles.shortcutsBarContainer}>
 			<span className={styles.shortcutsBarScope}>{focusedPanel ?? "Shortcuts"}</span>
 			{visibleHotkeys.map((hotkey) => (
-				<div key={hotkey.id} className={styles.shortcutsBarItem}>
+				<div key={hotkey.hotkey} className={styles.shortcutsBarItem}>
 					<kbd className={styles.shortcutsBarKeys}>{formatForDisplay(hotkey.hotkey)}</kbd>
-					<span className={styles.shortcutsBarName}>{hotkey.options.meta?.name}</span>
+					<span className={styles.shortcutsBarName}>{hotkey.label}</span>
 				</div>
 			))}
 		</div>
@@ -367,25 +393,27 @@ const ShortcutsBar: FC = () => {
 };
 
 const usePanelsHotkeys = ({ focusedPanel }: { focusedPanel: PanelType | null }) => {
-	useHotkey(
-		"H",
+	useCommand(
 		() => {
 			focusAdjacentPanel(-1);
 		},
 		{
+			layer: "focused-selection-tree",
 			enabled: focusedPanel !== null,
-			meta: { group: "Panels", name: "Focus previous panel", commandPalette: false },
+			shortcutsBar: { label: "Focus previous panel" },
+			hotkeys: [{ hotkey: "H" }],
 		},
 	);
 
-	useHotkey(
-		"L",
+	useCommand(
 		() => {
 			focusAdjacentPanel(1);
 		},
 		{
+			layer: "focused-selection-tree",
 			enabled: focusedPanel !== null,
-			meta: { group: "Panels", name: "Focus next panel", commandPalette: false },
+			shortcutsBar: { label: "Focus next panel" },
+			hotkeys: [{ hotkey: "L" }],
 		},
 	);
 };
@@ -411,16 +439,16 @@ const WorkspacePage: FC = () => {
 		});
 	};
 
-	useHotkey(
-		"Mod+K",
+	useCommand(
 		() => {
 			if (pickerDialog._tag === "CommandPalette")
 				dispatch(projectActions.closePickerDialog({ projectId }));
 			else dispatch(projectActions.openCommandPalette({ projectId, focusedPanel }));
 		},
 		{
-			conflictBehavior: "allow",
-			meta: { group: "Global", name: "Command palette", commandPalette: false },
+			layer: "global",
+			shortcutsBar: { label: "Command palette" },
+			hotkeys: [{ hotkey: "Mod+K" }],
 		},
 	);
 
