@@ -83,6 +83,18 @@
 
 	const modalProps = $derived(mapModalStateToProps(uiState.global.modal.current));
 
+	// Svelte 5 can propagate prop changes into the child block before the outer
+	// {#if} re-evaluates and unmounts it, causing crashes like
+	// "undefined is not an object (evaluating 'data.projectId')". stableModalData
+	// latches the last non-null modalProps so the children always see valid data;
+	// the {#if modalProps && stableModalData} gate handles visibility.
+	let stableModalData = $state<ModalData | null>(null);
+	$effect.pre(() => {
+		if (modalProps !== null) {
+			stableModalData = modalProps;
+		}
+	});
+
 	let modal = $state<Modal>();
 
 	// Show the modal whenever modalProps becomes truthy.
@@ -98,7 +110,7 @@
 		// If the login confirmation modal is closed without explicit user action (e.g., via ESC),
 		// we should reject the incoming user to maintain state consistency.
 		// We check if there's still an incoming user to avoid calling reject after accept/reject buttons.
-		if (modalProps?.state.type === "login-confirmation") {
+		if (stableModalData?.state.type === "login-confirmation") {
 			if (userService.incomingUserLogin) {
 				userService.rejectIncomingUser();
 			}
@@ -121,23 +133,23 @@
 	}
 </script>
 
-{#if modalProps}
+{#if modalProps && stableModalData}
 	<Modal
 		bind:this={modal}
-		{...modalProps.props}
+		{...stableModalData.props}
 		onClose={handleModalClose}
 		onSubmit={(close) => close()}
 	>
-		{#if modalProps.state.type === "commit-failed"}
-			<CommitFailedModalContent data={modalProps.state} oncloseclick={closeModal} />
-		{:else if modalProps.state.type === "author-missing"}
-			<AuthorMissingModalContent data={modalProps.state} close={closeModal} />
-		{:else if modalProps.state.type === "general-settings"}
-			<GeneralSettingsModalContent data={modalProps.state} />
-		{:else if modalProps.state.type === "project-settings"}
-			<ProjectSettingsModalContent data={modalProps.state} />
-		{:else if modalProps.state.type === "login-confirmation"}
-			<LoginConfirmationModalContent data={modalProps.state} close={closeModal} />
+		{#if stableModalData.state.type === "commit-failed"}
+			<CommitFailedModalContent data={stableModalData.state} oncloseclick={closeModal} />
+		{:else if stableModalData.state.type === "author-missing"}
+			<AuthorMissingModalContent data={stableModalData.state} close={closeModal} />
+		{:else if stableModalData.state.type === "general-settings"}
+			<GeneralSettingsModalContent data={stableModalData.state} />
+		{:else if stableModalData.state.type === "project-settings"}
+			<ProjectSettingsModalContent data={stableModalData.state} />
+		{:else if stableModalData.state.type === "login-confirmation"}
+			<LoginConfirmationModalContent data={stableModalData.state} close={closeModal} />
 		{/if}
 	</Modal>
 {/if}
