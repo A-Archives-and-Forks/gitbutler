@@ -14,10 +14,14 @@
 	// Ensure author information is present
 	const authorInfo = $derived(gitService.getAuthorInfo(projectId));
 
+	let hasShownModal = $state(false);
+
 	$effect(() => {
+		if (hasShownModal) return;
 		if (authorInfo.response) {
 			const { name, email } = authorInfo.response;
 			if (name === null || email === null) {
+				hasShownModal = true;
 				uiState.global.modal.set({
 					type: "author-missing",
 					projectId,
