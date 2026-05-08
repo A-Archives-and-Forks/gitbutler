@@ -30,9 +30,9 @@ import { AbsorptionTarget, BranchListing, Segment, Stack } from "@gitbutler/but-
 import {
 	formatForDisplay,
 	Hotkey,
+	HotkeyOptions,
 	HotkeySequence,
 	normalizeRegisterableHotkey,
-	type HotkeyRegistrationView,
 } from "@tanstack/react-hotkeys";
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
@@ -341,14 +341,14 @@ const TopBarActions: FC = () => {
 
 const isInputIgnoredHotkey = ({
 	activeElement,
-	hotkey,
+	hotkeyOpts,
 }: {
 	activeElement: Element | null;
-	hotkey: HotkeyRegistrationView;
+	hotkeyOpts: HotkeyOptions;
 }): boolean =>
-	hotkey.options.ignoreInputs !== false &&
+	hotkeyOpts.ignoreInputs !== false &&
 	isInputElement(activeElement) &&
-	activeElement !== hotkey.target;
+	activeElement !== document.documentElement;
 
 const ShortcutsBar: FC = () => {
 	const { id: projectId } = useParams({ from: "/project/$id/workspace" });
@@ -358,10 +358,9 @@ const ShortcutsBar: FC = () => {
 	const visibleHotkeys = Object.values(regs)
 		.flatMap(({ enabled, hotkeys, layer, shortcutsBar }) =>
 			enabled !== false && shortcutsBar !== undefined && hotkeys !== undefined
-				? // TODO: && isInputIgnoredHotkey({ activeElement, hotkey: "TODO" })
-					hotkeys.flatMap((hk) =>
+				? hotkeys.flatMap((hk) =>
 						// TODO: Render sequences too.
-						"sequence" in hk
+						"sequence" in hk || isInputIgnoredHotkey({ activeElement, hotkeyOpts: hk })
 							? []
 							: {
 									layer,
