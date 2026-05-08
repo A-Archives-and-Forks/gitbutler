@@ -32,7 +32,6 @@ import {
 	Hotkey,
 	HotkeySequence,
 	normalizeRegisterableHotkey,
-	useHotkey,
 	type HotkeyRegistrationView,
 } from "@tanstack/react-hotkeys";
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
@@ -51,31 +50,11 @@ import {
 	CommandLayer,
 	CommandLayerOrder,
 	CommandOptions,
+	useCommand,
 	useCommandFn,
 } from "#ui/commands/manager.ts";
 import type { CommandRegistrationId } from "#ui/commands/state.ts";
 import { optionalOrder } from "#ui/lib/order.ts";
-
-declare module "@tanstack/react-hotkeys" {
-	interface HotkeyMeta {
-		/**
-		 * The component where the hotkey is registered.
-		 */
-		group: CommandGroup;
-		/**
-		 * @default true
-		 *
-		 * Whether or not to display the command and/or hotkey in the command palette.
-		 */
-		commandPalette?: boolean | "hideHotkey";
-		/**
-		 * @default true
-		 *
-		 * Whether or not to display the command and associated hotkey in the shortcuts bar.
-		 */
-		shortcutsBar?: boolean;
-	}
-}
 
 type CommandPaletteItem = {
 	id: string;
@@ -323,28 +302,36 @@ const TopBarActions: FC = () => {
 
 		dispatch(projectActions.togglePanel({ projectId, panel: "details" }));
 	};
+	const detailsLabel = isPanelVisible(panelsState, "details") ? "Close" : "Open";
+
+	const applyBranchCommand = useCommand(openApplyBranchPicker, {
+		layer: "global",
+		commandPalette: { group: "Branches", label: "Apply" },
+		shortcutsBar: { label: "Apply" },
+		hotkeys: [{ hotkey: "Shift+A" }],
+	});
+
+	const toggleDetailsCommand = useCommand(toggleDetails, {
+		layer: "global",
+		commandPalette: { group: "Details", label: detailsLabel },
+		shortcutsBar: { label: detailsLabel },
+		hotkeys: [{ hotkey: "D" }],
+	});
 
 	return (
 		<>
 			<ShortcutButton
 				className={uiStyles.button}
-				hotkey="Shift+A"
-				hotkeyOptions={{ meta: { group: "Branches", name: "Apply" } }}
-				onClick={openApplyBranchPicker}
+				hotkeys={applyBranchCommand.hotkeys}
+				onClick={applyBranchCommand.commandFn}
 			>
 				Apply branch
 			</ShortcutButton>
 			<ShortcutButton
 				className={uiStyles.button}
-				hotkey="D"
+				hotkeys={toggleDetailsCommand.hotkeys}
 				aria-pressed={isPanelVisible(panelsState, "details")}
-				hotkeyOptions={{
-					meta: {
-						group: "Details",
-						name: isPanelVisible(panelsState, "details") ? "Close" : "Open",
-					},
-				}}
-				onClick={toggleDetails}
+				onClick={toggleDetailsCommand.commandFn}
 			>
 				Details
 			</ShortcutButton>
@@ -407,25 +394,27 @@ const ShortcutsBar: FC = () => {
 };
 
 const usePanelsHotkeys = ({ focusedPanel }: { focusedPanel: PanelType | null }) => {
-	useHotkey(
-		"H",
+	useCommand(
 		() => {
 			focusAdjacentPanel(-1);
 		},
 		{
+			layer: "focused-selection-tree",
 			enabled: focusedPanel !== null,
-			meta: { group: "Panels", name: "Focus previous panel", commandPalette: false },
+			shortcutsBar: { label: "Focus previous panel" },
+			hotkeys: [{ hotkey: "H" }],
 		},
 	);
 
-	useHotkey(
-		"L",
+	useCommand(
 		() => {
 			focusAdjacentPanel(1);
 		},
 		{
+			layer: "focused-selection-tree",
 			enabled: focusedPanel !== null,
-			meta: { group: "Panels", name: "Focus next panel", commandPalette: false },
+			shortcutsBar: { label: "Focus next panel" },
+			hotkeys: [{ hotkey: "L" }],
 		},
 	);
 };
@@ -451,16 +440,16 @@ const WorkspacePage: FC = () => {
 		});
 	};
 
-	useHotkey(
-		"Mod+K",
+	useCommand(
 		() => {
 			if (pickerDialog._tag === "CommandPalette")
 				dispatch(projectActions.closePickerDialog({ projectId }));
 			else dispatch(projectActions.openCommandPalette({ projectId, focusedPanel }));
 		},
 		{
-			conflictBehavior: "allow",
-			meta: { group: "Global", name: "Command palette", commandPalette: false },
+			layer: "global",
+			shortcutsBar: { label: "Command palette" },
+			hotkeys: [{ hotkey: "Mod+K" }],
 		},
 	);
 
