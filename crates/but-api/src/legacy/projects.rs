@@ -1,12 +1,10 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Result, anyhow};
 use but_api_macros::but_api;
 use but_ctx::{Context, ProjectHandleOrLegacyProjectId};
 use but_error::Code;
 use tracing::instrument;
-
-use super::legacy_project;
 
 #[but_api]
 #[instrument(err(Debug))]
@@ -43,8 +41,12 @@ pub fn get_project(
     match project_id {
         ProjectHandleOrLegacyProjectId::ProjectHandle(handle) => {
             if no_validation {
-                let ctx = Context::new_from_project_handle(handle)?;
-                Ok(ctx.legacy_project.migrated()?.into())
+                let project = gitbutler_project::get_raw(
+                    ProjectHandleOrLegacyProjectId::ProjectHandle(handle),
+                )?
+                .migrated()?
+                .into();
+                Ok(project)
             } else {
                 Ok(gitbutler_project::get_validated(
                     ProjectHandleOrLegacyProjectId::ProjectHandle(handle),
@@ -71,15 +73,38 @@ pub fn list_projects_stateless() -> Result<Vec<ProjectForFrontend>> {
     list_projects(vec![])
 }
 
+/// List all stored projects for the frontend.
+///
+/// `opened_projects` identifies projects the frontend currently considers open so the returned
+/// entries can be annotated with `is_open`. Stale opened-project handles are ignored because the
+/// frontend may still hold them briefly after project deletion.
+///
+/// This front-end specific behaviour needs review when this comes out of legacy.
 #[but_api]
 #[instrument(err(Debug))]
 pub fn list_projects(
     opened_projects: Vec<ProjectHandleOrLegacyProjectId>,
 ) -> Result<Vec<ProjectForFrontend>> {
+    // Skip handles that can no longer be resolved — e.g. the project was just deleted
+    // from storage but the frontend's `opened_projects` set hasn't caught up yet.
+    // Failing the whole listing on a stale entry would break the post-deletion refresh
+    // flow. Mirrors the warn-and-skip pattern used below for migration failures.
     let opened_projects: std::collections::HashSet<_> = opened_projects
         .into_iter()
-        .map(|project_id| legacy_project(project_id).map(|project| project.id))
-        .collect::<Result<_>>()?;
+        .filter_map(
+            |project_id| match gitbutler_project::get_raw(project_id.clone()) {
+                Ok(project) => Some(project.id),
+                Err(err) => {
+                    tracing::warn!(
+                        ?err,
+                        ?project_id,
+                        "Skipping over opened project as its handle could not be resolved"
+                    );
+                    None
+                }
+            },
+        )
+        .collect();
 
     gitbutler_project::assure_app_can_startup_or_fix_it(
         gitbutler_project::dangerously_list_projects_without_migration(),
@@ -107,8 +132,14 @@ pub fn list_projects(
 #[but_api]
 #[instrument(err(Debug))]
 pub fn delete_project(project_id: ProjectHandleOrLegacyProjectId) -> Result<()> {
-    let project = legacy_project(project_id)?;
-    gitbutler_project::delete(project.id)
+    delete_project_at_app_data_dir(but_path::app_data_dir()?, project_id)
+}
+
+fn delete_project_at_app_data_dir(
+    app_data_dir: impl AsRef<Path>,
+    project_id: ProjectHandleOrLegacyProjectId,
+) -> Result<()> {
+    gitbutler_project::delete_with_path(app_data_dir, project_id)
 }
 
 /// Prepare an already-known project for activation in the UI or server.
@@ -154,3 +185,24 @@ pub struct ProjectForFrontend {
 }
 #[cfg(feature = "export-schema")]
 but_schemars::register_sdk_type!(ProjectForFrontend);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn delete_project_is_idempotent() -> Result<()> {
+        let app_data_dir = tempfile::tempdir()?;
+        let repo_dir = tempfile::tempdir()?;
+        gix::init(repo_dir.path())?;
+        let project = gitbutler_project::add_at_app_data_dir(app_data_dir.path(), repo_dir.path())?
+            .unwrap_project();
+        let project_id = project.id.clone();
+
+        delete_project_at_app_data_dir(app_data_dir.path(), project_id.clone())?;
+        delete_project_at_app_data_dir(app_data_dir.path(), project_id.clone())?;
+
+        assert!(gitbutler_project::get_with_path(app_data_dir.path(), project_id).is_err());
+        Ok(())
+    }
+}
