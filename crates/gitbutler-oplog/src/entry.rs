@@ -159,9 +159,12 @@ pub enum OperationKind {
     TearOffBranch,
     /// Restore via `but undo`
     RestoreFromSnapshotViaUndo,
+    /// Restore via `but redo`
+    RestoreFromSnapshotViaRedo,
     /// Restore via `but oplog restore`
     ///
-    /// Or old oplog entries that existed before `RestoreFromSnapshotViaUndo` as introduced.
+    /// Or old oplog entries that existed before `RestoreFromSnapshotViaUndo` and
+    /// `RestoreFromSnapshotViaRedo` were introduced.
     RestoreFromSnapshot,
     ReorderCommit,
     InsertBlankCommit,
@@ -197,6 +200,7 @@ impl OperationKind {
             OperationKind::UpdateCommitMessage => "REWORD",
             OperationKind::MoveCommit => "MOVE",
             OperationKind::RestoreFromSnapshotViaUndo => "UNDO",
+            OperationKind::RestoreFromSnapshotViaRedo => "REDO",
             OperationKind::RestoreFromSnapshot => "RESTORE",
             OperationKind::ReorderCommit => "REORDER",
             OperationKind::InsertBlankCommit => "INSERT_COMMIT",

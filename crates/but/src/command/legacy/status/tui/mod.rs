@@ -761,6 +761,9 @@ impl App {
             Message::Undo => {
                 self.handle_undo(ctx)?;
             }
+            Message::Redo => {
+                self.handle_redo(ctx)?;
+            }
         }
 
         ensure_cursor_visible(self, visible_height);
@@ -2531,7 +2534,23 @@ impl App {
     }
 
     fn handle_undo(&mut self, ctx: &mut Context) -> anyhow::Result<()> {
-        let Some(target_snapshot) = but_api::legacy::oplog::get_undo_target_snapshot(ctx)? else {
+        self.restore_to_target_snapshot(UndoOrRedo::Undo, ctx)
+    }
+
+    fn handle_redo(&mut self, ctx: &mut Context) -> anyhow::Result<()> {
+        self.restore_to_target_snapshot(UndoOrRedo::Redo, ctx)
+    }
+
+    fn restore_to_target_snapshot(
+        &mut self,
+        kind: UndoOrRedo,
+        ctx: &mut Context,
+    ) -> anyhow::Result<()> {
+        let target_snapshot = match kind {
+            UndoOrRedo::Undo => but_api::legacy::oplog::get_undo_target_snapshot(ctx)?,
+            UndoOrRedo::Redo => but_api::legacy::oplog::get_redo_target_snapshot(ctx)?,
+        };
+        let Some(target_snapshot) = target_snapshot else {
             return Ok(());
         };
 
@@ -2544,7 +2563,10 @@ impl App {
 
             Line::from_iter(
                 [
-                    Span::raw("Undo "),
+                    Span::raw(match kind {
+                        UndoOrRedo::Undo => "Undo ",
+                        UndoOrRedo::Redo => "Redo ",
+                    }),
                     Span::raw(commit.to_string()).style(self.theme.cli_id),
                 ]
                 .into_iter()
@@ -2564,7 +2586,10 @@ impl App {
         self.confirm = Some(Confirm::new(text, self.theme, move |ctx, messages| {
             but_api::legacy::oplog::restore_snapshot_with_kind(
                 ctx,
-                RestoreKind::RestoreFromSnapshotViaUndo,
+                match kind {
+                    UndoOrRedo::Undo => RestoreKind::RestoreFromSnapshotViaUndo,
+                    UndoOrRedo::Redo => RestoreKind::RestoreFromSnapshotViaRedo,
+                },
                 commit,
             )?;
             messages.push(Message::Reload(None));
@@ -2573,6 +2598,12 @@ impl App {
 
         Ok(())
     }
+}
+
+#[derive(Copy, Clone)]
+enum UndoOrRedo {
+    Undo,
+    Redo,
 }
 
 fn event_to_messages(
@@ -2827,6 +2858,7 @@ enum Message {
     ToggleHelp,
     Mark,
     Undo,
+    Redo,
 
     // Utilities
     CopySelection,

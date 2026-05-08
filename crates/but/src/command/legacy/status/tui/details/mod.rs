@@ -206,6 +206,7 @@ impl Details {
             | Message::Back
             | Message::UnfocusDetails
             | Message::Undo
+            | Message::Redo
             | Message::EnterNormalModeAfterConfirmingOperation => false,
 
             Message::MoveCursorUp

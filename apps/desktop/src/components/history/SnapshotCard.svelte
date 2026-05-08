@@ -163,6 +163,7 @@
 				return { text: "Update workspace base", icon: "refresh" };
 			case "RestoreFromSnapshot":
 			case "RestoreFromSnapshotViaUndo":
+			case "RestoreFromSnapshotViaRedo":
 				return { text: "Revert snapshot" };
 			case "OnDemandSnapshot":
 				return {
@@ -179,7 +180,8 @@
 	const isRestoreSnapshot = untrack(
 		() =>
 			entry.details?.operation === "RestoreFromSnapshot" ||
-			entry.details?.operation === "RestoreFromSnapshotViaUndo",
+			entry.details?.operation === "RestoreFromSnapshotViaUndo" ||
+			entry.details?.operation === "RestoreFromSnapshotViaRedo",
 	);
 	const error = untrack(() => entry.details?.trailers.find((t) => t.key === "error")?.value);
 

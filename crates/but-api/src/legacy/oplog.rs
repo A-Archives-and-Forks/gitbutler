@@ -75,7 +75,7 @@ pub fn snapshots_iter(
 
 /// Get the snapshot that an undo operation should restore to.
 ///
-/// This handles multiple consecutive undos by walking backwards in the oplog.
+/// This handles multiple consecutive undos.
 #[but_api]
 #[instrument(err(Debug))]
 pub fn get_undo_target_snapshot(ctx: &but_ctx::Context) -> Result<Option<Snapshot>> {
@@ -114,6 +114,55 @@ pub fn get_undo_target_snapshot(ctx: &but_ctx::Context) -> Result<Option<Snapsho
             return Ok(Some(snapshot));
         }
         real_operations_to_skip -= 1;
+    }
+
+    Ok(None)
+}
+
+/// Get the snapshot that a redo operation should restore to.
+///
+/// This handles multiple consecutive redos.
+#[but_api]
+#[instrument(err(Debug))]
+pub fn get_redo_target_snapshot(ctx: &but_ctx::Context) -> Result<Option<Snapshot>> {
+    // Redo snapshots are bookkeeping entries, not operations we should restore to directly. Walk
+    // newest-to-oldest and let each redo entry cancel one older undo entry.
+    //
+    // This handles repeated redos:
+    //
+    //     [REDO] <- skip one undo
+    //     [REDO] <- skip one undo
+    //     [UNDO] <- skipped
+    //     [UNDO] <- skipped
+    //     [UNDO] <- target
+    //
+    // And stops redo when a new real operation happened after an undo:
+    //
+    //     [REWORD] <- not an undo, so there is no redo target
+    //     [UNDO]
+    //     [REWORD]
+    let snapshots = ctx.snapshots_iter(None, Vec::new(), None)?;
+    let mut undos_to_skip = 0_usize;
+
+    for snapshot in snapshots {
+        let snapshot = snapshot?;
+
+        if snapshot.details.as_ref().is_some_and(|details| {
+            matches!(details.operation, OperationKind::RestoreFromSnapshotViaRedo)
+        }) {
+            undos_to_skip += 1;
+            continue;
+        }
+
+        if undos_to_skip == 0 {
+            if snapshot.details.as_ref().is_some_and(|details| {
+                !matches!(details.operation, OperationKind::RestoreFromSnapshotViaUndo)
+            }) {
+                return Ok(None);
+            }
+            return Ok(Some(snapshot));
+        }
+        undos_to_skip -= 1;
     }
 
     Ok(None)
