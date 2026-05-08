@@ -330,6 +330,18 @@ jobs:
     permissions:
       contents: read
       packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - features: ""
+            cache_suffix: default
+          - features: "--features legacy"
+            cache_suffix: legacy
+          - features: "--features tauri"
+            cache_suffix: tauri
+          - features: "--features napi"
+            cache_suffix: napi
     container:
       image: ghcr.io/gitbutlerapp/ci-base-image@sha256:3eaeae1b07072796a53dc1e7585cdc1f462d0b11d10ecd3685c6fa8082d647dd
     env:
@@ -344,10 +356,10 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
-          shared-key: cargo-test-but-api-macros
+          shared-key: cargo-test-but-api-macros-${{ matrix.cache_suffix }}
           save-if: ${{ github.ref == 'refs/heads/master' }}
-      - name: Test but-api-macros feature matrix
-        run: make test-but-api-macros
+      - name: Test but-api-macros ${{ matrix.features || '(default)' }}
+        run: cargo test -p but-api-macros-tests ${{ matrix.features }}
 
   rust-test-tauri:
     needs: changes
