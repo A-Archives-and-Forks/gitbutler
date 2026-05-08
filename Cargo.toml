@@ -212,10 +212,10 @@ backoff = "0.4.0"
 bstr = "1.12.1"
 # Add the `tracing` or `tracing-detail` features to see more of gitoxide in the logs. Useful to see which programs it invokes.
 # When adjusting this, update `gix-testtools` as well!
-gix = { version = "0.83.0", git = "https://github.com/GitoxideLabs/gitoxide", rev = "adb8328952478c443ead5f5a8c6851928b377b37", default-features = false, features = [
-    "sha1",
+gix = { version = "0.83.0", git = "https://github.com/GitoxideLabs/gitoxide", rev = "db925ecaef8aeb810d7f596ab459372edbc39a6e", default-features = false, features = [
+    "sha1", "sha256"
 ] }
-gix-testtools = { version = "0.19.0", git = "https://github.com/GitoxideLabs/gitoxide", rev = "adb8328952478c443ead5f5a8c6851928b377b37" }
+gix-testtools = { version = "0.19.0", git = "https://github.com/GitoxideLabs/gitoxide", rev = "db925ecaef8aeb810d7f596ab459372edbc39a6e" }
 
 
 insta = { version = "1.47.2", features = ["json"] }
