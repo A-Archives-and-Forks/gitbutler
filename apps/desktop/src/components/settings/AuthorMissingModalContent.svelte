@@ -2,6 +2,7 @@
 	import { GIT_SERVICE } from "$lib/git/gitService";
 	import { inject } from "@gitbutler/core/context";
 	import { TestId, ModalHeader, ModalFooter, Textbox, EmailTextbox, Button } from "@gitbutler/ui";
+	import { untrack } from "svelte";
 	import type { AuthorMissingModalState } from "$lib/state/uiState.svelte";
 
 	type Props = {
@@ -14,8 +15,8 @@
 	const gitService = inject(GIT_SERVICE);
 	const [setAuthorInfo, settingInfo] = gitService.setAuthorInfo;
 
-	let name = $derived(data.authorName);
-	let email = $derived(data.authorEmail);
+	let name = $state(untrack(() => data.authorName));
+	let email = $state(untrack(() => data.authorEmail));
 	let emailTextbox: any;
 
 	async function handleSubmit() {

@@ -1,5 +1,5 @@
 import { TestId } from "@gitbutler/ui/utils/testIds";
-import { type Locator, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 type TestIdValues = `${TestId}`;
 
@@ -100,7 +100,10 @@ export async function fillByTestId(
 	value: string,
 ): Promise<Locator> {
 	const element = await waitForTestId(page, testId);
-	await element.fill(value);
+	await expect(async () => {
+		await element.fill(value);
+		await expect(element).toHaveValue(value);
+	}).toPass();
 	return element;
 }
 
