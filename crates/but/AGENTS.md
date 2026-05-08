@@ -2,6 +2,10 @@
 
 These supplement `crates/AGENTS.md` for work under `crates/but/`.
 
+For CLI work that touches graph/workspace/branch/stack/commit relationships,
+reachability, ordering, operation targets, or Git graph/history/ref-placement
+changes, also read `crates/WORKSPACE_MODEL.md`.
+
 ## CLI I/O
 
 - Route user-visible command output through `out: &mut OutputChannel`:
