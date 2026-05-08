@@ -2,7 +2,13 @@ import { discardFile } from "../src/file.ts";
 import { getHunkHeaderSelector, getHunkLineSelector } from "../src/hunk.ts";
 import { getBaseURL, startGitButler, type GitButler } from "../src/setup.ts";
 import { test } from "../src/test.ts";
-import { clickByTestId, fillByTestId, getByTestId, waitForTestId } from "../src/util.ts";
+import {
+	clickByTestId,
+	fillByTestId,
+	getByTestId,
+	waitForTestId,
+	waitForTestIdToNotExist,
+} from "../src/util.ts";
 import { expect, type Locator } from "@playwright/test";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join, resolve } from "path";
@@ -85,6 +91,9 @@ test("should be able to select the hunks correctly in a complex file", async ({
 	await fillByTestId(page, "commit-drawer-title-input", "Partial commit: Part 1");
 	await clickByTestId(page, "commit-drawer-action-button");
 
+	// Wait for the commit view to close before proceeding
+	await waitForTestIdToNotExist(page, "new-commit-view");
+
 	// Start the commit process
 	await clickByTestId(page, "start-commit-button");
 
@@ -101,6 +110,9 @@ test("should be able to select the hunks correctly in a complex file", async ({
 	// Commit the changes
 	await fillByTestId(page, "commit-drawer-title-input", "Partial commit: Part 2");
 	await clickByTestId(page, "commit-drawer-action-button");
+
+	// Wait for the commit view to close before proceeding
+	await waitForTestIdToNotExist(page, "new-commit-view");
 
 	// Start the commit process
 	await clickByTestId(page, "start-commit-button");
