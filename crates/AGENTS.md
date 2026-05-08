@@ -39,12 +39,16 @@ vendored, or fixture data unless the task is specifically about that code.
 - When an API offers both action-only and timeline-recording behavior, keep the
   `*_only*` function free of oplog side effects; prepare a best-effort oplog
   snapshot in the wrapper and commit it only after the mutation succeeds.
-- For graph/rebase-style workspace, commit, and branch mutations, use
-  `but_rebase::graph_rebase::Editor` unless the work is explicitly non-graph or
-  legacy-bound.
-- Treat `but_graph::projection::Workspace` as a lossy projection; do not use its
-  flattened stacks directly as mutation source of truth outside the proper
-  graph/rebase systems.
+- Before changing or reviewing code that derives graph/workspace/branch/stack/commit
+  relationships, reachability, dependencies, ordering, operation targets, or Git
+  graph/history/ref-placement mutations, use `crates/WORKSPACE_MODEL.md` as the
+  reference. In short: prefer commit IDs and refs at API boundaries, convert to
+  operation-local selectors inside editor-backed operations, use
+  `but_graph::Graph` for relationship/reachability questions, use
+  `but_rebase::graph_rebase::Editor` for Git graph/history/ref rewrites where an
+  editor model exists, and treat `but_graph::projection::Workspace` and
+  `but_workspace::RefInfo` as lossy presentation/compatibility views unless an
+  existing workspace-shaped boundary requires them.
 
 ## Code Shape and Naming
 
