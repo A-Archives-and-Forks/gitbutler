@@ -197,12 +197,12 @@ export const useCommand = <F extends CommandFn, O extends CommandOptions>(
 		commandFn,
 		hotkeys: resolvedHotkeys.length > 0 ? resolvedHotkeys : undefined,
 		contextMenu: regOptions?.contextMenu
-			? {
+			? ({
 					enabled: regOptions.enabled !== false,
 					onSelect: () => commandFn("contextMenu"),
 					...regOptions.contextMenu,
 					_tag: "Item",
-				}
+				} satisfies NativeMenuItem)
 			: undefined,
 	} as ResolvedCommand<F, O>;
 };
