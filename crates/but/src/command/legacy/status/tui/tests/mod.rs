@@ -6,8 +6,8 @@ use crossterm::event::*;
 use snapbox::{file, str};
 use temp_env::with_var;
 
-use crate::command::legacy::status::tui::Message;
 use crate::command::legacy::status::tui::tests::utils::{test_tui, test_tui_with_size};
+use crate::command::legacy::status::tui::{Message, ReloadCause};
 
 mod branch_picker_tests;
 mod branch_tests;
@@ -62,7 +62,7 @@ fn shows_full_error_when_message_wraps() {
     tui.render_with_messages(
         None,
         Vec::from([
-            Message::Reload(None),
+            Message::Reload(None, ReloadCause::Mutation),
             Message::ShowError(Arc::new(anyhow!(
                 "error-with-end-marker: this is a deliberately long error message that should wrap over multiple lines without clipping and it must include END-MARKER"
             ))),
@@ -85,7 +85,10 @@ fn shows_full_error_cause_chain_with_multiple_contexts() {
 
     tui.render_with_messages(
         None,
-        Vec::from([Message::Reload(None), Message::ShowError(Arc::new(err))]),
+        Vec::from([
+            Message::Reload(None, ReloadCause::Mutation),
+            Message::ShowError(Arc::new(err)),
+        ]),
     )
     .assert_rendered_term_svg_eq(file![
         "snapshots/shows_full_error_cause_chain_with_multiple_contexts_001.svg"
@@ -420,11 +423,14 @@ fn reload_preserves_visible_selection_when_scrolled() {
 
     tui.input_then_render([KeyCode::Down, KeyCode::Down, KeyCode::Down, KeyCode::Down]);
 
-    tui.render_with_messages(None, Vec::from([Message::Reload(None)]))
-        .assert_rendered_term_svg_eq(file![
-            "snapshots/reload_preserves_visible_selection_when_scrolled_001.svg"
-        ])
-        .assert_current_line_eq(str!["┊●   [..] add B"]);
+    tui.render_with_messages(
+        None,
+        Vec::from([Message::Reload(None, ReloadCause::Mutation)]),
+    )
+    .assert_rendered_term_svg_eq(file![
+        "snapshots/reload_preserves_visible_selection_when_scrolled_001.svg"
+    ])
+    .assert_current_line_eq(str!["┊●   [..] add B"]);
 }
 
 #[test]

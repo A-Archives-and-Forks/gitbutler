@@ -39,6 +39,7 @@ legacy = [
     "dep:gitbutler-operating-modes",
     "dep:gitbutler-repo",
     "dep:gitbutler-git",
+    "dep:gitbutler-watcher",
 ]
 ## Enable IRC collaboration features (enabled for dev and nightly builds).
 irc = ["dep:but-server", "but-server/irc"]
@@ -93,6 +94,7 @@ gitbutler-edit-mode = { workspace = true, optional = true }
 gitbutler-operating-modes = { workspace = true, optional = true }
 gitbutler-repo = { workspace = true, optional = true }
 gitbutler-git = { workspace = true, optional = true }
+gitbutler-watcher = { workspace = true, optional = true }
 
 schemars.workspace = true
 posthog-rs = { git = "https://github.com/gitbutlerapp/posthog-rs", rev = "664c9245f79aaedcdd025b9f3c141b62bb866b8e" }

@@ -216,7 +216,7 @@ impl Details {
             | Message::MoveCursorNextSection
             | Message::SelectUnassigned
             | Message::SelectMergeBase
-            | Message::Reload(_)
+            | Message::Reload(..)
             | Message::NewBranch => true,
 
             Message::Commit(commit_message) => match commit_message {

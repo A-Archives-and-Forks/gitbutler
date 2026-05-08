@@ -8,7 +8,9 @@ use crate::command::legacy::status::tui::{
     RewordMessage, RubMessage, help::HelpMessage, mode::ModeDiscriminant,
 };
 
-use super::{CommandModeKind, CommitMessage, DetailsMessage, FilesMessage, MoveMessage};
+use super::{
+    CommandModeKind, CommitMessage, DetailsMessage, FilesMessage, MoveMessage, ReloadCause,
+};
 
 #[cfg(test)]
 mod tests;
@@ -643,7 +645,7 @@ impl KeyBindsBuilder<'_> {
         self.key_bind(
             "reload",
             press().control().code(KeyCode::Char('r')),
-            Message::Reload(None),
+            Message::Reload(None, ReloadCause::Manual),
         )
         .hide_from_hotbar()
     }

@@ -1,4 +1,4 @@
-use std::{convert::Infallible, time::Duration};
+use std::{convert::Infallible, sync::atomic::AtomicBool, time::Duration};
 
 use but_testsupport::Sandbox;
 use crossterm::event::*;
@@ -15,7 +15,7 @@ use crate::{
     command::legacy::status::{
         StatusFlags, StatusOutput, StatusRenderMode, TuiLaunchOptions, build_status_context,
         build_status_output,
-        tui::{App, EventPolling, Message, render_loop_once},
+        tui::{App, EventPolling, Message, ReloadCause, render_loop_once},
     },
     theme,
     tui::TerminalGuard,
@@ -98,7 +98,10 @@ impl TestTui {
     where
         E: EventPolling,
     {
-        self.render_with_messages(event, Vec::from([Message::Reload(None)]))
+        self.render_with_messages(
+            event,
+            Vec::from([Message::Reload(None, ReloadCause::Mutation)]),
+        )
     }
 
     #[track_caller]
@@ -122,6 +125,7 @@ impl TestTui {
                         event,
                         &mut messages,
                         &mut other_messages,
+                        &AtomicBool::default(),
                         &mut ctx,
                         &mut self.out,
                         &self.mode,
