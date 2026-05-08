@@ -130,6 +130,8 @@ export const useCommand = <F extends CommandFn, O extends CommandOptions>(
 	// oxlint-disable-next-line typescript/no-non-null-assertion: Let it loudly fail.
 	const cbmap = useContext(CommandFnContext)!;
 	const dispatch = useAppDispatch();
+	const regs = useAppSelector((state) => state.commands.registrations);
+	const regOptions = regs[id];
 	const maxKeybindLayers = useMaxHotkeyLayers();
 
 	useEffect(() => {
@@ -144,7 +146,7 @@ export const useCommand = <F extends CommandFn, O extends CommandOptions>(
 		return () => void cbmap.delete(id);
 	}, [cbmap, id, commandFn]);
 
-	const { hotkeyDefs, sequenceDefs, resolvedHotkeys } = (options.hotkeys ?? []).reduce(
+	const { hotkeyDefs, sequenceDefs, resolvedHotkeys } = (regOptions?.hotkeys ?? []).reduce(
 		(acc, hk) => {
 			const maxKeybindLayer =
 				maxKeybindLayers[
@@ -152,7 +154,10 @@ export const useCommand = <F extends CommandFn, O extends CommandOptions>(
 				];
 
 			const defEnabled =
-				options.layer === maxKeybindLayer && options.enabled !== false && hk.enabled !== false;
+				regOptions &&
+				regOptions.layer === maxKeybindLayer &&
+				regOptions.enabled !== false &&
+				hk.enabled !== false;
 
 			if (defEnabled)
 				acc.resolvedHotkeys.push(
@@ -191,11 +196,11 @@ export const useCommand = <F extends CommandFn, O extends CommandOptions>(
 	return {
 		commandFn,
 		hotkeys: resolvedHotkeys.length > 0 ? resolvedHotkeys : undefined,
-		contextMenu: options.contextMenu
+		contextMenu: regOptions?.contextMenu
 			? {
-					enabled: options.enabled !== false,
+					enabled: regOptions.enabled !== false,
 					onSelect: () => commandFn("contextMenu"),
-					...options.contextMenu,
+					...regOptions.contextMenu,
 					_tag: "Item",
 				}
 			: undefined,
