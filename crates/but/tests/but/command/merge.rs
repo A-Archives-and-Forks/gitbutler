@@ -34,7 +34,7 @@ fn merge_first_branch_into_gb_local_and_verify_rebase() -> anyhow::Result<()> {
 
     // Verify git log shows both branches before merge
     insta::assert_snapshot!(env.git_log()?, @r"
-    *   945f3cf (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    *   71ae247 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
     |\  
     | * edca1cd (second-branch) second commit on branch B
     * | 549e10c (first-branch) first commit on branch A
@@ -123,7 +123,7 @@ To undo this operation:
     * e8d7818 (second-branch) second commit on branch B
     *   61888c9 (gb-local/main, gb-local/HEAD, main) Merge branch 'first-branch'
     |\  
-    | | * 945f3cf (gb-local/gitbutler/workspace) GitButler Workspace Commit
+    | | * 71ae247 (gb-local/gitbutler/workspace) GitButler Workspace Commit
     | |/| 
     |/| | 
     | | * edca1cd (gb-local/second-branch) second commit on branch B

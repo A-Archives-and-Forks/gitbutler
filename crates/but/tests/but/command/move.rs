@@ -375,7 +375,7 @@ Moved 4 commits → before [..]
 ┊●   [..] A: 10 lines on top
 ┊●   [..] C: add another 10 lines to new file
 ┊●   [..] C: add 10 lines to new file
-┊●   fc29de6 C: new file with 10 lines
+┊●   461deb3 C: new file with 10 lines
 ┊●   62e05ba B: 10 lines at the bottom
 ├╯
 ┊
@@ -518,7 +518,7 @@ Moved 4 commits → after a748762
 ┊●   [..] A: 10 lines on top
 ┊●   [..] C: add another 10 lines to new file
 ┊●   [..] C: add 10 lines to new file
-┊●   b665de5 C: new file with 10 lines
+┊●   5d69b97 C: new file with 10 lines
 ┊●   a748762 B: another 10 lines at the bottom
 ┊●   62e05ba B: 10 lines at the bottom
 ├╯
@@ -825,7 +825,7 @@ Moved branch A on top of C.
 ╭┄zz [unassigned changes] (no changes)
 ┊
 ┊╭┄g0 [A]
-┊●   afff88e add A
+┊●   89a57fc add A
 ┊│
 ┊├┄h0 [C]
 ┊●   3842fc0 add C
@@ -906,7 +906,7 @@ Moved branch A on top of C.
 ╭┄zz [unassigned changes] (no changes)
 ┊
 ┊╭┄g0 [A]
-┊●   afff88e add A
+┊●   89a57fc add A
 ┊│
 ┊├┄h0 [C]
 ┊●   3842fc0 add C
@@ -996,7 +996,7 @@ Unstacked branch C.
 ├╯
 ┊
 ┊╭┄i0 [C]
-┊●   31e83cd add C
+┊●   661a9b6 add C
 ├╯
 ┊
 ┴ 0dc3733 (common base) 2000-01-02 add M

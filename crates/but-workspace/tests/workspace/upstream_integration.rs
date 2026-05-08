@@ -64,11 +64,11 @@ fn diamond_partially_historically_integrated_rebase() -> Result<()> {
     rebase.materialize()?;
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    * 03f9366 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
-    * 22aa077 (E) E
-    *   8719a89 (C) C
+    * 996b85e (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    * 2eb4a8c (E) E
+    *   aecdc68 (C) C
     |\  
-    | * 59b39ea (D) D
+    | * 020d090 (D) D
     |/  
     * 7de2393 (origin/master, master) o4
     *   7d62953 (o3) o3
@@ -138,7 +138,7 @@ fn diamond_partially_historically_integrated_merge() -> Result<()> {
     rebase.materialize()?;
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    * 96c95ba (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    * 292b0b3 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
     *   ed5f276 (E) Merge refs/remotes/origin/master into merge
     |\  
     | * 7de2393 (origin/master, master) o4
@@ -226,11 +226,11 @@ fn diamond_partially_content_integrated_rebase() -> Result<()> {
     rebase.materialize()?;
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    * 5ba22ce (HEAD -> gitbutler/workspace) GitButler Workspace Commit
-    * 04b1a3e (E) E
-    *   1144e41 (C) C
+    * 8b48706 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    * cb866ec (E) E
+    *   c7b32b8 (C) C
     |\  
-    | * dd00172 (D) D
+    | * e05e7c1 (D) D
     |/  
     * 162b064 (origin/master, master) o4
     * dd87d69 (o3) B
@@ -295,7 +295,7 @@ fn diamond_partially_content_integrated_merge() -> Result<()> {
     rebase.materialize()?;
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    * 6c75185 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    * ebd6fa2 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
     *   0a395ba (E) Merge refs/remotes/origin/master into merge
     |\  
     | * 162b064 (origin/master, master) o4

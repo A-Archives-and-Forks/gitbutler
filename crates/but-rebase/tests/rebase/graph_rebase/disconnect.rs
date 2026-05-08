@@ -48,18 +48,18 @@ fn disconnect_and_remove_middle_commit_in_linear_history() -> Result<()> {
     insta::assert_snapshot!(overlayed, @"
 
     └── 👉►:0[0]:main[🌳]
-        ├── ·4de0144 (⌂|1)
+        ├── ·b4fd8ee (⌂|1)
         ├── ·d591dfe (⌂|1)
         └── ·35b8235 (⌂|1)
     ");
     let outcome = outcome.materialize()?;
     assert_eq!(overlayed, graph_tree(&outcome.workspace.graph).to_string());
 
-    insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-	* 4de0144 (HEAD -> main) c
-	* d591dfe a
-	* 35b8235 base
-	");
+    insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @"
+    * b4fd8ee (HEAD -> main) c
+    * d591dfe a
+    * 35b8235 base
+    ");
     insta::assert_snapshot!(git_status(&repo)?, @"");
 
     Ok(())
@@ -109,14 +109,14 @@ fn disconnect_and_remove_two_middle_commits_in_linear_history() -> Result<()> {
     insta::assert_snapshot!(overlayed, @"
 
     └── 👉►:0[0]:main[🌳]
-        ├── ·f55e07c (⌂|1)
+        ├── ·19f8134 (⌂|1)
         └── ·35b8235 (⌂|1)
     ");
     let outcome = outcome.materialize()?;
     assert_eq!(overlayed, graph_tree(&outcome.workspace.graph).to_string());
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @"
-    * f55e07c (HEAD -> main) c
+    * 19f8134 (HEAD -> main) c
     * 35b8235 base
     ");
     insta::assert_snapshot!(git_status(&repo)?, @"");
@@ -166,9 +166,9 @@ fn disconnect_and_remove_commit_in_merge_history_rewires_children() -> Result<()
     insta::assert_snapshot!(overlayed, @"
 
     └── 👉►:0[0]:with-inner-merge[🌳]
-        └── ·dde6cc8 (⌂|1)
+        └── ·4023659 (⌂|1)
             └── ►:1[1]:anon:
-                └── ·5f962e2 (⌂|1)
+                └── ·01c4df0 (⌂|1)
                     ├── ►:2[3]:anon:
                     │   └── ·8f0d338 (⌂|1) ►A, ►main, ►tags/base
                     └── ►:3[2]:B
@@ -183,8 +183,8 @@ fn disconnect_and_remove_commit_in_merge_history_rewires_children() -> Result<()
     assert_eq!(a_now, base, "A should now point to base after disconnect");
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    * dde6cc8 (HEAD -> with-inner-merge) on top of inner merge
-    *   5f962e2 Merge branch 'B' into with-inner-merge
+    * 4023659 (HEAD -> with-inner-merge) on top of inner merge
+    *   01c4df0 Merge branch 'B' into with-inner-merge
     |\  
     | * 984fd1c (B) C: new file with 10 lines
     |/  
@@ -241,9 +241,9 @@ fn disconnect_and_remove_merge_with_two_parents_and_two_children() -> Result<()>
     insta::assert_snapshot!(overlayed, @"
 
     └── 👉►:0[0]:with-two-children[🌳]
-        └── ·f914957 (⌂|1)
+        └── ·87269f1 (⌂|1)
             ├── ►:1[1]:C1
-            │   └── ·d8cc9ec (⌂|1)
+            │   └── ·3e50be4 (⌂|1)
             │       ├── ►:3[2]:anon:
             │       │   └── ·bc0e772 (⌂|1) ►M, ►P1
             │       │       └── ►:5[3]:main
@@ -252,7 +252,7 @@ fn disconnect_and_remove_merge_with_two_parents_and_two_children() -> Result<()>
             │           └── ·392a8f8 (⌂|1)
             │               └── →:5: (main)
             └── ►:2[1]:C2
-                └── ·72b8072 (⌂|1)
+                └── ·c291781 (⌂|1)
                     ├── →:3:
                     └── →:4: (P2)
     ");
@@ -290,11 +290,11 @@ fn disconnect_and_remove_merge_with_two_parents_and_two_children() -> Result<()>
     );
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    *   f914957 (HEAD -> with-two-children) tip
+    *   87269f1 (HEAD -> with-two-children) tip
     |\  
-    | *   72b8072 (C2) C2: second child
+    | *   c291781 (C2) C2: second child
     | |\  
-    * | \   d8cc9ec (C1) C1: first child
+    * | \   3e50be4 (C1) C1: first child
     |\ \ \  
     | |/ /  
     |/| /   
@@ -366,17 +366,17 @@ fn disconnect_and_remove_merge_with_two_parents_and_two_children_from_one_side()
     insta::assert_snapshot!(overlayed, @"
 
     └── 👉►:0[0]:with-two-children[🌳]
-        └── ·3305e26 (⌂|1)
+        └── ·9de031b (⌂|1)
             ├── ►:1[1]:C1
-            │   └── ·f928700 (⌂|1)
+            │   └── ·54d0b0d (⌂|1)
             │       └── ►:3[2]:P1
             │           └── ·bc0e772 (⌂|1)
             │               └── ►:5[4]:main
             │                   └── ·7674a5e (⌂|1) ►tags/base
             └── ►:2[1]:C2
-                └── ·0e87cd3 (⌂|1)
+                └── ·41cb528 (⌂|1)
                     └── ►:4[2]:M
-                        └── ·3089592 (⌂|1)
+                        └── ·9f6b11a (⌂|1)
                             └── ►:6[3]:P2
                                 └── ·392a8f8 (⌂|1)
                                     └── →:5: (main)
@@ -416,12 +416,12 @@ fn disconnect_and_remove_merge_with_two_parents_and_two_children_from_one_side()
     );
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    *   3305e26 (HEAD -> with-two-children) tip
+    *   9de031b (HEAD -> with-two-children) tip
     |\  
-    | * 0e87cd3 (C2) C2: second child
-    | * 3089592 (M) M: merge two parents
+    | * 41cb528 (C2) C2: second child
+    | * 9f6b11a (M) M: merge two parents
     | * 392a8f8 (P2) P2: second merge parent
-    * | f928700 (C1) C1: first child
+    * | 54d0b0d (C1) C1: first child
     * | bc0e772 (P1) P1: first merge parent
     |/  
     * 7674a5e (tag: base, main) base
@@ -483,17 +483,17 @@ fn disconnect_remove_merge_with_two_parents_and_two_children_children_only() -> 
     insta::assert_snapshot!(overlayed, @"
 
     └── 👉►:0[0]:with-two-children[🌳]
-        └── ·2eac185 (⌂|1)
+        └── ·b87b6c9 (⌂|1)
             ├── ►:1[1]:C1
-            │   └── ·76e6d3c (⌂|1)
+            │   └── ·76ecfed (⌂|1)
             │       └── ►:3[2]:M
-            │           └── ·3089592 (⌂|1)
+            │           └── ·9f6b11a (⌂|1)
             │               └── ►:4[3]:P2
             │                   └── ·392a8f8 (⌂|1)
             │                       └── ►:5[4]:main
             │                           └── ·7674a5e (⌂|1) ►tags/base
             └── ►:2[1]:C2
-                └── ·0e87cd3 (⌂|1)
+                └── ·41cb528 (⌂|1)
                     └── →:3: (M)
     ");
     let outcome = outcome.materialize()?;
@@ -556,12 +556,12 @@ fn disconnect_remove_merge_with_two_parents_and_two_children_children_only() -> 
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
     * bc0e772 (P1) P1: first merge parent
-    | *   2eac185 (HEAD -> with-two-children) tip
+    | *   b87b6c9 (HEAD -> with-two-children) tip
     | |\  
-    | | * 0e87cd3 (C2) C2: second child
-    | * | 76e6d3c (C1) C1: first child
+    | | * 41cb528 (C2) C2: second child
+    | * | 76ecfed (C1) C1: first child
     | |/  
-    | * 3089592 (M) M: merge two parents
+    | * 9f6b11a (M) M: merge two parents
     | * 392a8f8 (P2) P2: second merge parent
     |/  
     * 7674a5e (tag: base, main) base

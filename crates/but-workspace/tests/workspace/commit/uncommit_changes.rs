@@ -92,7 +92,7 @@ fn uncommit_file_from_parent() -> Result<()> {
 
     // Graph structure should be maintained
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @"
-    * 2c4471e (HEAD -> three) commit three
+    * 300f366 (HEAD -> three) commit three
     * 0f198e0 (two) commit two
     | * 16fd221 (origin/two) commit two
     |/  
@@ -147,8 +147,8 @@ fn uncommit_file_from_root_commit() -> Result<()> {
 
     // Graph structure should be maintained
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @"
-    * 72f5d24 (HEAD -> three) commit three
-    * 0a49f31 (two) commit two
+    * 95fb0e5 (HEAD -> three) commit three
+    * 910d5b1 (two) commit two
     * 7fcda42 (one) commit one
     * 16fd221 (origin/two) commit two
     * 8b426d0 commit one

@@ -77,7 +77,7 @@ fn commits_are_signed_by_default() -> Result<()> {
     insta::assert_snapshot!(overlayed, @"
 
     └── 👉►:0[0]:main[🌳]
-        ├── ·de980c3 (⌂|1) ►c
+        ├── ·06106c2 (⌂|1) ►c
         └── ·3bfeb52 (⌂|1) ►a, ►b
             └── ►:1[1]:base
                 └── ·b6e2f57 (⌂|1)
@@ -86,7 +86,7 @@ fn commits_are_signed_by_default() -> Result<()> {
     assert_eq!(overlayed, graph_tree(&outcome.workspace.graph).to_string());
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @"
-    * de980c3 (HEAD -> main, c) c
+    * 06106c2 (HEAD -> main, c) c
     * 3bfeb52 (b, a) a
     * b6e2f57 (base) base
     ");
@@ -97,7 +97,7 @@ fn commits_are_signed_by_default() -> Result<()> {
     author author <author@example.com> 946684800 +0000
     committer Committer (Memory Override) <committer@example.com> 946771200 +0000
     gitbutler-headers-version 2
-    change-id 1
+    change-id npznqkxwqsymyowwmpltqqvnvuqqrsoy
     gpgsig -----BEGIN SSH SIGNATURE-----
      U1NIU0lHAAAAAQAAARcAAAAHc3NoLXJzYQAAAAMBAAEAAAEBALgYZ0wtPvJyZ40qWRIe8A
      bAYhKYgt0bWX3Z16PyZjWEF+FFx9bRSThY0Bc45TNzon133/aaTWMBnO9RDPw50wZH2ULI
@@ -105,12 +105,12 @@ fn commits_are_signed_by_default() -> Result<()> {
      jf8ezbO+kZg8+J1HMS83gOxhxj15Gwf1cCJAInXr/phYX8BmAZWSHZHu8foy6IG1g1dutr
      2QyAGFddwDKObsrbejsOhwbF7u7PTEGWWO63ZlKS5/QfXg4hCoyWsrTW7lVqI6Xgxk4zOa
      U+EnrNSr2BBXGSSgAqe1vo8TVWggNh/ACdnZa4Y6EAAAADZ2l0AAAAAAAAAAZzaGE1MTIA
-     AAEUAAAADHJzYS1zaGEyLTUxMgAAAQCzgTRGROlhLbgBHE+/7Kp1Iy5zhO3KCQUqL1mxoN
-     MIP2YYq26jA7Xqxd5ZXBmQ/GjuPUb9SRiYt3gGQ24XuE3IPfMk4KEgR+ko/NyDWAx1M/kk
-     J4Kc6h7JoxNFDQFDY1Lj8BXNJ/DemHEHd6ncjBjdZlSlDpeB+x4Lv1fSnRF3RKhzXTA+sZ
-     aHOH9hZhWAftrV1IyG4JOfNeMaaHXt8HEuEPNUvCEajqqFCaQK9jBf3hd7biPUd/fQ2XUm
-     UfWrxBKP4ZKbO+/JQLmtJfIsxev6no7pF2nxnbmX+ivzE8n/TZJR3xuzBtXNsc1zBdkApM
-     LXBDTIkoN64ekxY0tJjYsE
+     AAEUAAAADHJzYS1zaGEyLTUxMgAAAQBPEv21QjFZJ+/CxMSCs1zb3yxEjqvPo181qaioTw
+     BFjDsJgnNLj5H9Uw/uCoTrXkmvOFpdbCJMb0iuf4aiDxqP7Q8wonC66tmdgbkyNQxJyl8T
+     CexJ8bhSrTFGu5vX9E2xdcYt5dCpUrD49w3a4hCAcoLAXrNFuGu9LDRRFfh8Bmp6zjXgYC
+     XZ0tI4iFDutMulDhmQZicFYPomb0TgHOzpDwr9+zX7pJOhX2xbeM3wbgj0hIfCDb2W81Rn
+     A5coj4FSlkXqpYC8mg/jwO54d4cfn2/y2oXesKAY5yxrZPIPlb7vmiLwiEcEh9YQhTT0c0
+     3KOol2J6bRKScwko1nMzSz
      -----END SSH SIGNATURE-----
 
     c
@@ -152,7 +152,7 @@ fn when_cherry_picking_dont_resign_if_not_set() -> Result<()> {
     insta::assert_snapshot!(overlayed, @"
 
     └── 👉►:0[0]:main[🌳]
-        ├── ·06fee46 (⌂|1) ►c
+        ├── ·a773b84 (⌂|1) ►c
         └── ·3bfeb52 (⌂|1) ►a, ►b
             └── ►:1[1]:base
                 └── ·b6e2f57 (⌂|1)
@@ -161,7 +161,7 @@ fn when_cherry_picking_dont_resign_if_not_set() -> Result<()> {
     assert_eq!(overlayed, graph_tree(&outcome.workspace.graph).to_string());
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @"
-    * 06fee46 (HEAD -> main, c) c
+    * a773b84 (HEAD -> main, c) c
     * 3bfeb52 (b, a) a
     * b6e2f57 (base) base
     ");
@@ -172,7 +172,7 @@ fn when_cherry_picking_dont_resign_if_not_set() -> Result<()> {
     author author <author@example.com> 946684800 +0000
     committer Committer (Memory Override) <committer@example.com> 946771200 +0000
     gitbutler-headers-version 2
-    change-id 1
+    change-id npznqkxwqsymyowwmpltqqvnvuqqrsoy
 
     c
     ");
@@ -220,7 +220,7 @@ fn force_picked_commit_with_sign_yes_is_signed_when_otherwise_unchanged() -> Res
 
     let after = visualize_commit_graph_all(&repo)?;
     insta::assert_snapshot!(after, @"
-    * 9500d40 (HEAD -> main, top) top
+    * a120c22 (HEAD -> main, top) top
     * 135e6ba (mid) mid
     * 7a5aacf (base) base
     ");
@@ -291,8 +291,8 @@ fn force_picked_ancestor_does_not_sign_descendants_picked_with_sign_commit_no() 
 
     let after = visualize_commit_graph_all(&repo)?;
     insta::assert_snapshot!(after, @"
-    * 4b4fbf0 (HEAD -> main, top) top
-    * b8cd8b5 (mid) mid
+    * ddf9e11 (HEAD -> main, top) top
+    * 70ea083 (mid) mid
     * 7a5aacf (base) base
     ");
 
@@ -378,8 +378,8 @@ fn force_picked_ancestor_triggers_cascading_signatures_on_descendants_picked_wit
 
     let after = visualize_commit_graph_all(&repo)?;
     insta::assert_snapshot!(after, @"
-    * c29936f (HEAD -> main, top) top
-    * b8cd8b5 (mid) mid
+    * 0ceb853 (HEAD -> main, top) top
+    * 70ea083 (mid) mid
     * 7a5aacf (base) base
     ");
 
@@ -460,7 +460,7 @@ fn commit_picked_with_sign_if_enabled_is_not_signed_when_signing_config_is_disab
 
     let after = visualize_commit_graph_all(&repo)?;
     insta::assert_snapshot!(after, @"
-    * f923739 (HEAD -> main, top) top
+    * de73d4b (HEAD -> main, top) top
     * 7a5aacf (mid, base) base
     ");
 

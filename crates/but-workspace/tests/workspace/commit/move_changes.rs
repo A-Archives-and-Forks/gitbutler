@@ -94,13 +94,13 @@ fn move_file_from_head_to_parent() -> Result<()> {
     insta::assert_debug_snapshot!(materialized.history.commit_mappings(), @"
     {
         Sha1(16fd22163adbb1118551777970db5fb4b59f6b9d): Sha1(88ba151b2f14a87051cdbeb3bdf850a6175eb8fe),
-        Sha1(c9f444cbd4d94f5b90aaa3e6e2e388c876cdbdae): Sha1(95562c28cbe1efce7d36dafe97fc35b1f804fba7),
+        Sha1(c9f444cbd4d94f5b90aaa3e6e2e388c876cdbdae): Sha1(5f79d8bc78f0fc157cf33456412cfa443c0ae4fc),
     }
     ");
 
     // Graph structure should be maintained (commit hashes will change)
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @"
-    * 95562c2 (HEAD -> three) commit three
+    * 5f79d8b (HEAD -> three) commit three
     * 88ba151 (two) commit two
     | * 16fd221 (origin/two) commit two
     |/  
@@ -160,13 +160,13 @@ fn move_file_from_parent_to_head() -> Result<()> {
     insta::assert_debug_snapshot!(materialized.history.commit_mappings(), @"
     {
         Sha1(16fd22163adbb1118551777970db5fb4b59f6b9d): Sha1(0f198e0be723143e843ec2e2f9538f4ba815cd62),
-        Sha1(c9f444cbd4d94f5b90aaa3e6e2e388c876cdbdae): Sha1(c7eb64bce6de865a5cc4c97ab296f424ec41210d),
+        Sha1(c9f444cbd4d94f5b90aaa3e6e2e388c876cdbdae): Sha1(cffb8daaedf92594a000665b3990714ad04115c7),
     }
     ");
 
     // Graph structure should be maintained
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @"
-    * c7eb64b (HEAD -> three) commit three
+    * cffb8da (HEAD -> three) commit three
     * 0f198e0 (two) commit two
     | * 16fd221 (origin/two) commit two
     |/  
@@ -223,16 +223,16 @@ fn move_file_between_non_adjacent_commits() -> Result<()> {
     let materialized = outcome.rebase.materialize()?;
     insta::assert_debug_snapshot!(materialized.history.commit_mappings(), @"
     {
-        Sha1(16fd22163adbb1118551777970db5fb4b59f6b9d): Sha1(364d4a2e248a71c66f26bb2b4651ea773fe214a5),
+        Sha1(16fd22163adbb1118551777970db5fb4b59f6b9d): Sha1(d9e603c74228d57e22e16431db09647bc281b65a),
         Sha1(8b426d09509e2a1e924d939055e1e3eb4b6e7fb4): Sha1(9bc8248dd9ea42b08f66103cd43352fcd2f45f3d),
-        Sha1(c9f444cbd4d94f5b90aaa3e6e2e388c876cdbdae): Sha1(4d3039f44cc829fd5f1622cecc5eafe93b252fe2),
+        Sha1(c9f444cbd4d94f5b90aaa3e6e2e388c876cdbdae): Sha1(cda98e06158943a26336b4584f016938ae72864b),
     }
     ");
 
     // Graph structure should be maintained
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @"
-    * 4d3039f (HEAD -> three) commit three
-    * 364d4a2 (two) commit two
+    * cda98e0 (HEAD -> three) commit three
+    * d9e603c (two) commit two
     * 9bc8248 (one) commit one
     * 16fd221 (origin/two) commit two
     * 8b426d0 commit one

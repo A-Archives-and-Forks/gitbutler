@@ -1,8 +1,8 @@
 //! Provides some slightly higher level tools to help with manipulating commits, in preparation for use in the editor.
 
 use anyhow::{Context, Result, bail};
-use but_core::RefMetadata;
 use but_core::commit::SignCommit;
+use but_core::{RefMetadata, commit::Headers};
 use gix::prelude::ObjectIdExt;
 
 use crate::{
@@ -104,7 +104,7 @@ impl<M: RefMetadata> Editor<'_, '_, M> {
         Ok(new_id)
     }
 
-    /// Creates a commit with only the signature and author set correctly.
+    /// Creates a commit with only the signature, author, and headers set correctly.
     ///
     /// The ID of the commit is all zeros & the commit hasn't been written into any ODB
     pub fn empty_commit(&self) -> Result<but_core::CommitOwned> {
@@ -128,7 +128,7 @@ impl<M: RefMetadata> Editor<'_, '_, M> {
             author,
             encoding: None,
             message: b"".into(),
-            extra_headers: vec![],
+            extra_headers: (&Headers::from_config(&self.repo.config_snapshot())).into(),
         };
 
         Ok(but_core::CommitOwned {

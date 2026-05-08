@@ -36,7 +36,7 @@ fn by_default_conflicts_are_allowed() -> Result<()> {
     insta::assert_snapshot!(overlayed, @"
 
     └── 👉►:0[0]:main[🌳]
-        ├── ·103b227 (⌂|1) ►c
+        ├── ·04d1892 (⌂|1) ►c
         └── ·5e0ba46 (⌂|1) ►a, ►b
             └── ►:1[1]:base
                 └── ·6155f21 (⌂|1)
@@ -51,7 +51,7 @@ fn by_default_conflicts_are_allowed() -> Result<()> {
     author author <author@example.com> 946684800 +0000
     committer Committer (Memory Override) <committer@example.com> 946771200 +0000
     gitbutler-headers-version 2
-    change-id 1
+    change-id ulsktwtuywxwowluzmmxlqrqnyxktwuz
 
     [conflict] c
 
@@ -149,7 +149,7 @@ fn if_a_commit_has_been_configured_not_to_conflict_and_doesnt_end_up_conflicted_
     insta::assert_snapshot!(overlayed, @"
 
     └── 👉►:0[0]:main[🌳]
-        └── ·00c31ec (⌂|1) ►c
+        └── ·8b4d335 (⌂|1) ►c
             └── ►:1[1]:b
                 ├── ·7762cf9 (⌂|1)
                 └── ·3b3bd41 (⌂|1)
@@ -163,7 +163,7 @@ fn if_a_commit_has_been_configured_not_to_conflict_and_doesnt_end_up_conflicted_
 
     // The rebase is successful because `c` remained unconflicted
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @"
-    * 00c31ec (HEAD -> main, c) c
+    * 8b4d335 (HEAD -> main, c) c
     * 7762cf9 (b) I'm a new commit! Hello there
     * 3b3bd41 b
     * 5e0ba46 (a) a

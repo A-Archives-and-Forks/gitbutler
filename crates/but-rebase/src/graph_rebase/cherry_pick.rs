@@ -337,6 +337,7 @@ fn commit_from_unconflicted_tree<'repo>(
     let repo = to_rebase.id.repo;
 
     let headers = to_rebase.headers();
+    let change_id = to_rebase.change_id();
     let mut new_commit = to_rebase.inner;
     new_commit.tree = resolved_tree_id.detach();
 
@@ -348,11 +349,12 @@ fn commit_from_unconflicted_tree<'repo>(
     {
         new_commit.extra_headers.remove(pos);
     } else if headers.is_none() {
-        let headers = Headers::from_config(&repo.config_snapshot());
+        let headers = Headers::from_change_id(change_id);
         new_commit
             .extra_headers
             .extend(Vec::<(BString, BString)>::from(&headers));
     }
+
     new_commit.parents = parents.into();
 
     Ok(crate::commit::create(
@@ -411,7 +413,7 @@ fn commit_from_conflicted_tree<'repo>(
 
     let mut headers = to_rebase
         .headers()
-        .unwrap_or_else(|| Headers::from_config(&repo.config_snapshot()));
+        .unwrap_or_else(|| Headers::from_change_id(to_rebase.change_id()));
     headers.conflicted = None;
     to_rebase.tree = tree.write().context("failed to write tree")?.detach();
     to_rebase.parents = parents.into();

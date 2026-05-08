@@ -379,8 +379,8 @@ fn squash_list_with_bottom_target_keeps_target_message_first() -> anyhow::Result
     env.setup_metadata(&["A"])?;
     setup_branch_with_commits(&env, "A", 3);
 
-    insta::assert_snapshot!(env.git_log()?, @r"
-    * c7b6336 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    insta::assert_snapshot!(env.git_log()?, @"
+    * ec2758d (HEAD -> gitbutler/workspace) GitButler Workspace Commit
     * 8a1f552 (A) commit 3
     * 39dd878 commit 2
     * 8128859 commit 1
@@ -426,8 +426,8 @@ fn squash_list_with_middle_target_keeps_target_message_first() -> anyhow::Result
     env.setup_metadata(&["A"])?;
     setup_branch_with_commits(&env, "A", 3);
 
-    insta::assert_snapshot!(env.git_log()?, @r"
-    * c7b6336 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    insta::assert_snapshot!(env.git_log()?, @"
+    * ec2758d (HEAD -> gitbutler/workspace) GitButler Workspace Commit
     * 8a1f552 (A) commit 3
     * 39dd878 commit 2
     * 8128859 commit 1
@@ -477,8 +477,8 @@ fn squash_multiple_commits_keeps_squashed_commit_content() -> anyhow::Result<()>
     env.setup_metadata(&["A"])?;
     setup_branch_with_commits(&env, "A", 3);
 
-    insta::assert_snapshot!(env.git_log()?, @r"
-    * c7b6336 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    insta::assert_snapshot!(env.git_log()?, @"
+    * ec2758d (HEAD -> gitbutler/workspace) GitButler Workspace Commit
     * 8a1f552 (A) commit 3
     * 39dd878 commit 2
     * 8128859 commit 1

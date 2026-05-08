@@ -47,10 +47,10 @@ fn insert_below_merge_commit() -> Result<()> {
     insta::assert_snapshot!(overlayed, @"
 
     └── 👉►:0[0]:with-inner-merge[🌳]
-        ├── ·ceb4158 (⌂|1)
-        └── ·ea55b6e (⌂|1)
+        ├── ·f699c45 (⌂|1)
+        └── ·16b7c68 (⌂|1)
             └── ►:1[1]:anon:
-                └── ·ec48031 (⌂|1)
+                └── ·8ca0053 (⌂|1)
                     ├── ►:2[2]:A
                     │   └── ·add59d2 (⌂|1)
                     │       └── ►:4[3]:main
@@ -63,9 +63,9 @@ fn insert_below_merge_commit() -> Result<()> {
     assert_eq!(overlayed, graph_tree(&outcome.workspace.graph).to_string());
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    * ceb4158 (HEAD -> with-inner-merge) on top of inner merge
-    * ea55b6e Merge branch 'B' into with-inner-merge
-    *   ec48031 Commit below the merge commit
+    * f699c45 (HEAD -> with-inner-merge) on top of inner merge
+    * 16b7c68 Merge branch 'B' into with-inner-merge
+    *   8ca0053 Commit below the merge commit
     |\  
     | * 984fd1c (B) C: new file with 10 lines
     * | add59d2 (A) A: 10 lines on top
@@ -75,9 +75,9 @@ fn insert_below_merge_commit() -> Result<()> {
     insta::assert_snapshot!(git_status(&repo)?, @"");
     insta::assert_debug_snapshot!(outcome.history.commit_mappings(), @"
     {
-        Sha1(231acb683a6ecfb1ff546952057c4b3d3764b28c): Sha1(ec48031bb803e3711d7ce5646e80c72d8447aedc),
-        Sha1(2fc288c36c8bb710c78203f78ea9883724ce142b): Sha1(ea55b6e69f7043c1afb46b8daeef988dc212be3c),
-        Sha1(e8ee978dac10e6a85006543ef08be07c5824b4f7): Sha1(ceb4158ddbc6bc4c580c553e7d2aa6c9248d9d9e),
+        Sha1(231acb683a6ecfb1ff546952057c4b3d3764b28c): Sha1(8ca0053aa15fe12ab6b467a82bedf86401628c17),
+        Sha1(2fc288c36c8bb710c78203f78ea9883724ce142b): Sha1(16b7c68c1dae39aa8b5e4c56e3bc4b1d508cfb25),
+        Sha1(e8ee978dac10e6a85006543ef08be07c5824b4f7): Sha1(f699c45a85f07b90f2d9531269d79b2ffbf3795e),
     }
     ");
 
@@ -129,10 +129,10 @@ fn insert_below_merge_commit_excluded_mappings() -> Result<()> {
     insta::assert_snapshot!(overlayed, @"
 
     └── 👉►:0[0]:with-inner-merge[🌳]
-        ├── ·ceb4158 (⌂|1)
-        └── ·ea55b6e (⌂|1)
+        ├── ·f699c45 (⌂|1)
+        └── ·16b7c68 (⌂|1)
             └── ►:1[1]:anon:
-                └── ·ec48031 (⌂|1)
+                └── ·8ca0053 (⌂|1)
                     ├── ►:2[2]:A
                     │   └── ·add59d2 (⌂|1)
                     │       └── ►:4[3]:main
@@ -145,9 +145,9 @@ fn insert_below_merge_commit_excluded_mappings() -> Result<()> {
     assert_eq!(overlayed, graph_tree(&outcome.workspace.graph).to_string());
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    * ceb4158 (HEAD -> with-inner-merge) on top of inner merge
-    * ea55b6e Merge branch 'B' into with-inner-merge
-    *   ec48031 Commit below the merge commit
+    * f699c45 (HEAD -> with-inner-merge) on top of inner merge
+    * 16b7c68 Merge branch 'B' into with-inner-merge
+    *   8ca0053 Commit below the merge commit
     |\  
     | * 984fd1c (B) C: new file with 10 lines
     * | add59d2 (A) A: 10 lines on top
@@ -157,8 +157,8 @@ fn insert_below_merge_commit_excluded_mappings() -> Result<()> {
     insta::assert_snapshot!(git_status(&repo)?, @"");
     insta::assert_debug_snapshot!(outcome.history.commit_mappings(), @"
     {
-        Sha1(2fc288c36c8bb710c78203f78ea9883724ce142b): Sha1(ea55b6e69f7043c1afb46b8daeef988dc212be3c),
-        Sha1(e8ee978dac10e6a85006543ef08be07c5824b4f7): Sha1(ceb4158ddbc6bc4c580c553e7d2aa6c9248d9d9e),
+        Sha1(2fc288c36c8bb710c78203f78ea9883724ce142b): Sha1(16b7c68c1dae39aa8b5e4c56e3bc4b1d508cfb25),
+        Sha1(e8ee978dac10e6a85006543ef08be07c5824b4f7): Sha1(f699c45a85f07b90f2d9531269d79b2ffbf3795e),
     }
     ");
 
@@ -206,39 +206,39 @@ fn insert_above_commit_with_two_children() -> Result<()> {
     insta::assert_snapshot!(overlayed, @"
 
     └── 👉►:0[0]:with-inner-merge[🌳]
-        └── ·9d2b9d9 (⌂|1)
+        └── ·42f9ff4 (⌂|1)
             └── ►:1[1]:anon:
-                └── ·8502201 (⌂|1)
+                └── ·5219d30 (⌂|1)
                     ├── ►:2[2]:A
-                    │   └── ·0379d6c (⌂|1)
+                    │   └── ·72d9d9b (⌂|1)
                     │       └── ►:4[3]:main
-                    │           ├── ·055ead5 (⌂|1) ►tags/base
+                    │           ├── ·3dc4e45 (⌂|1) ►tags/base
                     │           └── ·8f0d338 (⌂|1)
                     └── ►:3[2]:B
-                        └── ·97c7cc6 (⌂|1)
+                        └── ·df0cf44 (⌂|1)
                             └── →:4: (main)
     ");
     let outcome = outcome.materialize()?;
     assert_eq!(overlayed, graph_tree(&outcome.workspace.graph).to_string());
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    * 9d2b9d9 (HEAD -> with-inner-merge) on top of inner merge
-    *   8502201 Merge branch 'B' into with-inner-merge
+    * 42f9ff4 (HEAD -> with-inner-merge) on top of inner merge
+    *   5219d30 Merge branch 'B' into with-inner-merge
     |\  
-    | * 97c7cc6 (B) C: new file with 10 lines
-    * | 0379d6c (A) A: 10 lines on top
+    | * df0cf44 (B) C: new file with 10 lines
+    * | 72d9d9b (A) A: 10 lines on top
     |/  
-    * 055ead5 (tag: base, main) Commit above base commit
+    * 3dc4e45 (tag: base, main) Commit above base commit
     * 8f0d338 base
     ");
     insta::assert_snapshot!(git_status(&repo)?, @"");
     insta::assert_debug_snapshot!(outcome.history.commit_mappings(), @"
     {
-        Sha1(2fc288c36c8bb710c78203f78ea9883724ce142b): Sha1(8502201c3e5e7ccd1acce001dd2c72c1af8f4a02),
-        Sha1(984fd1c6d3975901147b1f02aae6ef0a16e5904e): Sha1(97c7cc62f0ddefff490fa673a101045dfd143749),
-        Sha1(add59d26b2ffd7468fcb44c2db48111dd8f481e5): Sha1(0379d6c1d89617ff6c438e6e2ebdc9d5db4d831e),
-        Sha1(e8aafee980f055ee43ef702a2d159fec9b781db1): Sha1(055ead578607b2021aeb80df7ac67e294d5272a9),
-        Sha1(e8ee978dac10e6a85006543ef08be07c5824b4f7): Sha1(9d2b9d900e9ec5abbb44480114205fcad42ac1da),
+        Sha1(2fc288c36c8bb710c78203f78ea9883724ce142b): Sha1(5219d30048fd87943c2c87401527b75f26a1f8be),
+        Sha1(984fd1c6d3975901147b1f02aae6ef0a16e5904e): Sha1(df0cf447d953bcb8e79bac528f65f53bd498b9d2),
+        Sha1(add59d26b2ffd7468fcb44c2db48111dd8f481e5): Sha1(72d9d9b11a71e30cc0ae1d14d03038568f0d964c),
+        Sha1(e8aafee980f055ee43ef702a2d159fec9b781db1): Sha1(3dc4e4586430dfca273b5bdefc0e7fc5cd99de82),
+        Sha1(e8ee978dac10e6a85006543ef08be07c5824b4f7): Sha1(42f9ff4611aecf1274b35a44b09ab2054b12d52d),
     }
     ");
 

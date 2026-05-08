@@ -425,7 +425,7 @@ fn squash_across_stacks_subject_into_target() -> Result<()> {
     assert_eq!(squashed_commit.tree_id()?.detach(), subject_tree);
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    *   d6e2c4d (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    *   c12bb2a (HEAD -> gitbutler/workspace) GitButler Workspace Commit
     |\  
     | * 82d6f41 (B) B
     |/  
@@ -493,7 +493,7 @@ fn squash_across_stacks_target_into_subject() -> Result<()> {
     assert_eq!(squashed_commit.tree_id()?.detach(), subject_tree);
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    *   e33c9cc (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    *   9df30a4 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
     |\  
     * | 17e27b0 (A) A
     |/  
