@@ -41,15 +41,6 @@ pub fn get_raw(id: ProjectHandleOrLegacyProjectId) -> anyhow::Result<Project> {
     controller.get_raw(id)
 }
 
-/// Testing purpose only.
-pub fn get_raw_with_path<P: AsRef<Path>>(
-    app_data_dir: P,
-    id: ProjectHandleOrLegacyProjectId,
-) -> anyhow::Result<Project> {
-    let controller = Controller::from_path(app_data_dir.as_ref());
-    controller.get_raw(id)
-}
-
 pub fn update(project: UpdateRequest) -> anyhow::Result<Project> {
     let controller = Controller::from_path(but_path::app_data_dir()?);
     controller.update(project)

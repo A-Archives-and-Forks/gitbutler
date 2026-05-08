@@ -980,6 +980,7 @@ dependencies = [
  "serde-error",
  "serde_json",
  "tauri",
+ "tempfile",
  "tokio",
  "tracing",
  "url",

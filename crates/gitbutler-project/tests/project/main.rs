@@ -524,25 +524,3 @@ mod delete {
             .collect())
     }
 }
-
-mod get_raw {
-    use super::*;
-
-    /// `get_raw` must keep working when the worktree is missing on disk.
-    /// This backs the recovery flow in `ProjectNotFound`/`delete_project`/`list_projects`
-    /// — those callers rely on storage-only metadata and must not eagerly open the repo.
-    #[test]
-    fn succeeds_when_worktree_deleted_from_disk() -> anyhow::Result<()> {
-        let data_dir = support::data_dir();
-        let repo = support::TestProject::default();
-        let project =
-            gitbutler_project::add_at_app_data_dir(data_dir.path(), repo.path())?.unwrap_project();
-        let id = project.id.clone();
-
-        std::fs::remove_dir_all(repo.path())?;
-
-        let raw = gitbutler_project::get_raw_with_path(data_dir.path(), id.clone())?;
-        assert_eq!(raw.id, id);
-        Ok(())
-    }
-}
