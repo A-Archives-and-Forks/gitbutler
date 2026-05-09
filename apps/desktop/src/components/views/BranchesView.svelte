@@ -303,7 +303,7 @@
 										{@const hasLocal = listing.hasLocal}
 										<!-- Apply branch -->
 
-										{#if branchName && !inWorkspace}
+										{#if branchName && inWorkspace !== true}
 											<div class="branch-actions">
 												<AsyncButton
 													testId={TestId.BranchesViewApplyBranchButton}
