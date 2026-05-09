@@ -223,7 +223,7 @@ const OutlineTreePanel: FC<{} & PanelProps> = ({ ...panelProps }) => {
 
 	useCommand(openBranchPicker, {
 		layer: "global",
-		commandPalette: { group: "Outline", label: "Branch" },
+		commandPalette: { group: "Outline", label: "Select branch" },
 		shortcutsBar: { label: "Branch" },
 		hotkeys: [{ hotkey: "T" }],
 	});
@@ -982,7 +982,7 @@ const Changes: FC<{
 
 	useCommand(selectChangesAndFocusOutline, {
 		layer: "global",
-		commandPalette: { group: "Outline", label: "Changes" },
+		commandPalette: { group: "Outline", label: "Select changes" },
 		shortcutsBar: { label: "Changes" },
 		hotkeys: [{ hotkey: "Z" }],
 	});

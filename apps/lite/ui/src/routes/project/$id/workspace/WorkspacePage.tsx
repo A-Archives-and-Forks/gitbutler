@@ -301,7 +301,6 @@ const TopBarActions: FC = () => {
 
 		dispatch(projectActions.togglePanel({ projectId, panel: "details" }));
 	};
-	const detailsLabel = isPanelVisible(panelsState, "details") ? "Close" : "Open";
 
 	const applyBranchCommand = useCommand(openApplyBranchPicker, {
 		layer: "global",
@@ -312,8 +311,11 @@ const TopBarActions: FC = () => {
 
 	const toggleDetailsCommand = useCommand(toggleDetails, {
 		layer: "global",
-		commandPalette: { group: "Details", label: detailsLabel },
-		shortcutsBar: { label: detailsLabel },
+		commandPalette: {
+			group: "Details",
+			label: isPanelVisible(panelsState, "details") ? "Close" : "Open",
+		},
+		shortcutsBar: { label: "Details" },
 		hotkeys: [{ hotkey: "D" }],
 	});
 
