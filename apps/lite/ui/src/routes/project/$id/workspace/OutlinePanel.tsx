@@ -1052,7 +1052,8 @@ const Changes: FC<{
 					items={branchComboboxItems}
 					open={open}
 					onOpenChange={setOpen}
-					value={branch}
+					// Note `undefined` means uncontrolled.
+					value={branch ?? null}
 					onValueChange={selectBranch}
 					itemToStringLabel={(x) => x.label}
 					itemToStringValue={(x) => x.id}
