@@ -3,7 +3,7 @@
 	flex-direction: column;
 }
 
-.changesContainer {
+.panelPadding {
 	padding: var(--panel-padding);
 }
 
@@ -114,7 +114,7 @@
 
 .commitControls {
 	display: flex;
-	gap: 4px;
+	column-gap: 2px;
 }
 
 .commitBranchComboboxTrigger {

@@ -9,18 +9,8 @@
 	white-space: nowrap;
 }
 
-/* This might be applied to an element that already has its own background, so
-we must use an overlay for the background. */
 .activeSource {
-	position: relative;
-
-	&:after {
-		position: absolute;
-		inset: 0;
-		border-radius: 8px;
-		background-color: var(--bg-1);
-		content: "";
-		opacity: 0.6;
-		pointer-events: none;
-	}
+	border-radius: 8px;
+	outline: 2px dashed var(--border-1);
+	outline-offset: 1px;
 }

@@ -2,7 +2,6 @@ import uiStyles from "#ui/ui/ui.module.css";
 import { FilesPanel } from "./FilesPanel.tsx";
 import { applyBranchMutationOptions } from "#ui/api/mutations.ts";
 import {
-	absorptionPlanQueryOptions,
 	headInfoQueryOptions,
 	listBranchesQueryOptions,
 	listProjectsQueryOptions,
@@ -17,8 +16,8 @@ import {
 import { isPanelVisible } from "#ui/panels/state.ts";
 import {
 	projectActions,
+	selectProjectDialogState,
 	selectProjectPanelsState,
-	selectProjectPickerDialogState,
 } from "#ui/projects/state.ts";
 import { AbsorptionDialog } from "#ui/routes/project/$id/workspace/AbsorptionDialog.tsx";
 import { ShortcutsBarPortal, TopBarActionsPortal } from "#ui/portals.tsx";
@@ -26,7 +25,7 @@ import { Keys } from "#ui/ui/Keys.tsx";
 import { ShortcutButton } from "#ui/ui/ShortcutButton.tsx";
 import { useAppDispatch, useAppSelector } from "#ui/store.ts";
 import { isInputElement } from "#ui/commands/hotkeys.ts";
-import { AbsorptionTarget, BranchListing, Segment, Stack } from "@gitbutler/but-sdk";
+import { BranchListing, Segment, Stack } from "@gitbutler/but-sdk";
 import {
 	formatForDisplay,
 	Hotkey,
@@ -34,10 +33,10 @@ import {
 	HotkeySequence,
 	normalizeRegisterableHotkey,
 } from "@tanstack/react-hotkeys";
-import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { Match, Order } from "effect";
-import { FC, useState } from "react";
+import { FC } from "react";
 import { Group, Separator, useDefaultLayout } from "react-resizable-panels";
 import { branchOperand, type BranchOperand } from "#ui/operands.ts";
 import { PickerDialog, type PickerDialogGroup } from "#ui/ui/PickerDialog/PickerDialog.tsx";
@@ -302,19 +301,21 @@ const TopBarActions: FC = () => {
 
 		dispatch(projectActions.togglePanel({ projectId, panel: "details" }));
 	};
-	const detailsLabel = isPanelVisible(panelsState, "details") ? "Close" : "Open";
 
 	const applyBranchCommand = useCommand(openApplyBranchPicker, {
 		layer: "global",
 		commandPalette: { group: "Branches", label: "Apply" },
 		shortcutsBar: { label: "Apply" },
-		hotkeys: [{ hotkey: "Shift+A" }],
+		hotkeys: [{ hotkey: "Mod+Shift+A" }],
 	});
 
 	const toggleDetailsCommand = useCommand(toggleDetails, {
 		layer: "global",
-		commandPalette: { group: "Details", label: detailsLabel },
-		shortcutsBar: { label: detailsLabel },
+		commandPalette: {
+			group: "Details",
+			label: isPanelVisible(panelsState, "details") ? "Close" : "Open",
+		},
+		shortcutsBar: { label: "Details" },
 		hotkeys: [{ hotkey: "D" }],
 	});
 
@@ -423,26 +424,13 @@ const WorkspacePage: FC = () => {
 
 	const { id: projectId } = useParams({ from: "/project/$id/workspace" });
 
-	const pickerDialog = useAppSelector((state) => selectProjectPickerDialogState(state, projectId));
+	const dialog = useAppSelector((state) => selectProjectDialogState(state, projectId));
 	const panelsState = useAppSelector((state) => selectProjectPanelsState(state, projectId));
 	const focusedPanel = useFocusedProjectPanel(projectId);
 
-	const [absorptionTarget, setAbsorptionTarget] = useState<AbsorptionTarget | null>(null);
-
-	const queryClient = useQueryClient();
-	const openAbsorptionDialog = (target: AbsorptionTarget) => {
-		// Before opening the dialog, warm cache to avoid showing loading states in
-		// the dialog itself. This also ensures we don't show a stale absorption
-		// plan whilst the dialog revalidates.
-		void queryClient.prefetchQuery(absorptionPlanQueryOptions({ projectId, target })).then(() => {
-			setAbsorptionTarget(target);
-		});
-	};
-
 	useCommand(
 		() => {
-			if (pickerDialog._tag === "CommandPalette")
-				dispatch(projectActions.closePickerDialog({ projectId }));
+			if (dialog._tag === "CommandPalette") dispatch(projectActions.closeDialog({ projectId }));
 			else dispatch(projectActions.openCommandPalette({ projectId, focusedPanel }));
 		},
 		{
@@ -471,17 +459,17 @@ const WorkspacePage: FC = () => {
 
 	const setBranchPickerOpen = (open: boolean) => {
 		if (open) dispatch(projectActions.openBranchPicker({ projectId }));
-		else dispatch(projectActions.closePickerDialog({ projectId }));
+		else dispatch(projectActions.closeDialog({ projectId }));
 	};
 
 	const setApplyBranchPickerOpen = (open: boolean) => {
 		if (open) dispatch(projectActions.openApplyBranchPicker({ projectId }));
-		else dispatch(projectActions.closePickerDialog({ projectId }));
+		else dispatch(projectActions.closeDialog({ projectId }));
 	};
 
 	const setCommandPaletteOpen = (open: boolean) => {
 		if (open) dispatch(projectActions.openCommandPalette({ projectId, focusedPanel }));
-		else dispatch(projectActions.closePickerDialog({ projectId }));
+		else dispatch(projectActions.closeDialog({ projectId }));
 	};
 
 	return (
@@ -503,7 +491,6 @@ const WorkspacePage: FC = () => {
 					tabIndex={0}
 					className={styles.panel}
 					elementRef={(el) => el?.focus({ focusVisible: false })}
-					onAbsorbChanges={openAbsorptionDialog}
 				/>
 				{isPanelVisible(panelsState, "files") && (
 					<>
@@ -515,7 +502,6 @@ const WorkspacePage: FC = () => {
 							groupResizeBehavior="preserve-pixel-size"
 							tabIndex={0}
 							className={classes(styles.panel, styles.panelPadding)}
-							onAbsorbChanges={openAbsorptionDialog}
 						/>
 					</>
 				)}
@@ -532,18 +518,17 @@ const WorkspacePage: FC = () => {
 				)}
 			</Group>
 
-			{absorptionTarget && (
-				<AbsorptionDialog
-					projectId={projectId}
-					target={absorptionTarget}
-					onOpenChange={(open) => {
-						if (!open) setAbsorptionTarget(null);
-					}}
-				/>
-			)}
-
-			{Match.value(pickerDialog).pipe(
+			{Match.value(dialog).pipe(
 				Match.tagsExhaustive({
+					Absorption: ({ target }) => (
+						<AbsorptionDialog
+							projectId={projectId}
+							target={target}
+							onOpenChange={(open) => {
+								if (!open) dispatch(projectActions.closeDialog({ projectId }));
+							}}
+						/>
+					),
 					None: () => null,
 					ApplyBranchPicker: () => (
 						<ApplyBranchPicker open onOpenChange={setApplyBranchPickerOpen} projectId={projectId} />

@@ -8,7 +8,11 @@ import {
 	unapplyStackMutationOptions,
 	updateBranchNameMutationOptions,
 } from "#ui/api/mutations.ts";
-import { changesInWorktreeQueryOptions, headInfoQueryOptions } from "#ui/api/queries.ts";
+import {
+	absorptionPlanQueryOptions,
+	changesInWorktreeQueryOptions,
+	headInfoQueryOptions,
+} from "#ui/api/queries.ts";
 import { getCommonBaseCommitId } from "#ui/api/ref-info.ts";
 import { encodeRefName } from "#ui/api/ref-name.ts";
 import { commitTitle, shortCommitId } from "#ui/commit.ts";
@@ -187,21 +191,19 @@ const useNavigationIndex = (projectId: string) => {
 	return navigationIndex;
 };
 
-export const OutlinePanel: FC<
-	{
-		onAbsorbChanges: (target: AbsorptionTarget) => void;
-	} & PanelProps
-> = ({ onAbsorbChanges, ...panelProps }) => (
-	<Suspense fallback={<Panel {...panelProps}>Loading outline…</Panel>}>
-		<OutlineTreePanel onAbsorbChanges={onAbsorbChanges} {...panelProps} />
+export const OutlinePanel: FC<{} & PanelProps> = ({ ...panelProps }) => (
+	<Suspense
+		fallback={
+			<Panel {...panelProps} className={classes(panelProps.className, styles.panelPadding)}>
+				Loading outline…
+			</Panel>
+		}
+	>
+		<OutlineTreePanel {...panelProps} />
 	</Suspense>
 );
 
-const OutlineTreePanel: FC<
-	{
-		onAbsorbChanges: (target: AbsorptionTarget) => void;
-	} & PanelProps
-> = ({ onAbsorbChanges, ...panelProps }) => {
+const OutlineTreePanel: FC<{} & PanelProps> = ({ ...panelProps }) => {
 	const { id: projectId } = useParams({ from: "/project/$id/workspace" });
 	const dispatch = useAppDispatch();
 
@@ -221,7 +223,7 @@ const OutlineTreePanel: FC<
 
 	useCommand(openBranchPicker, {
 		layer: "global",
-		commandPalette: { group: "Outline", label: "Branch" },
+		commandPalette: { group: "Outline", label: "Select branch" },
 		shortcutsBar: { label: "Branch" },
 		hotkeys: [{ hotkey: "T" }],
 	});
@@ -234,12 +236,8 @@ const OutlineTreePanel: FC<
 			aria-activedescendant={treeItemId(selection)}
 			className={classes(panelProps.className, styles.panel)}
 		>
-			<div className={styles.changesContainer}>
-				<Changes
-					projectId={projectId}
-					onAbsorbChanges={onAbsorbChanges}
-					navigationIndex={navigationIndex}
-				/>
+			<div className={styles.panelPadding}>
+				<Changes projectId={projectId} navigationIndex={navigationIndex} />
 			</div>
 
 			<div className={styles.scroller}>
@@ -498,7 +496,11 @@ const CommitRow: FC<
 		const prevItem = navigationIndex.items[selectionIdx - 1];
 		if (!prevItem) return;
 
-		const operation = moveOperation({ source: operand, target: prevItem, side: "above" });
+		const operation = moveOperation({
+			source: operand,
+			target: prevItem,
+			side: "above",
+		});
 		if (!operation) return;
 
 		runOperation(projectId, operation);
@@ -515,7 +517,11 @@ const CommitRow: FC<
 		const nextItem = navigationIndex.items[nextIdx];
 		if (!nextItem) return;
 
-		const operation = moveOperation({ source: operand, target: nextItem, side: "below" });
+		const operation = moveOperation({
+			source: operand,
+			target: nextItem,
+			side: "below",
+		});
 		if (!operation) return;
 
 		runOperation(projectId, operation);
@@ -557,6 +563,24 @@ const CommitRow: FC<
 			}
 		});
 	};
+
+	const amendCommit = () => {
+		dispatch(projectActions.enterRubMode({ projectId, source: changesSectionOperand }));
+		focusPanel("outline");
+	};
+
+	const { contextMenu: amendCommitContextMenuItem } = useCommand(amendCommit, {
+		enabled: isSelected && focusedPanel === "outline" && outlineMode._tag === "Default",
+		layer: "focused-selection",
+		commandPalette: { group: "Commit", label: "Amend" },
+		shortcutsBar: { label: "Amend" },
+		contextMenu: {
+			label: "Amend commit",
+			// Focus change is too slow / the menu item isn't reactive.
+			enabled: true,
+		},
+		hotkeys: [{ hotkey: "Shift+A" }],
+	});
 
 	const { contextMenu: cutCommitContextMenuItem } = useCommand(cutCommit, {
 		enabled: isSelected && focusedPanel === "outline" && outlineMode._tag === "Default",
@@ -648,6 +672,7 @@ const CommitRow: FC<
 	});
 
 	const menuItems: Array<NativeMenuItem> = [
+		amendCommitContextMenuItem,
 		cutCommitContextMenuItem,
 		startEditingContextMenuItem,
 		{
@@ -740,16 +765,25 @@ const CommitC: FC<{
 const ChangesSectionRow: FC<{
 	changes: Array<TreeChange>;
 	navigationIndex: NavigationIndex;
-	onAbsorbChanges: (target: AbsorptionTarget) => void;
+
 	projectId: string;
-}> = ({ changes, navigationIndex, onAbsorbChanges, projectId }) => {
+}> = ({ changes, navigationIndex, projectId }) => {
 	const operand = changesSectionOperand;
 	const isSelected = useIsSelected({ projectId, operand });
 	const focusedPanel = useFocusedProjectPanel(projectId);
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
+	const dispatch = useAppDispatch();
+	const queryClient = useQueryClient();
+	const openAbsorptionDialog = (target: AbsorptionTarget) => {
+		// [ref:absorption-dialog-prefetch]
+		void queryClient.prefetchQuery(absorptionPlanQueryOptions({ projectId, target })).then(() => {
+			dispatch(projectActions.openAbsorptionDialog({ projectId, target }));
+		});
+	};
+
 	const absorb = () => {
-		onAbsorbChanges({ type: "all" });
+		openAbsorptionDialog({ type: "all" });
 	};
 
 	const { contextMenu: absorbContextMenuItem } = useCommand(absorb, {
@@ -867,9 +901,9 @@ const CommitBranchComboboxPopup: FC = () => (
 
 const Changes: FC<{
 	projectId: string;
-	onAbsorbChanges: (target: AbsorptionTarget) => void;
+
 	navigationIndex: NavigationIndex;
-}> = ({ projectId, onAbsorbChanges, navigationIndex }) => {
+}> = ({ projectId, navigationIndex }) => {
 	const toastManager = Toast.useToastManager();
 
 	const commitCreate = useMutation({
@@ -916,12 +950,8 @@ const Changes: FC<{
 		});
 	});
 
-	const [branchState, setBranch] = useState<CommitBranchComboboxItem | null>(null);
-
-	if (branchState && !branchComboboxItems.some((item) => item.id === branchState.id))
-		setBranch(null);
-
-	const branch = branchState ?? branchComboboxItems[0];
+	const [branchId, setBranchId] = useState<string | null>(null);
+	const branch = branchComboboxItems.find((item) => item.id === branchId) ?? branchComboboxItems[0];
 
 	const commit = () => {
 		if (!branch) return;
@@ -936,7 +966,10 @@ const Changes: FC<{
 		commitCreate.mutate(
 			{
 				projectId,
-				relativeTo: { type: "referenceBytes", subject: branch.branch.branchRef },
+				relativeTo: {
+					type: "referenceBytes",
+					subject: branch.branch.branchRef,
+				},
 				side: "below",
 				changes,
 				message: commitTextareaRef.current?.value ?? "",
@@ -955,14 +988,13 @@ const Changes: FC<{
 	const [open, setOpen] = useState(false);
 
 	const selectBranch = (option: CommitBranchComboboxItem | null) => {
-		setBranch(option);
+		setBranchId(option?.id ?? null);
 		setOpen(false);
 	};
 	const openBranchCombobox = () => setOpen(true);
 
 	const isSelected = useIsSelected({ projectId, operand });
 	const selectChanges = () => {
-		if (isSelected) return;
 		dispatch(projectActions.selectOutline({ projectId, selection: operand }));
 	};
 	const selectChangesAndFocusOutline = () => {
@@ -976,7 +1008,7 @@ const Changes: FC<{
 
 	useCommand(selectChangesAndFocusOutline, {
 		layer: "global",
-		commandPalette: { group: "Outline", label: "Changes" },
+		commandPalette: { group: "Outline", label: "Select changes" },
 		shortcutsBar: { label: "Changes" },
 		hotkeys: [{ hotkey: "Z" }],
 	});
@@ -1023,7 +1055,6 @@ const Changes: FC<{
 			<ChangesSectionRow
 				changes={worktreeChanges.changes}
 				navigationIndex={navigationIndex}
-				onAbsorbChanges={onAbsorbChanges}
 				projectId={projectId}
 			/>
 
@@ -1046,7 +1077,8 @@ const Changes: FC<{
 					items={branchComboboxItems}
 					open={open}
 					onOpenChange={setOpen}
-					value={branch}
+					// Note `undefined` means uncontrolled.
+					value={branch ?? null}
 					onValueChange={selectBranch}
 					itemToStringLabel={(x) => x.label}
 					itemToStringValue={(x) => x.id}

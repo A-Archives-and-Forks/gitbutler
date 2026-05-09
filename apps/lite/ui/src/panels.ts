@@ -4,7 +4,7 @@ import { changesSectionOperand, Operand } from "#ui/operands.ts";
 import {
 	projectActions,
 	selectProjectOutlineModeState,
-	selectProjectPickerDialogState,
+	selectProjectDialogState,
 } from "#ui/projects/state.ts";
 import { useAppDispatch, useAppSelector } from "#ui/store.ts";
 import {
@@ -24,8 +24,8 @@ const getFocusedProjectPanel = (activeElement: Element | null) =>
 export const useFocusedProjectPanel = (projectId: string): Panel | null => {
 	const activeElement = useActiveElement();
 	const focusedPanel = getFocusedProjectPanel(activeElement);
-	const pickerDialog = useAppSelector((state) => selectProjectPickerDialogState(state, projectId));
-	return pickerDialog._tag === "CommandPalette" ? pickerDialog.focusedPanel : focusedPanel;
+	const dialog = useAppSelector((state) => selectProjectDialogState(state, projectId));
+	return dialog._tag === "CommandPalette" ? dialog.focusedPanel : focusedPanel;
 };
 
 export const focusPanel = (panel: Panel) => {
@@ -102,26 +102,6 @@ export const useNavigationIndexHotkeys = ({
 		selectAndFocus(newItem);
 	};
 
-	const enterMoveMode = () => {
-		dispatch(projectActions.enterMoveMode({ projectId, source: selection }));
-		focusPanel("outline");
-	};
-
-	const enterRubMode = (source: Operand) => () => {
-		dispatch(projectActions.enterRubMode({ projectId, source }));
-		focusPanel("outline");
-	};
-
-	const enterCutMode = () => {
-		dispatch(projectActions.enterCutMode({ projectId, source: selection }));
-		focusPanel("outline");
-	};
-
-	const enterCommitMode = () => {
-		dispatch(projectActions.enterMoveMode({ projectId, source: changesSectionOperand }));
-		focusPanel("outline");
-	};
-
 	useCommand(selectPreviousItem, {
 		enabled: focusedPanel === panel,
 		layer: "focused-selection-tree",
@@ -162,6 +142,26 @@ export const useNavigationIndexHotkeys = ({
 
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
+	const enterMoveMode = () => {
+		dispatch(projectActions.enterMoveMode({ projectId, source: selection }));
+		focusPanel("outline");
+	};
+
+	const enterRubMode = () => {
+		dispatch(projectActions.enterRubMode({ projectId, source: selection }));
+		focusPanel("outline");
+	};
+
+	const enterCutMode = () => {
+		dispatch(projectActions.enterCutMode({ projectId, source: selection }));
+		focusPanel("outline");
+	};
+
+	const enterCommitMode = () => {
+		dispatch(projectActions.enterMoveMode({ projectId, source: changesSectionOperand }));
+		focusPanel("outline");
+	};
+
 	useCommand(enterMoveMode, {
 		enabled: focusedPanel === panel && outlineMode._tag === "Default",
 		layer: "focused-selection-tree",
@@ -178,20 +178,12 @@ export const useNavigationIndexHotkeys = ({
 		hotkeys: [{ hotkey: "Mod+X", ignoreInputs: true }],
 	});
 
-	useCommand(enterRubMode(selection), {
+	useCommand(enterRubMode, {
 		enabled: focusedPanel === panel && outlineMode._tag === "Default",
 		layer: "focused-selection-tree",
 		commandPalette: { group, label: "Rub" },
 		shortcutsBar: { label: "Rub" },
 		hotkeys: [{ hotkey: "R" }],
-	});
-
-	useCommand(enterRubMode(changesSectionOperand), {
-		enabled: focusedPanel === panel && outlineMode._tag === "Default",
-		layer: "focused-selection-tree",
-		commandPalette: { group, label: "Rub changes" },
-		shortcutsBar: { label: "Rub changes" },
-		hotkeys: [{ hotkey: "Shift+R" }],
 	});
 
 	useCommand(enterCommitMode, {

@@ -59,7 +59,7 @@ const OperationModeControls: FC<{
 					hotkeys={confirmCommand.hotkeys}
 					onClick={confirmCommand.commandFn}
 				>
-					Confirm
+					{operationLabel(operation)}
 				</ShortcutButton>
 			)}
 			<ShortcutButton
@@ -93,24 +93,34 @@ const CutOperationControls: FC<{
 	const moveAboveCommand = useCommand(() => run(operations.moveAbove), {
 		enabled: !!operations.moveAbove,
 		layer: "global",
-		commandPalette: { group: "Operation mode", label: "Move above" },
-		shortcutsBar: { label: "Move above" },
+		commandPalette: operations.moveAbove
+			? { group: "Operation mode", label: operationLabel(operations.moveAbove) }
+			: undefined,
+		shortcutsBar: operations.moveAbove
+			? { label: operationLabel(operations.moveAbove) }
+			: undefined,
 		hotkeys: [{ hotkey: "A" }],
 	});
 
 	const rubCommand = useCommand(() => run(operations.rub), {
 		enabled: !!operations.rub,
 		layer: "global",
-		commandPalette: { group: "Operation mode", label: "Rub" },
-		shortcutsBar: { label: "Rub" },
+		commandPalette: operations.rub
+			? { group: "Operation mode", label: operationLabel(operations.rub) }
+			: undefined,
+		shortcutsBar: operations.rub ? { label: operationLabel(operations.rub) } : undefined,
 		hotkeys: [{ hotkey: "Mod+V", ignoreInputs: true }],
 	});
 
 	const moveBelowCommand = useCommand(() => run(operations.moveBelow), {
 		enabled: !!operations.moveBelow,
 		layer: "global",
-		commandPalette: { group: "Operation mode", label: "Move below" },
-		shortcutsBar: { label: "Move below" },
+		commandPalette: operations.moveBelow
+			? { group: "Operation mode", label: operationLabel(operations.moveBelow) }
+			: undefined,
+		shortcutsBar: operations.moveBelow
+			? { label: operationLabel(operations.moveBelow) }
+			: undefined,
 		hotkeys: [{ hotkey: "B" }],
 	});
 
@@ -123,30 +133,33 @@ const CutOperationControls: FC<{
 
 	return (
 		<>
-			<ShortcutButton
-				className={uiStyles.button}
-				hotkeys={moveAboveCommand.hotkeys}
-				disabled={!operations.moveAbove}
-				onClick={moveAboveCommand.commandFn}
-			>
-				Move above
-			</ShortcutButton>
-			<ShortcutButton
-				className={uiStyles.button}
-				hotkeys={rubCommand.hotkeys}
-				disabled={!operations.rub}
-				onClick={rubCommand.commandFn}
-			>
-				Rub
-			</ShortcutButton>
-			<ShortcutButton
-				className={uiStyles.button}
-				hotkeys={moveBelowCommand.hotkeys}
-				disabled={!operations.moveBelow}
-				onClick={moveBelowCommand.commandFn}
-			>
-				Move below
-			</ShortcutButton>
+			{operations.moveAbove && (
+				<ShortcutButton
+					className={uiStyles.button}
+					hotkeys={moveAboveCommand.hotkeys}
+					onClick={moveAboveCommand.commandFn}
+				>
+					{operationLabel(operations.moveAbove)}
+				</ShortcutButton>
+			)}
+			{operations.rub && (
+				<ShortcutButton
+					className={uiStyles.button}
+					hotkeys={rubCommand.hotkeys}
+					onClick={rubCommand.commandFn}
+				>
+					{operationLabel(operations.rub)}
+				</ShortcutButton>
+			)}
+			{operations.moveBelow && (
+				<ShortcutButton
+					className={uiStyles.button}
+					hotkeys={moveBelowCommand.hotkeys}
+					onClick={moveBelowCommand.commandFn}
+				>
+					{operationLabel(operations.moveBelow)}
+				</ShortcutButton>
+			)}
 			<ShortcutButton
 				className={uiStyles.button}
 				hotkeys={cancelCommand.hotkeys}
@@ -170,21 +183,24 @@ export const OperationTooltip: FC<
 		isActive && !!operationMode
 			? Match.value(operationMode).pipe(
 					Match.tags({
-						DragAndDrop: () => {
+						DragAndDrop: ({ operationType }) => {
 							const operation = getOperation({
 								source: operationMode.source,
 								target: operand,
-								operationType: operationModeToOperationType(operationMode),
+								operationType,
 							});
 							if (!operation) return null;
 
 							return <>{operationLabel(operation)}</>;
 						},
 						Cut: ({ source }) => (
-							<CutOperationControls
-								projectId={projectId}
-								operations={getOperations(source, operand)}
-							/>
+							<>
+								{operandEquals(operationMode.source, operand) && <>Select a target</>}
+								<CutOperationControls
+									projectId={projectId}
+									operations={getOperations(source, operand)}
+								/>
+							</>
 						),
 					}),
 					Match.orElse(() => {
@@ -195,11 +211,7 @@ export const OperationTooltip: FC<
 						});
 						return (
 							<>
-								{operation ? (
-									<>{operationLabel(operation)}</>
-								) : operandEquals(operationMode.source, operand) ? (
-									<>Select a target</>
-								) : null}
+								{operandEquals(operationMode.source, operand) && <>Select a target</>}
 								<OperationModeControls projectId={projectId} operation={operation} />
 							</>
 						);
@@ -226,7 +238,7 @@ export const OperationTooltip: FC<
 		>
 			<Tooltip.Trigger render={trigger} />
 			<Tooltip.Portal>
-				<Tooltip.Positioner sideOffset={8}>
+				<Tooltip.Positioner sideOffset={8} side="right">
 					<Tooltip.Popup className={classes(uiStyles.popup, uiStyles.tooltip, styles.popup)}>
 						{tooltip}
 					</Tooltip.Popup>

@@ -1,20 +1,22 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { RootState } from "#ui/store.ts";
+import { type AbsorptionTarget } from "@gitbutler/but-sdk";
 import { type BranchOperand, type CommitOperand, type Operand } from "#ui/operands.ts";
 import { type Panel } from "#ui/panels.ts";
 import * as panels from "#ui/panels/state.ts";
 import * as workspace from "#ui/projects/workspace/state.ts";
 import { OperationType } from "#ui/operations/operation.ts";
 
-type PickerDialog =
+type Dialog =
+	| { _tag: "Absorption"; target: AbsorptionTarget }
 	| { _tag: "None" }
 	| { _tag: "ApplyBranchPicker" }
 	| { _tag: "BranchPicker" }
 	| { _tag: "CommandPalette"; focusedPanel: Panel | null };
 
 type ProjectState = {
+	dialog: Dialog;
 	panels: panels.PanelsState;
-	pickerDialog: PickerDialog;
 	workspace: workspace.WorkspaceState;
 };
 
@@ -23,8 +25,8 @@ type ProjectSliceState = {
 };
 
 const initialProjectState: ProjectState = {
+	dialog: { _tag: "None" },
 	panels: panels.initialState,
-	pickerDialog: { _tag: "None" },
 	workspace: workspace.initialState,
 };
 
@@ -33,8 +35,8 @@ const initialState: ProjectSliceState = {
 };
 
 const createProjectState = (): ProjectState => ({
+	dialog: { _tag: "None" },
 	panels: panels.createInitialState(),
-	pickerDialog: { _tag: "None" },
 	workspace: workspace.createInitialState(),
 });
 
@@ -150,23 +152,33 @@ const projectSlice = createSlice({
 			}>,
 		) => {
 			const { projectId, focusedPanel } = action.payload;
-			ensureProjectState(state, projectId).pickerDialog = {
+			ensureProjectState(state, projectId).dialog = {
 				_tag: "CommandPalette",
 				focusedPanel,
 			};
 		},
 		openBranchPicker: (state, action: PayloadAction<{ projectId: string }>) => {
-			ensureProjectState(state, action.payload.projectId).pickerDialog = {
+			ensureProjectState(state, action.payload.projectId).dialog = {
 				_tag: "BranchPicker",
 			};
 		},
 		openApplyBranchPicker: (state, action: PayloadAction<{ projectId: string }>) => {
-			ensureProjectState(state, action.payload.projectId).pickerDialog = {
+			ensureProjectState(state, action.payload.projectId).dialog = {
 				_tag: "ApplyBranchPicker",
 			};
 		},
-		closePickerDialog: (state, action: PayloadAction<{ projectId: string }>) => {
-			ensureProjectState(state, action.payload.projectId).pickerDialog = { _tag: "None" };
+		openAbsorptionDialog: (
+			state,
+			action: PayloadAction<{ projectId: string; target: AbsorptionTarget }>,
+		) => {
+			const { projectId, target } = action.payload;
+			ensureProjectState(state, projectId).dialog = {
+				_tag: "Absorption",
+				target,
+			};
+		},
+		closeDialog: (state, action: PayloadAction<{ projectId: string }>) => {
+			ensureProjectState(state, action.payload.projectId).dialog = { _tag: "None" };
 		},
 	},
 });
@@ -180,8 +192,8 @@ const selectProjectState = (state: RootState, projectId: string): ProjectState =
 export const selectProjectPanelsState = (state: RootState, projectId: string) =>
 	selectProjectState(state, projectId).panels;
 
-export const selectProjectPickerDialogState = (state: RootState, projectId: string) =>
-	selectProjectState(state, projectId).pickerDialog;
+export const selectProjectDialogState = (state: RootState, projectId: string) =>
+	selectProjectState(state, projectId).dialog;
 
 const selectProjectWorkspaceState = (state: RootState, projectId: string) =>
 	selectProjectState(state, projectId).workspace;
