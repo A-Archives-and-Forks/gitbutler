@@ -68,12 +68,9 @@ const groupCommandPaletteItems = (
 			{
 				id,
 				name: cmd.commandPalette.label,
-				hotkeys:
-					cmd.commandPalette.hotkeys !== false
-						? cmd.hotkeys?.map((hk) =>
-								"sequence" in hk ? hk.sequence : normalizeRegisterableHotkey(hk.hotkey),
-							)
-						: undefined,
+				hotkeys: cmd.hotkeys?.map((hk) =>
+					"sequence" in hk ? hk.sequence : normalizeRegisterableHotkey(hk.hotkey),
+				),
 			},
 		]);
 	}

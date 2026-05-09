@@ -23,8 +23,6 @@ export type CommandOptions = {
 	enabled?: boolean;
 	commandPalette?: {
 		label: string;
-		/** @default true */
-		hotkeys?: boolean;
 	};
 	shortcutsBar?: {
 		label: string;
