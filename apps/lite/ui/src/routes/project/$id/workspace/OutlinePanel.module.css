@@ -3,7 +3,7 @@
 	flex-direction: column;
 }
 
-.changesContainer {
+.panelPadding {
 	padding: var(--panel-padding);
 }
 

@@ -192,7 +192,13 @@ export const OutlinePanel: FC<
 		onAbsorbChanges: (target: AbsorptionTarget) => void;
 	} & PanelProps
 > = ({ onAbsorbChanges, ...panelProps }) => (
-	<Suspense fallback={<Panel {...panelProps}>Loading outline…</Panel>}>
+	<Suspense
+		fallback={
+			<Panel {...panelProps} className={classes(panelProps.className, styles.panelPadding)}>
+				Loading outline…
+			</Panel>
+		}
+	>
 		<OutlineTreePanel onAbsorbChanges={onAbsorbChanges} {...panelProps} />
 	</Suspense>
 );
@@ -234,7 +240,7 @@ const OutlineTreePanel: FC<
 			aria-activedescendant={treeItemId(selection)}
 			className={classes(panelProps.className, styles.panel)}
 		>
-			<div className={styles.changesContainer}>
+			<div className={styles.panelPadding}>
 				<Changes
 					projectId={projectId}
 					onAbsorbChanges={onAbsorbChanges}
