@@ -217,6 +217,8 @@ impl Subcommands {
             #[cfg(all(feature = "legacy", feature = "remote"))]
             Subcommands::Remote { .. } => Unknown,
             Subcommands::Onboarding | Subcommands::EvalHook => Unknown,
+            #[cfg(feature = "agentlog")]
+            Subcommands::AgentLog { .. } => Unknown,
         }
     }
 }
