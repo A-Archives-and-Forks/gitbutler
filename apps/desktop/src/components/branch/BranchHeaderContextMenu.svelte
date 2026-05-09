@@ -342,8 +342,11 @@
 					testId={TestId.BranchHeaderContextMenu_UnapplyBranch}
 					disabled={isReadOnly}
 					onclick={async () => {
-						await stackService.unapply({ projectId, stackId });
-						close();
+						try {
+							await stackService.unapply({ projectId, stackId });
+						} finally {
+							close();
+						}
 					}}
 				/>
 			</ContextMenuSection>

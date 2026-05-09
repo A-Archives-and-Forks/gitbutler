@@ -88,13 +88,16 @@
 	async function unapplyStack() {
 		if (!stackId) return;
 
-		await stackService.unapply({
-			projectId,
-			stackId,
-		});
-
-		// Refetch to update the UI
-		await stacksQuery.result.refetch();
+		try {
+			await stackService.unapply({
+				projectId,
+				stackId,
+			});
+		} finally {
+			// Always refetch to clear stale stacks from the UI,
+			// even if the unapply failed (e.g. branch already removed).
+			await stacksQuery.result.refetch();
+		}
 	}
 </script>
 
