@@ -104,39 +104,33 @@ export const useNavigationIndexHotkeys = ({
 
 	useCommand(selectPreviousItem, {
 		enabled: focusedPanel === panel,
-		layer: "focused-selection-tree",
 		shortcutsBar: { label: "Up" },
 		hotkeys: [{ hotkey: "ArrowUp" }, { hotkey: "K" }],
 	});
 
 	useCommand(selectNextItem, {
 		enabled: focusedPanel === panel,
-		layer: "focused-selection-tree",
 		shortcutsBar: { label: "Down" },
 		hotkeys: [{ hotkey: "ArrowDown" }, { hotkey: "J" }],
 	});
 
 	useCommand(selectPreviousSection, {
 		enabled: focusedPanel === panel,
-		layer: "focused-selection-tree",
 		hotkeys: [{ hotkey: "Shift+ArrowUp" }, { hotkey: "Shift+K" }],
 	});
 
 	useCommand(selectNextSection, {
 		enabled: focusedPanel === panel,
-		layer: "focused-selection-tree",
 		hotkeys: [{ hotkey: "Shift+ArrowDown" }, { hotkey: "Shift+J" }],
 	});
 
 	useCommand(selectFirstItem, {
 		enabled: focusedPanel === panel,
-		layer: "focused-selection-tree",
 		hotkeys: [{ hotkey: "Home" }, { hotkey: "Meta+ArrowUp" }, { sequence: ["G", "G"] }],
 	});
 
 	useCommand(selectLastItem, {
 		enabled: focusedPanel === panel,
-		layer: "focused-selection-tree",
 		hotkeys: [{ hotkey: "End" }, { hotkey: "Meta+ArrowDown" }, { hotkey: "Shift+G" }],
 	});
 
@@ -164,7 +158,6 @@ export const useNavigationIndexHotkeys = ({
 
 	useCommand(enterMoveMode, {
 		enabled: focusedPanel === panel && outlineMode._tag === "Default",
-		layer: "focused-selection-tree",
 		commandPalette: { group, label: "Move" },
 		shortcutsBar: { label: "Move" },
 		hotkeys: [{ hotkey: "M" }],
@@ -172,7 +165,6 @@ export const useNavigationIndexHotkeys = ({
 
 	useCommand(enterCutMode, {
 		enabled: focusedPanel === panel && outlineMode._tag === "Default",
-		layer: "focused-selection-tree",
 		commandPalette: { group, label: "Cut" },
 		shortcutsBar: { label: "Cut" },
 		hotkeys: [{ hotkey: "Mod+X", ignoreInputs: true }],
@@ -180,7 +172,6 @@ export const useNavigationIndexHotkeys = ({
 
 	useCommand(enterRubMode, {
 		enabled: focusedPanel === panel && outlineMode._tag === "Default",
-		layer: "focused-selection-tree",
 		commandPalette: { group, label: "Rub" },
 		shortcutsBar: { label: "Rub" },
 		hotkeys: [{ hotkey: "R" }],
@@ -188,7 +179,6 @@ export const useNavigationIndexHotkeys = ({
 
 	useCommand(enterCommitMode, {
 		enabled: focusedPanel === panel && outlineMode._tag === "Default",
-		layer: "focused-selection-tree",
 		commandPalette: { group, label: "Commit" },
 		shortcutsBar: { label: "Commit" },
 		hotkeys: [{ hotkey: "C" }],

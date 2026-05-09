@@ -38,14 +38,12 @@ const OperationModeControls: FC<{
 
 	const confirmCommand = useCommand(confirm, {
 		enabled: !!operation,
-		layer: "global",
 		commandPalette: { group: "Operation mode", label: "Confirm" },
 		shortcutsBar: { label: "Confirm" },
 		hotkeys: [{ hotkey: "Enter" }],
 	});
 
 	const cancelCommand = useCommand(cancel, {
-		layer: "global",
 		commandPalette: { group: "Operation mode", label: "Cancel" },
 		shortcutsBar: { label: "Cancel" },
 		hotkeys: [{ hotkey: "Escape" }],
@@ -92,7 +90,6 @@ const CutOperationControls: FC<{
 
 	const moveAboveCommand = useCommand(() => run(operations.moveAbove), {
 		enabled: !!operations.moveAbove,
-		layer: "global",
 		commandPalette: operations.moveAbove
 			? { group: "Operation mode", label: operationLabel(operations.moveAbove) }
 			: undefined,
@@ -104,7 +101,6 @@ const CutOperationControls: FC<{
 
 	const rubCommand = useCommand(() => run(operations.rub), {
 		enabled: !!operations.rub,
-		layer: "global",
 		commandPalette: operations.rub
 			? { group: "Operation mode", label: operationLabel(operations.rub) }
 			: undefined,
@@ -114,7 +110,6 @@ const CutOperationControls: FC<{
 
 	const moveBelowCommand = useCommand(() => run(operations.moveBelow), {
 		enabled: !!operations.moveBelow,
-		layer: "global",
 		commandPalette: operations.moveBelow
 			? { group: "Operation mode", label: operationLabel(operations.moveBelow) }
 			: undefined,
@@ -125,7 +120,6 @@ const CutOperationControls: FC<{
 	});
 
 	const cancelCommand = useCommand(cancel, {
-		layer: "global",
 		commandPalette: { group: "Operation mode", label: "Cancel" },
 		shortcutsBar: { label: "Cancel" },
 		hotkeys: [{ hotkey: "Escape" }],

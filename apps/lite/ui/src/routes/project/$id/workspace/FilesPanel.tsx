@@ -503,7 +503,6 @@ const ChangesFileRow: FC<{
 
 	const { contextMenu: absorbContextMenuItem } = useCommand(absorb, {
 		enabled: isSelected && focusedPanel === "files" && outlineMode._tag === "Default",
-		layer: "focused-selection",
 		commandPalette: { group: "Changes file", label: "Absorb" },
 		shortcutsBar: { label: "Absorb" },
 		hotkeys: [{ hotkey: "A" }],

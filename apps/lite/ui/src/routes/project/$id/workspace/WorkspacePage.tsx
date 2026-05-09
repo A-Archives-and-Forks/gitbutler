@@ -45,19 +45,11 @@ import styles from "./WorkspacePage.module.css";
 import type { CommandGroup } from "#ui/commands/groups.ts";
 import { OutlinePanel } from "#ui/routes/project/$id/workspace/OutlinePanel.tsx";
 import { classes } from "#ui/ui/classes.ts";
-import {
-	CommandLayer,
-	CommandLayerOrder,
-	CommandOptions,
-	useCommand,
-	useCommandFn,
-} from "#ui/commands/manager.ts";
+import { CommandOptions, useCommand, useCommandFn } from "#ui/commands/manager.ts";
 import type { CommandRegistrationId } from "#ui/commands/state.ts";
-import { optionalOrder } from "#ui/lib/order.ts";
 
 type CommandPaletteItem = {
 	id: string;
-	layer: CommandLayer;
 	name: string;
 	hotkeys?: Array<Hotkey | HotkeySequence>;
 };
@@ -65,47 +57,32 @@ type CommandPaletteItem = {
 const groupCommandPaletteItems = (
 	regs: Record<CommandRegistrationId, CommandOptions>,
 ): Array<PickerDialogGroup<CommandPaletteItem>> => {
-	const grouped: Map<CommandGroup, [Array<CommandPaletteItem>, topmostLayer?: CommandLayer]> =
-		new Map();
+	const grouped: Map<CommandGroup, Array<CommandPaletteItem>> = new Map();
 
 	for (const [id, cmd] of Object.entries(regs)) {
 		if (cmd.enabled === false || cmd.commandPalette === undefined) continue;
 
-		const [mitems, mlayer] = grouped.get(cmd.commandPalette.group) ?? [];
+		const mitems = grouped.get(cmd.commandPalette.group) ?? [];
 		grouped.set(cmd.commandPalette.group, [
-			[
-				...(mitems ?? []),
-				{
-					id,
-					layer: cmd.layer,
-					name: cmd.commandPalette.label,
-					hotkeys:
-						cmd.commandPalette.hotkeys !== false
-							? cmd.hotkeys?.map((hk) =>
-									"sequence" in hk ? hk.sequence : normalizeRegisterableHotkey(hk.hotkey),
-								)
-							: undefined,
-				},
-			],
-			Order.max(optionalOrder(CommandLayerOrder))(mlayer, cmd.layer),
+			...mitems,
+			{
+				id,
+				name: cmd.commandPalette.label,
+				hotkeys:
+					cmd.commandPalette.hotkeys !== false
+						? cmd.hotkeys?.map((hk) =>
+								"sequence" in hk ? hk.sequence : normalizeRegisterableHotkey(hk.hotkey),
+							)
+						: undefined,
+			},
 		]);
 	}
 
 	return Array.from(grouped.entries())
-		.toSorted(
-			Order.combineAll([
-				Order.reverse(Order.mapInput(optionalOrder(CommandLayerOrder), ([_g, [_is, tl]]) => tl)),
-				Order.mapInput(Order.string, ([g]) => g),
-			]),
-		)
-		.map(([group, [cmds]]) => ({
+		.toSorted(Order.mapInput(Order.string, ([g]) => g))
+		.map(([group, cmds]) => ({
 			value: group,
-			items: cmds.toSorted(
-				Order.combineAll([
-					Order.reverse(Order.mapInput(CommandLayerOrder, (cmd) => cmd.layer)),
-					Order.mapInput(Order.string, (cmd) => cmd.name),
-				]),
-			),
+			items: cmds.toSorted(Order.mapInput(Order.string, (cmd) => cmd.name)),
 		}));
 };
 
@@ -303,14 +280,12 @@ const TopBarActions: FC = () => {
 	};
 
 	const applyBranchCommand = useCommand(openApplyBranchPicker, {
-		layer: "global",
 		commandPalette: { group: "Branches", label: "Apply" },
 		shortcutsBar: { label: "Apply" },
 		hotkeys: [{ hotkey: "Mod+Shift+A" }],
 	});
 
 	const toggleDetailsCommand = useCommand(toggleDetails, {
-		layer: "global",
 		commandPalette: {
 			group: "Details",
 			label: isPanelVisible(panelsState, "details") ? "Close" : "Open",
@@ -357,26 +332,20 @@ const ShortcutsBar: FC = () => {
 	const activeElement = useActiveElement();
 	const regs = useAppSelector((state) => state.commands.registrations);
 	const visibleHotkeys = Object.values(regs)
-		.flatMap(({ enabled, hotkeys, layer, shortcutsBar }) =>
+		.flatMap(({ enabled, hotkeys, shortcutsBar }) =>
 			enabled !== false && shortcutsBar !== undefined && hotkeys !== undefined
 				? hotkeys.flatMap((hk) =>
 						// TODO: Render sequences too.
 						"sequence" in hk || isInputIgnoredHotkey({ activeElement, hotkeyOpts: hk })
 							? []
 							: {
-									layer,
 									label: shortcutsBar.label,
 									hotkey: formatForDisplay(hk.hotkey),
 								},
 					)
 				: [],
 		)
-		.toSorted(
-			Order.combineAll([
-				Order.reverse(Order.mapInput(CommandLayerOrder, (hk) => hk.layer)),
-				Order.mapInput(Order.string, (hk) => hk.hotkey),
-			]),
-		);
+		.toSorted(Order.mapInput(Order.string, (hk) => hk.hotkey));
 
 	if (visibleHotkeys.length === 0) return null;
 
@@ -399,7 +368,6 @@ const usePanelsHotkeys = ({ focusedPanel }: { focusedPanel: PanelType | null }) 
 			focusAdjacentPanel(-1);
 		},
 		{
-			layer: "focused-selection-tree",
 			enabled: focusedPanel !== null,
 			shortcutsBar: { label: "Focus previous panel" },
 			hotkeys: [{ hotkey: "H" }],
@@ -411,7 +379,6 @@ const usePanelsHotkeys = ({ focusedPanel }: { focusedPanel: PanelType | null }) 
 			focusAdjacentPanel(1);
 		},
 		{
-			layer: "focused-selection-tree",
 			enabled: focusedPanel !== null,
 			shortcutsBar: { label: "Focus next panel" },
 			hotkeys: [{ hotkey: "L" }],
@@ -434,7 +401,6 @@ const WorkspacePage: FC = () => {
 			else dispatch(projectActions.openCommandPalette({ projectId, focusedPanel }));
 		},
 		{
-			layer: "global",
 			shortcutsBar: { label: "Command palette" },
 			hotkeys: [{ hotkey: "Mod+K" }],
 		},

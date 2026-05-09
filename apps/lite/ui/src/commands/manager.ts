@@ -15,36 +15,11 @@ import type { CommandGroup } from "./groups";
 import type { NativeMenuItem, NativeMenuItemData } from "#ui/native-menu.ts";
 import { useAppDispatch, useAppSelector } from "#ui/store.ts";
 import { commandsActions, CommandRegistrationId } from "./state";
-import { Order } from "effect";
-import { optionalOrder } from "#ui/lib/order.ts";
-
-export type CommandLayer =
-	| "global"
-	| "selection-tree"
-	| "selection"
-	| "focused-selection-tree"
-	| "focused-selection";
-
-export const CommandLayerOrder: Order.Order<CommandLayer> = Order.mapInput(Order.number, (cl) => {
-	switch (cl) {
-		case "global":
-			return 0;
-		case "selection-tree":
-			return 1;
-		case "selection":
-			return 2;
-		case "focused-selection-tree":
-			return 3;
-		case "focused-selection":
-			return 4;
-	}
-});
 
 // consider if many of these could typically share a label
 export type CommandOptions = {
 	/** @default true */
 	enabled?: boolean;
-	layer: CommandLayer;
 	commandPalette?: {
 		group: CommandGroup;
 		label: string;
@@ -80,12 +55,6 @@ export type CommandFn = (scenario: CommandTrigger) => void;
 
 export const CommandFnContext: Context<Map<CommandRegistrationId, CommandFn> | null> =
 	createContext<Map<CommandRegistrationId, CommandFn> | null>(null);
-
-const sequenceKey = (s: HotkeySequence): string =>
-	s
-		.join("")
-		// Disambiguate from non-sequenced hotkeys.
-		.concat("_seq_");
 
 type HotkeySegment<T extends string> = T extends `${infer Head}+${infer Tail}`
 	? Head | HotkeySegment<Tail>
@@ -132,27 +101,6 @@ const firstNativeMenuAccelerator = (
 	return firstHotkey ? toElectronAccelerator(firstHotkey.hotkey) : undefined;
 };
 
-const useMaxHotkeyLayers = (): Record<string, CommandLayer | undefined> => {
-	const regs = useAppSelector((state) => state.commands.registrations);
-
-	return Object.values(regs).reduce(
-		(acc, val) => {
-			if (!val.hotkeys) return acc;
-
-			for (const hotkey of val.hotkeys) {
-				const k =
-					"sequence" in hotkey
-						? sequenceKey(hotkey.sequence)
-						: normalizeRegisterableHotkey(hotkey.hotkey);
-				acc[k] = Order.max(optionalOrder(CommandLayerOrder))(acc[k], val.layer);
-			}
-
-			return acc;
-		},
-		{} as Record<string, CommandLayer | undefined>,
-	);
-};
-
 type ResolvedCommand<F extends CommandFn, O extends CommandOptions> = {
 	commandFn: F;
 	contextMenu: O extends { contextMenu: NativeMenuItemData } ? NativeMenuItem : undefined;
@@ -177,7 +125,6 @@ export const useCommand = <F extends CommandFn, O extends CommandOptions>(
 	const dispatch = useAppDispatch();
 	const regs = useAppSelector((state) => state.commands.registrations);
 	const regOptions = regs[id];
-	const maxKeybindLayers = useMaxHotkeyLayers();
 
 	useEffect(() => {
 		dispatch(commandsActions.register({ id, options }));
@@ -193,16 +140,7 @@ export const useCommand = <F extends CommandFn, O extends CommandOptions>(
 
 	const { hotkeyDefs, sequenceDefs, resolvedHotkeys } = (regOptions?.hotkeys ?? []).reduce(
 		(acc, hk) => {
-			const maxKeybindLayer =
-				maxKeybindLayers[
-					"sequence" in hk ? sequenceKey(hk.sequence) : normalizeRegisterableHotkey(hk.hotkey)
-				];
-
-			const defEnabled =
-				regOptions &&
-				regOptions.layer === maxKeybindLayer &&
-				regOptions.enabled !== false &&
-				hk.enabled !== false;
+			const defEnabled = regOptions && regOptions.enabled !== false && hk.enabled !== false;
 
 			if (defEnabled)
 				acc.resolvedHotkeys.push(
