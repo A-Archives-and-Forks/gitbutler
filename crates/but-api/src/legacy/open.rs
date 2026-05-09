@@ -25,6 +25,11 @@ pub(crate) fn open_that(target_url: &Url) -> anyhow::Result<()> {
         bail!("Invalid path scheme: {}", target_url.scheme());
     }
 
+    #[cfg(target_os = "linux")]
+    if open_wsl_editor_url(target_url) {
+        return Ok(());
+    }
+
     fn clean_env_vars<'a, 'b>(
         var_names: &'a [&'b str],
     ) -> impl Iterator<Item = (&'b str, String)> + 'a {
@@ -92,6 +97,150 @@ pub(crate) fn open_that(target_url: &Url) -> anyhow::Result<()> {
         bail!("Errors occurred: {cmd_errors:?}");
     }
     Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn open_wsl_editor_url(target_url: &Url) -> bool {
+    use std::process::Command;
+
+    if !is_wsl() {
+        return false;
+    }
+
+    let Some((command, args)) = wsl_editor_invocation(target_url) else {
+        return false;
+    };
+
+    let mut cmd = Command::new(command);
+    cmd.args(args);
+    tracing::info!(?cmd, "editor command");
+    matches!(cmd.status(), Ok(status) if status.success())
+}
+
+#[cfg(target_os = "linux")]
+fn is_wsl() -> bool {
+    env::var_os("WSL_DISTRO_NAME").is_some() || env::var_os("WSL_INTEROP").is_some()
+}
+
+#[cfg(target_os = "linux")]
+fn wsl_editor_invocation(target_url: &Url) -> Option<(&'static str, Vec<String>)> {
+    let command = wsl_editor_command(target_url.scheme())?;
+    if target_url.host_str() != Some("file") {
+        return None;
+    }
+
+    let path = editor_url_path(target_url)?;
+    if path.is_empty() {
+        return None;
+    }
+
+    let mut args = Vec::new();
+    if target_url
+        .query_pairs()
+        .any(|(key, value)| key == "windowId" && value == "_blank")
+    {
+        args.push("--new-window".to_owned());
+    }
+
+    if path_has_position(&path) {
+        args.push("--goto".to_owned());
+    }
+    args.push(path);
+
+    Some((command, args))
+}
+
+#[cfg(target_os = "linux")]
+fn wsl_editor_command(scheme: &str) -> Option<&'static str> {
+    match scheme {
+        "vscode" => Some("code"),
+        "vscode-insiders" => Some("code-insiders"),
+        "vscodium" => Some("codium"),
+        "cursor" => Some("cursor"),
+        "windsurf" => Some("windsurf"),
+        "trae" => Some("trae"),
+        _ => None,
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn editor_url_path(target_url: &Url) -> Option<String> {
+    let file_url = Url::parse(&format!("file://{}", target_url.path())).ok()?;
+    file_url
+        .to_file_path()
+        .ok()?
+        .into_os_string()
+        .into_string()
+        .ok()
+}
+
+#[cfg(target_os = "linux")]
+fn path_has_position(path: &str) -> bool {
+    let Some((_, line_or_column)) = path.rsplit_once(':') else {
+        return false;
+    };
+
+    line_or_column.parse::<u32>().is_ok()
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cursor_editor_url_becomes_goto_cli_invocation() {
+        let url = Url::parse("cursor://file/home/example/project/src/main.rs:42:7").unwrap();
+
+        assert_eq!(
+            wsl_editor_invocation(&url),
+            Some((
+                "cursor",
+                vec![
+                    "--goto".to_owned(),
+                    "/home/example/project/src/main.rs:42:7".to_owned(),
+                ],
+            ))
+        );
+    }
+
+    #[test]
+    fn vscode_project_url_becomes_new_window_cli_invocation() {
+        let url = Url::parse("vscode://file/home/example/project?windowId=_blank").unwrap();
+
+        assert_eq!(
+            wsl_editor_invocation(&url),
+            Some((
+                "code",
+                vec![
+                    "--new-window".to_owned(),
+                    "/home/example/project".to_owned()
+                ]
+            ))
+        );
+    }
+
+    #[test]
+    fn editor_url_paths_are_percent_decoded() {
+        let url = Url::parse("vscode://file/home/example/My%20Project/src/lib.rs:3").unwrap();
+
+        assert_eq!(
+            wsl_editor_invocation(&url),
+            Some((
+                "code",
+                vec![
+                    "--goto".to_owned(),
+                    "/home/example/My Project/src/lib.rs:3".to_owned(),
+                ],
+            ))
+        );
+    }
+
+    #[test]
+    fn unsupported_editor_scheme_falls_back_to_url_handler() {
+        let url = Url::parse("zed://file/home/example/project/src/main.rs:42").unwrap();
+
+        assert_eq!(wsl_editor_invocation(&url), None);
+    }
 }
 
 #[but_api]
