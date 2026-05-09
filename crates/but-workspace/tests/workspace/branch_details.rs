@@ -337,7 +337,7 @@ mod with_workspace {
     impl RefMetadata for WorkspaceRefMetadataStore {
         type Handle<T> = NullHandle<T>;
 
-        fn iter(&self) -> impl Iterator<Item = anyhow::Result<(FullName, Box<dyn Any>)>> + '_ {
+        fn iter(&self) -> impl Iterator<Item = anyhow::Result<(FullName, Box<dyn Any>)>> {
             std::iter::empty()
         }
 

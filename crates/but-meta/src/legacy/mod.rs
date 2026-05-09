@@ -588,7 +588,7 @@ const INTEGRATION_BRANCH: &str = WORKSPACE_REF_NAME;
 impl RefMetadata for VirtualBranchesTomlMetadata {
     type Handle<T> = VBTomlMetadataHandle<T>;
 
-    fn iter(&self) -> impl Iterator<Item = anyhow::Result<(FullName, Box<dyn Any>)>> + '_ {
+    fn iter(&self) -> impl Iterator<Item = anyhow::Result<(FullName, Box<dyn Any>)>> {
         let data = &self.snapshot.content;
         // Keep it simple - dump everything into a Vec, pre-allocated.
         let mut out = Vec::new();

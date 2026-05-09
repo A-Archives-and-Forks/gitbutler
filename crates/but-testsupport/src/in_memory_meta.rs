@@ -54,7 +54,7 @@ impl<T> DerefMut for InMemoryRefMetadataHandle<T> {
 impl but_core::RefMetadata for InMemoryRefMetadata {
     type Handle<T> = InMemoryRefMetadataHandle<T>;
 
-    fn iter(&self) -> impl Iterator<Item = anyhow::Result<(FullName, Box<dyn Any>)>> + '_ {
+    fn iter(&self) -> impl Iterator<Item = anyhow::Result<(FullName, Box<dyn Any>)>> {
         self.workspaces
             .iter()
             .cloned()
