@@ -138,7 +138,7 @@ resolver = "2"
 repository = "https://github.com/gitbutlerapp/gitbutler"
 authors = ["GitButler <gitbutler@gitbutler.com>"]
 edition = "2024"
-rust-version = "1.89"
+rust-version = "1.95"
 
 [workspace.dependencies]
 but-debug = { path = "crates/but-debug" }
