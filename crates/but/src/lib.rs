@@ -980,7 +980,9 @@ async fn match_subcommand(
         #[cfg(feature = "legacy")]
         Subcommands::Push(push_args) => {
             let mut ctx = setup::init_ctx(&args, InitCtxOptions::default(), out)?;
-            command::legacy::push::handle(push_args, &mut ctx, out).emit_metrics(metrics_ctx)
+            command::legacy::push::handle(push_args, &mut ctx, out)
+                .await
+                .emit_metrics(metrics_ctx)
         }
         #[cfg(feature = "legacy")]
         Subcommands::Reword {

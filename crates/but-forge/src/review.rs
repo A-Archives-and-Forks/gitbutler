@@ -1087,38 +1087,59 @@ pub async fn create_forge_review(
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "export-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "camelCase")]
-pub struct ForgeReviewDescriptionUpdate {
+pub struct ForgeReviewUpdate {
     /// The unique identifier number for this review within its repository. This can be a PR or MR number.
     pub number: i64,
     /// The current body/description of the review, which may be None if no description is set.
     pub body: Option<String>,
     /// The platform-specific symbol for this review type (e.g., "#" for GitHub pull requests and "!" for MRs).
     pub unit_symbol: String,
+    /// If set, update the base/target branch of this review to the given value.
+    pub target_branch: Option<String>,
 }
 
 #[cfg(feature = "export-schema")]
-but_schemars::register_sdk_type!(ForgeReviewDescriptionUpdate);
+but_schemars::register_sdk_type!(ForgeReviewUpdate);
 
-impl From<ForgeReview> for ForgeReviewDescriptionUpdate {
+impl From<ForgeReview> for ForgeReviewUpdate {
     fn from(review: ForgeReview) -> Self {
-        ForgeReviewDescriptionUpdate {
+        ForgeReviewUpdate {
             number: review.number,
             body: review.body,
             unit_symbol: review.unit_symbol,
+            target_branch: Some(review.target_branch),
         }
     }
 }
 
-/// Update the review description tables for a set of reviews
-pub async fn update_review_description_tables(
+impl From<ForgeReviewTargetUpdate> for ForgeReviewUpdate {
+    fn from(update: ForgeReviewTargetUpdate) -> Self {
+        ForgeReviewUpdate {
+            number: update.number,
+            body: None,
+            unit_symbol: String::new(),
+            target_branch: Some(update.target_branch),
+        }
+    }
+}
+
+/// Update reviews: description footers and, optionally, target/base branches.
+///
+/// Per-review failures are collected rather than aborting the batch.
+pub async fn sync_reviews(
     preferred_forge_user: &Option<crate::ForgeUser>,
     forge_repo_info: &crate::forge::ForgeRepoInfo,
-    reviews: &[ForgeReviewDescriptionUpdate],
+    reviews: &[ForgeReviewUpdate],
     storage: &but_forge_storage::Controller,
 ) -> Result<()> {
     let crate::forge::ForgeRepoInfo {
         forge, owner, repo, ..
     } = forge_repo_info;
+
+    let mut errors: Vec<String> = Vec::new();
+
+    // Skip body updates when no review has footer content (e.g. push-only target updates).
+    let has_footer_content = reviews.iter().any(|r| !r.unit_symbol.is_empty());
 
     match forge {
         ForgeName::GitHub => {
@@ -1126,27 +1147,31 @@ pub async fn update_review_description_tables(
             let pr_numbers: Vec<i64> = reviews.iter().map(|r| r.number).collect();
 
             for review in reviews {
-                let updated_body = update_body(
-                    review.body.as_deref(),
-                    review.number,
-                    &pr_numbers,
-                    &review.unit_symbol,
-                );
+                let updated_body = if has_footer_content {
+                    Some(update_body(
+                        review.body.as_deref(),
+                        review.number,
+                        &pr_numbers,
+                        &review.unit_symbol,
+                    ))
+                } else {
+                    None
+                };
 
                 let params = but_github::UpdatePullRequestParams {
                     owner,
                     repo,
                     pr_number: review.number,
                     title: None,
-                    body: Some(&updated_body),
-                    base: None,
+                    body: updated_body.as_deref(),
+                    base: review.target_branch.as_deref(),
                     state: None,
                 };
 
-                but_github::pr::update(preferred_account, params, storage).await?;
+                if let Err(err) = but_github::pr::update(preferred_account, params, storage).await {
+                    errors.push(format!("PR #{}: {err}", review.number));
+                }
             }
-
-            Ok(())
         }
         ForgeName::GitLab => {
             let project_id = GitLabProjectId::new(owner, repo);
@@ -1154,31 +1179,75 @@ pub async fn update_review_description_tables(
             let mr_iids: Vec<i64> = reviews.iter().map(|r| r.number).collect();
 
             for review in reviews {
-                let updated_body = update_body(
-                    review.body.as_deref(),
-                    review.number,
-                    &mr_iids,
-                    &review.unit_symbol,
-                );
+                let updated_body = if has_footer_content {
+                    Some(update_body(
+                        review.body.as_deref(),
+                        review.number,
+                        &mr_iids,
+                        &review.unit_symbol,
+                    ))
+                } else {
+                    None
+                };
 
                 let params = but_gitlab::UpdateMergeRequestParams {
                     project_id: project_id.clone(),
                     mr_iid: review.number,
                     title: None,
-                    description: Some(&updated_body),
-                    target_branch: None,
+                    description: updated_body.as_deref(),
+                    target_branch: review.target_branch.as_deref(),
                     state_event: None,
                 };
 
-                but_gitlab::mr::update(preferred_account, params, storage).await?;
+                if let Err(err) = but_gitlab::mr::update(preferred_account, params, storage).await {
+                    errors.push(format!("MR !{}: {err}", review.number));
+                }
             }
-
-            Ok(())
         }
-        _ => Err(Error::msg(format!(
-            "Updating review descriptions for forge {forge:?} is not implemented yet.",
-        ))),
+        _ => {
+            return Err(Error::msg(format!(
+                "Updating reviews for forge {forge:?} is not implemented yet.",
+            )));
+        }
     }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(Error::msg(format!(
+            "Some reviews failed to update:\n{}",
+            errors.join("\n")
+        )))
+    }
+}
+
+/// A target branch update for a single review (PR/MR).
+#[derive(Debug, Clone)]
+pub struct ForgeReviewTargetUpdate {
+    pub number: i64,
+    pub target_branch: String,
+}
+
+/// Compute the expected target branch for each review in a stack.
+/// Walks branches bottom-to-top; each review targets the preceding branch
+/// (or `base_branch` for the bottom-most).
+pub fn compute_review_target_updates(
+    heads: &[(String, Option<i64>)],
+    base_branch: &str,
+) -> Vec<ForgeReviewTargetUpdate> {
+    let mut updates = Vec::new();
+    let mut current_target = base_branch;
+    // heads are expected bottom-to-top (base branch first).
+    for (branch_name, review_number) in heads {
+        if let Some(number) = review_number {
+            updates.push(ForgeReviewTargetUpdate {
+                number: *number,
+                target_branch: current_target.to_string(),
+            });
+        }
+        current_target = branch_name;
+    }
+    updates
 }
 
 /// Replaces or inserts a new footer into an existing body of text.
@@ -1708,5 +1777,80 @@ mod tests {
 
         assert_eq!(result, "Head content\n\nTail content");
         assert!(!result.contains(STACKING_FOOTER_BOUNDARY_TOP));
+    }
+
+    // --- compute_review_target_updates tests ---
+
+    fn heads(specs: &[(&str, Option<i64>)]) -> Vec<(String, Option<i64>)> {
+        specs
+            .iter()
+            .map(|(name, id)| (name.to_string(), *id))
+            .collect()
+    }
+
+    #[test]
+    fn target_updates_empty_stack() {
+        let result = compute_review_target_updates(&[], "main");
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn target_updates_no_reviews() {
+        let h = heads(&[("branch-a", None), ("branch-b", None)]);
+        let result = compute_review_target_updates(&h, "main");
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn target_updates_single_branch_with_review() {
+        let h = heads(&[("branch-a", Some(1))]);
+        let result = compute_review_target_updates(&h, "main");
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].number, 1);
+        assert_eq!(result[0].target_branch, "main");
+    }
+
+    #[test]
+    fn target_updates_stacked_reviews_point_to_parent() {
+        // bottom-to-top: branch-a -> branch-b -> branch-c
+        let h = heads(&[
+            ("branch-a", Some(1)),
+            ("branch-b", Some(2)),
+            ("branch-c", Some(3)),
+        ]);
+        let result = compute_review_target_updates(&h, "main");
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0].number, 1);
+        assert_eq!(result[0].target_branch, "main");
+        assert_eq!(result[1].number, 2);
+        assert_eq!(result[1].target_branch, "branch-a");
+        assert_eq!(result[2].number, 3);
+        assert_eq!(result[2].target_branch, "branch-b");
+    }
+
+    #[test]
+    fn target_updates_skips_branches_without_reviews() {
+        // branch-a has no review, branch-b does — b should target a (not main)
+        let h = heads(&[("branch-a", None), ("branch-b", Some(5))]);
+        let result = compute_review_target_updates(&h, "main");
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].number, 5);
+        assert_eq!(result[0].target_branch, "branch-a");
+    }
+
+    #[test]
+    fn target_updates_gap_in_middle() {
+        // a(PR) -> b(no PR) -> c(PR): c should target b, a should target main
+        let h = heads(&[
+            ("branch-a", Some(1)),
+            ("branch-b", None),
+            ("branch-c", Some(3)),
+        ]);
+        let result = compute_review_target_updates(&h, "main");
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].number, 1);
+        assert_eq!(result[0].target_branch, "main");
+        assert_eq!(result[1].number, 3);
+        assert_eq!(result[1].target_branch, "branch-b");
     }
 }

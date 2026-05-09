@@ -705,12 +705,11 @@ async fn publish_reviews_for_branch_and_dependents(
         match published_review {
             PublishReviewResult::Published(review) => {
                 newly_published.push(*review.clone());
-                all_reviews_in_order.push(*review);
+                all_reviews_in_order.push((*review, current_target_branch.to_string()));
             }
             PublishReviewResult::AlreadyExists(reviews) => {
                 if let Some(review) = reviews.first() {
-                    // Ignore other existing reviews for ordering
-                    all_reviews_in_order.push(review.clone());
+                    all_reviews_in_order.push((review.clone(), current_target_branch.to_string()));
                 }
                 already_existing.extend(reviews);
             }
@@ -723,12 +722,21 @@ async fn publish_reviews_for_branch_and_dependents(
         }
     }
 
-    // Update the PR descriptions to have the footers
-    but_api::legacy::forge::update_review_footers(
-        ctx.to_sync(),
-        all_reviews_in_order.into_iter().map(Into::into).collect(),
-    )
-    .await?;
+    // Update footers and fix any drifted target branches in a single pass.
+    let review_updates: Vec<but_forge::ForgeReviewUpdate> = all_reviews_in_order
+        .into_iter()
+        .map(|(review, expected_target)| {
+            let mut update: but_forge::ForgeReviewUpdate = review.into();
+            // Only send a target update when it has drifted.
+            if update.target_branch.as_ref() == Some(&expected_target) {
+                update.target_branch = None;
+            } else {
+                update.target_branch = Some(expected_target);
+            }
+            update
+        })
+        .collect();
+    but_api::legacy::forge::update_review_footers(ctx.to_sync(), review_updates).await?;
 
     let outcome = PublishReviewsOutcome {
         published: newly_published,

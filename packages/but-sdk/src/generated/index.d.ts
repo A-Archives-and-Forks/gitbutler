@@ -306,8 +306,8 @@ export declare function unapplyStack(projectId: string, stackId: string): Promis
  */
 export declare function updateBranchName(projectId: string, stackId: string, branchName: string, newName: string): Promise<void>
 
-/** Update the stacked review descriptions to have the correct footers. */
-export declare function updateReviewFooters(projectId: string, reviews: Array<ForgeReviewDescriptionUpdate>): Promise<void>
+/** Update stacked reviews: description footers and, optionally, target branches. */
+export declare function updateReviewFooters(projectId: string, reviews: Array<ForgeReviewUpdate>): Promise<void>
 
 /**
  * Warm up the CI checks cache for all applied branches with PRs.
@@ -1068,21 +1068,23 @@ export type ForgeReview = {
   lastSyncAt: string;
 };
 
-export type ForgeReviewDescriptionUpdate = {
-  /** The unique identifier number for this review within its repository. This can be a PR or MR number. */
-  number: number;
-  /** The current body/description of the review, which may be None if no description is set. */
-  body: string | null;
-  /** The platform-specific symbol for this review type (e.g., "#" for GitHub pull requests and "!" for MRs). */
-  unitSymbol: string;
-};
-
 export type ForgeReviewFilter = "today" | "thisWeek" | "thisMonth" | "all";
 
 export type ForgeReviewLabel = {
   name: string;
   description: string | null;
   color: string | null;
+};
+
+export type ForgeReviewUpdate = {
+  /** The unique identifier number for this review within its repository. This can be a PR or MR number. */
+  number: number;
+  /** The current body/description of the review, which may be None if no description is set. */
+  body: string | null;
+  /** The platform-specific symbol for this review type (e.g., "#" for GitHub pull requests and "!" for MRs). */
+  unitSymbol: string;
+  /** If set, update the base/target branch of this review to the given value. */
+  targetBranch: string | null;
 };
 
 /**

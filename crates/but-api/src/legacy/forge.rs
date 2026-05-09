@@ -365,12 +365,12 @@ pub async fn set_review_draftiness(
     .await
 }
 
-/// Update the stacked review descriptions to have the correct footers.
+/// Update stacked reviews: description footers and, optionally, target branches.
 #[but_api(napi)]
 #[instrument(err(Debug))]
 pub async fn update_review_footers(
     ctx: ThreadSafeContext,
-    reviews: Vec<but_forge::ForgeReviewDescriptionUpdate>,
+    reviews: Vec<but_forge::ForgeReviewUpdate>,
 ) -> Result<()> {
     let (storage, forge_repo_info, preferred_forge_user) = {
         let ctx = ctx.into_thread_local();
@@ -384,7 +384,7 @@ pub async fn update_review_footers(
         )
     };
 
-    but_forge::update_review_description_tables(
+    but_forge::sync_reviews(
         &preferred_forge_user,
         &forge_repo_info.context("No forge could be determined for this repository branch")?,
         &reviews,
