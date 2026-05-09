@@ -201,6 +201,7 @@ export interface NativeMenuPosition {
 
 type NativeMenuPopupItemData = {
 	label: string;
+	accelerator?: string;
 	enabled?: boolean;
 	itemId?: string;
 	submenu?: Array<NativeMenuPopupItem>;

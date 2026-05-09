@@ -586,6 +586,7 @@ const CommitRow: FC<
 		enabled: isSelected && focusedPanel === "outline" && outlineMode._tag === "Default",
 		layer: "focused-selection",
 		commandPalette: { group: "Commit", label: "Cut" },
+		// TODO: missing shortcut because it's defined elsewhere for all operands
 		contextMenu: {
 			label: "Cut commit",
 			// Focus change is too slow / the menu item isn't reactive.

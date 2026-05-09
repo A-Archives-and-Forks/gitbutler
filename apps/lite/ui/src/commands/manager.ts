@@ -87,6 +87,51 @@ const sequenceKey = (s: HotkeySequence): string =>
 		// Disambiguate from non-sequenced hotkeys.
 		.concat("_seq_");
 
+type HotkeySegment<T extends string> = T extends `${infer Head}+${infer Tail}`
+	? Head | HotkeySegment<Tail>
+	: T;
+
+const electronAcceleratorKeys: Partial<Record<HotkeySegment<Hotkey>, string>> = {
+	Alt: "Alt",
+	ArrowDown: "Down",
+	ArrowLeft: "Left",
+	ArrowRight: "Right",
+	ArrowUp: "Up",
+	Backspace: "Backspace",
+	Control: "Control",
+	Delete: "Delete",
+	End: "End",
+	Escape: "Esc",
+	Enter: "Enter",
+	Home: "Home",
+	Meta: "Command",
+	Mod: "CommandOrControl",
+	PageDown: "PageDown",
+	PageUp: "PageUp",
+	Shift: "Shift",
+	Space: "Space",
+	Tab: "Tab",
+};
+
+const toElectronAccelerator = (hotkey: RegisterableHotkey): string | undefined => {
+	const accelerator = normalizeRegisterableHotkey(hotkey)
+		.split("+")
+		.map((part) => electronAcceleratorKeys[part as HotkeySegment<Hotkey>] ?? part)
+		.join("+");
+
+	return accelerator.length > 0 ? accelerator : undefined;
+};
+
+const firstNativeMenuAccelerator = (
+	hotkeys: Array<CommandHotkey | CommandHotkeySequence> | undefined,
+): string | undefined => {
+	const firstHotkey = hotkeys?.find(
+		(hotkey): hotkey is CommandHotkey => !("sequence" in hotkey) && hotkey.enabled !== false,
+	);
+
+	return firstHotkey ? toElectronAccelerator(firstHotkey.hotkey) : undefined;
+};
+
 const useMaxHotkeyLayers = (): Record<string, CommandLayer | undefined> => {
 	const regs = useAppSelector((state) => state.commands.registrations);
 
@@ -200,6 +245,7 @@ export const useCommand = <F extends CommandFn, O extends CommandOptions>(
 			? ({
 					enabled: regOptions.enabled !== false,
 					onSelect: () => commandFn("contextMenu"),
+					accelerator: firstNativeMenuAccelerator(regOptions.hotkeys),
 					...regOptions.contextMenu,
 					_tag: "Item",
 				} satisfies NativeMenuItem)

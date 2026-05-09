@@ -195,6 +195,7 @@ const buildNativeMenuTemplate = (
 
 		return {
 			label: item.label,
+			accelerator: item.accelerator,
 			enabled: item.enabled,
 			click: itemId !== undefined ? () => onItem(itemId) : undefined,
 			submenu: item.submenu ? buildNativeMenuTemplate(item.submenu, onItem) : undefined,
