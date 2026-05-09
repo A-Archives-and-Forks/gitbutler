@@ -1,48 +1,82 @@
 import { listProjectsQueryOptions } from "#ui/api/queries.ts";
-import { CommandFnContext, CommandFn } from "#ui/commands/manager.ts";
+import { CommandFnContext, CommandFn, useCommand } from "#ui/commands/manager.ts";
+import { CommandRegistrationId } from "#ui/commands/state.ts";
 import { lastOpenedProjectKey } from "#ui/projects/last-opened.ts";
 import { ShortcutsBarElementContext, TopBarActionsElementContext } from "#ui/portals.tsx";
+import { PickerDialog } from "#ui/ui/PickerDialog/PickerDialog.tsx";
+import { ShortcutButton } from "#ui/ui/ShortcutButton.tsx";
 import uiStyles from "#ui/ui/ui.module.css";
 import { HotkeysProvider } from "@tanstack/react-hotkeys";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Outlet, useMatch, useNavigate } from "@tanstack/react-router";
 import { FC, useRef, useState } from "react";
 import styles from "./RootLayout.module.css";
-import { CommandRegistrationId } from "#ui/commands/state.ts";
+import { ProjectForFrontend } from "@gitbutler/but-sdk";
 
 const ProjectSelect: FC = () => {
 	const { data: projects } = useSuspenseQuery(listProjectsQueryOptions);
 	const navigate = useNavigate();
+	const [pickerOpen, setPickerOpen] = useState(false);
 	const projectMatch = useMatch({
 		from: "/project/$id",
 		shouldThrow: false,
 	});
 	const selectedProjectId = projectMatch?.params.id;
+	const selectedProject = projects.find((project) => project.id === selectedProjectId);
+
+	const openProjectPickerCommand = useCommand(
+		() => {
+			setPickerOpen(true);
+		},
+		{
+			layer: "global",
+			enabled: projects.length > 0,
+			commandPalette: { group: "Global", label: "Select project" },
+			shortcutsBar: { label: "Project" },
+			hotkeys: [{ hotkey: "Mod+Shift+P" }],
+		},
+	);
+
+	const selectProject = (project: ProjectForFrontend) => {
+		setPickerOpen(false);
+		void navigate({
+			to: "/project/$id/workspace",
+			params: { id: project.id },
+		});
+		window.localStorage.setItem(lastOpenedProjectKey, project.id);
+	};
 
 	return (
-		<select
-			name="projectId"
-			disabled={projects.length === 0}
-			value={selectedProjectId ?? ""}
-			onChange={(event) => {
-				const nextProjectId = event.currentTarget.value;
-				void navigate({
-					to: "/project/$id/workspace",
-					params: { id: nextProjectId },
-				});
-				window.localStorage.setItem(lastOpenedProjectKey, nextProjectId);
-			}}
-			className={uiStyles.button}
-		>
-			<option value="" disabled>
-				Select a project
-			</option>
-			{projects.map((project) => (
-				<option key={project.id} value={project.id}>
-					{project.title}
-				</option>
-			))}
-		</select>
+		<>
+			<ShortcutButton
+				aria-label="Select project"
+				className={uiStyles.button}
+				disabled={projects.length === 0}
+				hotkeys={openProjectPickerCommand.hotkeys}
+				onClick={openProjectPickerCommand.commandFn}
+			>
+				{selectedProject?.title ?? "Select a project"}
+			</ShortcutButton>
+			<PickerDialog
+				ariaLabel="Select project"
+				closeLabel="Close project picker"
+				emptyLabel="No projects found."
+				getItemKey={(project) => project.id}
+				getItemLabel={(project) => project.title}
+				getItemType={(project) => (project.id === selectedProjectId ? "Current" : "Project")}
+				itemToStringValue={(project) => project.title}
+				items={[
+					{
+						value: "Projects",
+						items: projects,
+					},
+				]}
+				open={pickerOpen}
+				onOpenChange={setPickerOpen}
+				onSelectItem={selectProject}
+				placeholder="Search projects…"
+			/>
+		</>
 	);
 };
 
