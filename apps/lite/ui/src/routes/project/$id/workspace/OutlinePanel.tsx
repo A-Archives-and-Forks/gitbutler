@@ -486,41 +486,17 @@ const CommitRow: FC<
 
 	const runOperation = useRunOperation();
 
-	const moveCommitUp = () => {
+	const moveCommit = (offset: -1 | 1) => {
 		const selectionIdx = navigationIndex.indexByKey.get(operandIdentityKey(operand));
 		if (selectionIdx === undefined) return;
 
-		const selectionSectionIdx = navigationIndex.sectionIndexByItemIndex[selectionIdx];
-		if (selectionSectionIdx === undefined) return;
-
-		const prevItem = navigationIndex.items[selectionIdx - 1];
-		if (!prevItem) return;
-
-		const operation = moveOperation({
-			source: operand,
-			target: prevItem,
-			side: "above",
-		});
-		if (!operation) return;
-
-		runOperation(projectId, operation);
-	};
-
-	const moveCommitDown = () => {
-		const selectionIdx = navigationIndex.indexByKey.get(operandIdentityKey(operand));
-		if (selectionIdx === undefined) return;
-
-		const selectionSectionIdx = navigationIndex.sectionIndexByItemIndex[selectionIdx];
-		if (selectionSectionIdx === undefined) return;
-
-		const nextIdx = selectionIdx + 1;
-		const nextItem = navigationIndex.items[nextIdx];
+		const nextItem = navigationIndex.items[selectionIdx + offset];
 		if (!nextItem) return;
 
 		const operation = moveOperation({
 			source: operand,
 			target: nextItem,
-			side: "below",
+			side: offset === -1 ? "above" : "below",
 		});
 		if (!operation) return;
 
@@ -610,7 +586,7 @@ const CommitRow: FC<
 		},
 	});
 
-	useCommand(moveCommitUp, {
+	useCommand(() => moveCommit(-1), {
 		enabled:
 			!commitMove.isPending &&
 			isSelected &&
@@ -620,7 +596,7 @@ const CommitRow: FC<
 		hotkeys: [{ hotkey: "Alt+ArrowUp" }],
 	});
 
-	useCommand(moveCommitDown, {
+	useCommand(() => moveCommit(1), {
 		enabled:
 			!commitMove.isPending &&
 			isSelected &&
