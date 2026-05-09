@@ -71,6 +71,8 @@ function projects() {
 		name: "webkit",
 		use: {
 			...devices["Desktop Safari"],
+			viewport: { width: 1920, height: 1080 },
+			deviceScaleFactor: 1,
 			headless: process.env.PLAYWRIGHT_UI === "1" ? false : true,
 		},
 	});
