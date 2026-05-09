@@ -18,10 +18,10 @@ import { commandsActions, CommandRegistrationId } from "./state";
 
 // consider if many of these could typically share a label
 export type CommandOptions = {
+	group: CommandGroup;
 	/** @default true */
 	enabled?: boolean;
 	commandPalette?: {
-		group: CommandGroup;
 		label: string;
 		/** @default true */
 		hotkeys?: boolean;

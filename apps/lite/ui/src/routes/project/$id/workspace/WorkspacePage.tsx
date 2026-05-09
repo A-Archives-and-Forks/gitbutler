@@ -62,8 +62,8 @@ const groupCommandPaletteItems = (
 	for (const [id, cmd] of Object.entries(regs)) {
 		if (cmd.enabled === false || cmd.commandPalette === undefined) continue;
 
-		const mitems = grouped.get(cmd.commandPalette.group) ?? [];
-		grouped.set(cmd.commandPalette.group, [
+		const mitems = grouped.get(cmd.group) ?? [];
+		grouped.set(cmd.group, [
 			...mitems,
 			{
 				id,
@@ -280,14 +280,15 @@ const TopBarActions: FC = () => {
 	};
 
 	const applyBranchCommand = useCommand(openApplyBranchPicker, {
-		commandPalette: { group: "Branches", label: "Apply" },
+		group: "Branches",
+		commandPalette: { label: "Apply" },
 		shortcutsBar: { label: "Apply" },
 		hotkeys: [{ hotkey: "Mod+Shift+A" }],
 	});
 
 	const toggleDetailsCommand = useCommand(toggleDetails, {
+		group: "Details",
 		commandPalette: {
-			group: "Details",
 			label: isPanelVisible(panelsState, "details") ? "Close" : "Open",
 		},
 		shortcutsBar: { label: "Details" },
@@ -368,6 +369,7 @@ const usePanelsHotkeys = ({ focusedPanel }: { focusedPanel: PanelType | null }) 
 			focusAdjacentPanel(-1);
 		},
 		{
+			group: "Panels",
 			enabled: focusedPanel !== null,
 			shortcutsBar: { label: "Focus previous panel" },
 			hotkeys: [{ hotkey: "H" }],
@@ -379,6 +381,7 @@ const usePanelsHotkeys = ({ focusedPanel }: { focusedPanel: PanelType | null }) 
 			focusAdjacentPanel(1);
 		},
 		{
+			group: "Panels",
 			enabled: focusedPanel !== null,
 			shortcutsBar: { label: "Focus next panel" },
 			hotkeys: [{ hotkey: "L" }],
@@ -401,6 +404,7 @@ const WorkspacePage: FC = () => {
 			else dispatch(projectActions.openCommandPalette({ projectId, focusedPanel }));
 		},
 		{
+			group: "Global",
 			shortcutsBar: { label: "Command palette" },
 			hotkeys: [{ hotkey: "Mod+K" }],
 		},

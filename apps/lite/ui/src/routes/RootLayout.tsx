@@ -30,7 +30,8 @@ const ProjectSelect: FC = () => {
 		},
 		{
 			enabled: projects.length > 0,
-			commandPalette: { group: "Global", label: "Select project" },
+			group: "Global",
+			commandPalette: { label: "Select project" },
 			shortcutsBar: { label: "Project" },
 			hotkeys: [{ hotkey: "Mod+Shift+P" }],
 		},

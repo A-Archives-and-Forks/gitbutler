@@ -222,7 +222,8 @@ const OutlineTreePanel: FC<{} & PanelProps> = ({ ...panelProps }) => {
 	};
 
 	useCommand(openBranchPicker, {
-		commandPalette: { group: "Outline", label: "Select branch" },
+		group: "Outline",
+		commandPalette: { label: "Select branch" },
 		shortcutsBar: { label: "Branch" },
 		hotkeys: [{ hotkey: "T" }],
 	});
@@ -380,12 +381,14 @@ const InlineRewordCommit: FC<{
 	};
 
 	useCommand(() => formRef.current?.requestSubmit(), {
+		group: "Reword commit",
 		enabled: focusedPanel === "outline",
 		shortcutsBar: { label: "Save" },
 		hotkeys: [{ hotkey: "Enter", ignoreInputs: false }],
 	});
 
 	useCommand(onExit, {
+		group: "Reword commit",
 		enabled: focusedPanel === "outline",
 		shortcutsBar: { label: "Cancel" },
 		hotkeys: [{ hotkey: "Escape", ignoreInputs: false }],
@@ -568,7 +571,8 @@ const CommitRow: FC<
 
 	const { contextMenu: amendCommitContextMenuItem } = useCommand(amendCommit, {
 		enabled: isSelected && focusedPanel === "outline" && outlineMode._tag === "Default",
-		commandPalette: { group: "Commit", label: "Amend" },
+		group: "Commit",
+		commandPalette: { label: "Amend" },
 		shortcutsBar: { label: "Amend" },
 		contextMenu: {
 			label: "Amend commit",
@@ -580,7 +584,8 @@ const CommitRow: FC<
 
 	const { contextMenu: cutCommitContextMenuItem } = useCommand(cutCommit, {
 		enabled: isSelected && focusedPanel === "outline" && outlineMode._tag === "Default",
-		commandPalette: { group: "Commit", label: "Cut" },
+		group: "Commit",
+		commandPalette: { label: "Cut" },
 		// TODO: missing shortcut because it's defined elsewhere for all operands
 		contextMenu: {
 			label: "Cut commit",
@@ -595,7 +600,8 @@ const CommitRow: FC<
 			isSelected &&
 			focusedPanel === "outline" &&
 			outlineMode._tag === "Default",
-		commandPalette: { group: "Commit", label: "Reword" },
+		group: "Commit",
+		commandPalette: { label: "Reword" },
 		shortcutsBar: { label: "Reword" },
 		hotkeys: [{ hotkey: "Enter" }],
 		contextMenu: {
@@ -610,6 +616,7 @@ const CommitRow: FC<
 			isSelected &&
 			focusedPanel === "outline" &&
 			outlineMode._tag === "Default",
+		group: "Commit",
 		hotkeys: [{ hotkey: "Alt+ArrowUp" }],
 	});
 
@@ -619,6 +626,7 @@ const CommitRow: FC<
 			isSelected &&
 			focusedPanel === "outline" &&
 			outlineMode._tag === "Default",
+		group: "Commit",
 		hotkeys: [{ hotkey: "Alt+ArrowDown" }],
 	});
 
@@ -626,7 +634,8 @@ const CommitRow: FC<
 		insertBlankCommitAbove,
 		{
 			enabled: isSelected && focusedPanel === "outline" && outlineMode._tag === "Default",
-			commandPalette: { group: "Commit", label: "Add empty commit above" },
+			group: "Commit",
+			commandPalette: { label: "Add empty commit above" },
 			contextMenu: {
 				label: "Above",
 				// Focus change is too slow / the menu item isn't reactive.
@@ -639,7 +648,8 @@ const CommitRow: FC<
 		insertBlankCommitBelow,
 		{
 			enabled: isSelected && focusedPanel === "outline" && outlineMode._tag === "Default",
-			commandPalette: { group: "Commit", label: "Add empty commit below" },
+			group: "Commit",
+			commandPalette: { label: "Add empty commit below" },
 			contextMenu: {
 				label: "Below",
 				// Focus change is too slow / the menu item isn't reactive.
@@ -654,7 +664,8 @@ const CommitRow: FC<
 			isSelected &&
 			focusedPanel === "outline" &&
 			outlineMode._tag === "Default",
-		commandPalette: { group: "Commit", label: "Delete commit" },
+		group: "Commit",
+		commandPalette: { label: "Delete commit" },
 		contextMenu: {
 			label: "Delete commit",
 			enabled: !commitDiscard.isPending,
@@ -782,7 +793,8 @@ const ChangesSectionRow: FC<{
 			isSelected &&
 			focusedPanel === "outline" &&
 			outlineMode._tag === "Default",
-		commandPalette: { group: "Changes", label: "Absorb" },
+		group: "Changes",
+		commandPalette: { label: "Absorb" },
 		shortcutsBar: { label: "Absorb" },
 		hotkeys: [{ hotkey: "A" }],
 		contextMenu: {
@@ -996,34 +1008,39 @@ const Changes: FC<{
 	};
 
 	useCommand(selectChangesAndFocusOutline, {
-		commandPalette: { group: "Outline", label: "Select changes" },
+		group: "Outline",
+		commandPalette: { label: "Select changes" },
 		shortcutsBar: { label: "Changes" },
 		hotkeys: [{ hotkey: "Z" }],
 	});
 
 	useCommand(composeCommitMessage, {
-		commandPalette: { group: "Outline", label: "Compose commit message" },
+		group: "Outline",
+		commandPalette: { label: "Compose commit message" },
 		shortcutsBar: { label: "Compose commit message" },
 		hotkeys: [{ hotkey: "Shift+Z" }],
 	});
 
 	useCommand(() => commitTextareaRef.current?.focus(), {
 		enabled: isSelected && focusedPanel === "outline" && outlineMode._tag === "Default",
-		commandPalette: { group: "Changes", label: "Compose commit message" },
+		group: "Changes",
+		commandPalette: { label: "Compose commit message" },
 		shortcutsBar: { label: "Compose commit message" },
 		hotkeys: [{ hotkey: "Enter" }],
 	});
 
 	const openBranchComboboxCommand = useCommand(openBranchCombobox, {
 		enabled: outlineMode._tag === "Default",
-		commandPalette: { group: "Changes", label: "Select commit branch" },
+		group: "Changes",
+		commandPalette: { label: "Select commit branch" },
 		shortcutsBar: { label: "Select commit branch" },
 		hotkeys: [{ hotkey: "Mod+Shift+B" }],
 	});
 
 	const commitCommand = useCommand(commit, {
 		enabled: outlineMode._tag === "Default" && !!branch,
-		commandPalette: { group: "Changes", label: "Commit" },
+		group: "Changes",
+		commandPalette: { label: "Commit" },
 		shortcutsBar: { label: "Commit" },
 		hotkeys: [{ hotkey: "Mod+Enter" }],
 	});
@@ -1111,12 +1128,14 @@ const InlineRenameBranch: FC<{
 	};
 
 	useCommand(() => formRef.current?.requestSubmit(), {
+		group: "Rename branch",
 		enabled: focusedPanel === "outline",
 		shortcutsBar: { label: "Save" },
 		hotkeys: [{ hotkey: "Enter", ignoreInputs: false }],
 	});
 
 	useCommand(onExit, {
+		group: "Rename branch",
 		enabled: focusedPanel === "outline",
 		shortcutsBar: { label: "Cancel" },
 		hotkeys: [{ hotkey: "Escape", ignoreInputs: false }],
@@ -1214,7 +1233,8 @@ const BranchRow: FC<
 
 	const { contextMenu: startEditingContextMenuItem } = useCommand(startEditing, {
 		enabled: isSelected && focusedPanel === "outline" && outlineMode._tag === "Default",
-		commandPalette: { group: "Branch", label: "Rename" },
+		group: "Branch",
+		commandPalette: { label: "Rename" },
 		shortcutsBar: { label: "Rename" },
 		hotkeys: [{ hotkey: "Enter" }],
 		contextMenu: {
@@ -1308,7 +1328,8 @@ const StackRow: FC<
 			focusedPanel === "outline" &&
 			outlineMode._tag === "Default" &&
 			!unapplyStack.isPending,
-		commandPalette: { group: "Stack", label: "Unapply stack" },
+		group: "Stack",
+		commandPalette: { label: "Unapply stack" },
 		contextMenu: {
 			label: "Unapply stack",
 			// Focus change is too slow / the menu item isn't reactive.
