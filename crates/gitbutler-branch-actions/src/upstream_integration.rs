@@ -568,7 +568,9 @@ pub(crate) fn integrate_upstream(
         let statuses = upstream_integration_statuses(&context)?;
 
         let StackStatuses::UpdatesRequired { statuses, .. } = statuses else {
-            bail!("Branches are all up to date")
+            return Ok(IntegrationOutcome {
+                deleted_branches: vec![],
+            });
         };
 
         if resolutions.len() != context.stacks_in_workspace.len() {
