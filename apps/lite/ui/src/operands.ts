@@ -12,6 +12,11 @@ export type FileParent =
 	| ({ _tag: "Commit" } & CommitFileParent);
 
 /** @public */
+export const changesFileParent: FileParent = {
+	_tag: "Changes",
+};
+
+/** @public */
 export const branchFileParent = ({ stackId, branchRef }: BranchFileParent): FileParent => ({
 	_tag: "Branch",
 	stackId,
@@ -24,11 +29,6 @@ export const commitFileParent = ({ stackId, commitId }: CommitFileParent): FileP
 	stackId,
 	commitId,
 });
-
-/** @public */
-export const changesFileParent: FileParent = {
-	_tag: "Changes",
-};
 
 /** @public */
 export type StackOperand = {
