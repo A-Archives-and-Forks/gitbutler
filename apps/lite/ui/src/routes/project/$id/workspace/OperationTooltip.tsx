@@ -172,11 +172,11 @@ const CutOperationControls: FC<{
 export const OperationTooltip: FC<
 	{
 		projectId: string;
-		operand: Operand;
+		target: Operand;
 		operationMode: OperationMode | null;
 		isActive: boolean;
 	} & useRender.ComponentProps<"div">
-> = ({ projectId, operand, operationMode, isActive, render, ...props }) => {
+> = ({ projectId, target, operationMode, isActive, render, ...props }) => {
 	const tooltip =
 		isActive && !!operationMode
 			? Match.value(operationMode).pipe(
@@ -184,7 +184,7 @@ export const OperationTooltip: FC<
 						DragAndDrop: ({ operationType }) => {
 							const operation = getOperation({
 								source: operationMode.source,
-								target: operand,
+								target,
 								operationType,
 							});
 							if (!operation) return null;
@@ -193,10 +193,10 @@ export const OperationTooltip: FC<
 						},
 						Cut: ({ source }) => (
 							<>
-								{operandEquals(operationMode.source, operand) && <>Select a target</>}
+								{operandEquals(operationMode.source, target) && <>Select a target</>}
 								<CutOperationControls
 									projectId={projectId}
-									operations={getOperations(source, operand)}
+									operations={getOperations(source, target)}
 								/>
 							</>
 						),
@@ -204,12 +204,12 @@ export const OperationTooltip: FC<
 					Match.orElse(() => {
 						const operation = getOperation({
 							source: operationMode.source,
-							target: operand,
+							target,
 							operationType: operationModeToOperationType(operationMode),
 						});
 						return (
 							<>
-								{operandEquals(operationMode.source, operand) && <>Select a target</>}
+								{operandEquals(operationMode.source, target) && <>Select a target</>}
 								<OperationModeControls projectId={projectId} operation={operation} />
 							</>
 						);

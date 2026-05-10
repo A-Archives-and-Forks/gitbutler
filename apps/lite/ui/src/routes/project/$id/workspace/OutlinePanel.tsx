@@ -340,7 +340,7 @@ const OperandC: FC<
 				render={
 					<OperationTarget
 						projectId={projectId}
-						operand={operand}
+						target={operand}
 						isSelected={isSelected}
 						render={render}
 					/>
