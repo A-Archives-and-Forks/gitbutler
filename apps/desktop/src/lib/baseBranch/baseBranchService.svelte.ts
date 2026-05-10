@@ -1,6 +1,7 @@
 import { isReduxError } from "$lib/error/reduxError";
 import { showError } from "$lib/error/showError";
 import { parseRemoteUrl } from "$lib/git/gitUrl";
+import { showWarning } from "$lib/notifications/toasts";
 import { InjectionToken } from "@gitbutler/core/context";
 import type { BackendApi } from "$lib/state/backendApi";
 import type { BaseBranch } from "@gitbutler/but-sdk";
@@ -96,7 +97,7 @@ export default class BaseBranchService {
 				}
 
 				if (action !== "auto") {
-					showError("Failed to fetch", error.message);
+					showWarning("Failed to fetch", error.message);
 				}
 
 				console.error(error);

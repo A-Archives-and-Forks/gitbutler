@@ -9,6 +9,7 @@ use but_core::{
     sync::RepoExclusive,
 };
 use but_ctx::{Context, ThreadSafeContext};
+use but_error::bail_precondition;
 use but_workspace::legacy::ui::{StackEntryNoOpt, StackHeadInfo};
 use gitbutler_branch::{BranchCreateRequest, BranchUpdateRequest};
 use gitbutler_branch_actions::{
@@ -115,9 +116,7 @@ pub fn delete_local_branch(
         })
         .is_some_and(|stack| stack.is_in_workspace())
     {
-        return Err(anyhow!(
-            "Cannot delete a branch that is applied in workspace"
-        ));
+        bail_precondition!("Cannot delete a branch that is applied in workspace");
     }
 
     if let Some(new_ws) = but_workspace::branch::remove_reference(
@@ -136,9 +135,9 @@ pub fn delete_local_branch(
             let safe_delete = but_core::branch::SafeDelete::new(&repo)?;
             let outcome = safe_delete.delete_reference(&reference)?;
             if let Some(paths) = outcome.checked_out_in_worktree_dirs {
-                return Err(anyhow!(
+                bail_precondition!(
                     "Refusing to delete a branch that is checked out. Worktrees are: {paths:?}"
-                ));
+                );
             }
         }
         meta.remove(branch_refname.as_ref())?;

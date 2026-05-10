@@ -1,6 +1,10 @@
 import type { Code } from "@gitbutler/but-sdk";
 
-export type ReduxError = { name?: string; message: string; code?: Code };
+export type ReduxError = {
+	name?: string;
+	message: string;
+	code?: Code;
+};
 
 export function isReduxError(something: unknown): something is ReduxError {
 	if (!something || typeof something !== "object") return false;

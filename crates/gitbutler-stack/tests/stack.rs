@@ -156,10 +156,18 @@ fn add_series_duplicate_name_fails() -> Result<()> {
     let result = test_ctx.stack.add_series(&ctx, reference.clone(), None);
     assert!(result.is_ok());
     let result = test_ctx.stack.add_series(&ctx, reference, None);
-    assert_eq!(
-        result.err().unwrap().to_string(),
-        "A patch reference with the name asdf exists"
+    insta::assert_debug_snapshot!(
+        result.unwrap_err(),
+        @r#"
+    Context {
+        code: PreconditionFailed,
+        message: Some(
+            "A patch reference with the name asdf exists",
+        ),
+    }
+    "#
     );
+
     Ok(())
 }
 

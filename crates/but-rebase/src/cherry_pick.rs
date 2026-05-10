@@ -27,6 +27,7 @@ use std::path::PathBuf;
 use anyhow::{Context as _, bail};
 use bstr::BString;
 use but_core::commit::{HEADERS_CONFLICTED_FIELD, Headers, SignCommit, TreeKind};
+use but_error::bail_precondition;
 use gix::{object::tree::EntryKind, prelude::ObjectIdExt};
 use serde::Serialize;
 
@@ -57,7 +58,7 @@ fn cherry_pick_one_inner<'repo>(
     empty_commit: EmptyCommit,
 ) -> anyhow::Result<gix::Id<'repo>> {
     if commit_to_rebase.parents.len() > 1 {
-        bail!("Cannot yet cherry-pick merge-commits - use rebasing for that")
+        bail_precondition!("Cannot yet cherry-pick merge-commits - use rebasing for that")
     }
     if matches!(pick_mode, PickMode::SkipIfNoop)
         && commit_to_rebase.parents.contains(&base.id.detach())

@@ -11,7 +11,7 @@ import { showToast, type Toast } from "$lib/notifications/toasts";
 type ExtraAction = NonNullable<Toast["extraAction"]>;
 
 export function showError(title: string, error: unknown, extraAction?: ExtraAction, id?: string) {
-	const { name, message, description, ignored } = parseError(error);
+	const { name, message, code, description, ignored } = parseError(error);
 	if (isBundlingError(message)) {
 		console.warn(
 			"You are likely experiencing a dev mode bundling error, " +
@@ -37,12 +37,14 @@ export function showError(title: string, error: unknown, extraAction?: ExtraActi
 					}
 				: undefined);
 
+		const isWarn = code === "PreconditionFailed";
+
 		showToast({
 			id,
 			title: actualTitle,
 			message: description,
 			error: message,
-			style: "danger",
+			style: isWarn ? "warning" : "danger",
 			extraAction: actualExtraAction,
 		});
 	}

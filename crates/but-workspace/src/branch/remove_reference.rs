@@ -14,6 +14,7 @@ pub struct Options {
 
 use anyhow::{Context as _, bail};
 use but_core::RefMetadata;
+use but_error::bail_precondition;
 use gix::refs::transaction::PreviousValue;
 
 /// Remove the workspace reference `ref_name` (if it still exists),
@@ -62,7 +63,9 @@ pub fn remove_reference(
         let safe = but_core::branch::SafeDelete::new(repo)?;
         let out = safe.delete_reference(&r)?;
         if let Some(paths) = out.checked_out_in_worktree_dirs {
-            bail!("Refusing to delete a branch that is checked out. Worktrees are: {paths:?}");
+            bail_precondition!(
+                "Refusing to delete a branch that is checked out. Worktrees are: {paths:?}"
+            );
         }
         true
     } else {

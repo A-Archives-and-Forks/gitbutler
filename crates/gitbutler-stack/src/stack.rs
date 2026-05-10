@@ -8,6 +8,7 @@ use anyhow::{Context as _, Result, anyhow, bail};
 use but_core::Reference;
 pub(crate) use but_core::ref_metadata::StackId;
 use but_ctx::Context;
+use but_error::bail_precondition;
 use but_meta::virtual_branches_legacy_types;
 use but_rebase::ReferenceSpec;
 use gitbutler_reference::{Refname, RemoteRefname, VirtualRefname, normalize_branch_name};
@@ -779,7 +780,7 @@ fn validate_name(name: &str, state: &VirtualBranchesHandle) -> Result<()> {
     name_partial(name.into()).context("Invalid branch name")?;
     // assert that there are no existing patch references with this name
     if patch_reference_exists(state, name)? {
-        return Err(anyhow!("A patch reference with the name {name} exists"));
+        bail_precondition!("A patch reference with the name {name} exists");
     }
 
     Ok(())
