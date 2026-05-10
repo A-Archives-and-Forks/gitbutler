@@ -47,7 +47,7 @@ import { decodeRefName } from "#ui/api/ref-name.ts";
 import { OperationSourceC } from "#ui/routes/project/$id/workspace/OperationSourceC.tsx";
 import { getDependencyCommitIds, getHunkDependencyDiffsByPath } from "#ui/hunk.ts";
 import { DependencyIndicatorButton } from "#ui/routes/project/$id/workspace/DependencyIndicatorButton.tsx";
-import { useFocusedProjectPanel } from "#ui/panels.ts";
+import { focusPanel, useFocusedProjectPanel } from "#ui/panels.ts";
 import {
 	buildNavigationIndex,
 	NavigationIndex,
@@ -472,18 +472,17 @@ const ChangesFileRow: FC<{
 
 	const dispatch = useAppDispatch();
 	const queryClient = useQueryClient();
-	const openAbsorptionDialog = (target: AbsorptionTarget) => {
-		// Before opening the dialog, warm cache to avoid showing loading states in
-		// the dialog itself. This also ensures we don't show a stale absorption
-		// plan whilst the dialog revalidates.
-		// [ref:absorption-dialog-prefetch]
-		void queryClient.prefetchQuery(absorptionPlanQueryOptions({ projectId, target })).then(() => {
-			dispatch(projectActions.openAbsorptionDialog({ projectId, target }));
-		});
+	const enterAbsorbMode = (source: Operand, sourceTarget: AbsorptionTarget) => {
+		void queryClient
+			.fetchQuery(absorptionPlanQueryOptions({ projectId, target: sourceTarget }))
+			.then((absorptionPlan) => {
+				dispatch(projectActions.enterAbsorbMode({ projectId, source, absorptionPlan }));
+				focusPanel("outline");
+			});
 	};
 
 	const absorb = () => {
-		openAbsorptionDialog({
+		enterAbsorbMode(operand, {
 			type: "treeChanges",
 			subject: {
 				changes: [change],

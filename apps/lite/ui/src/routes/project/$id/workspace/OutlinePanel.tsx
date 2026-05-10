@@ -751,15 +751,16 @@ const ChangesSectionRow: FC<{
 
 	const dispatch = useAppDispatch();
 	const queryClient = useQueryClient();
-	const openAbsorptionDialog = (target: AbsorptionTarget) => {
-		// [ref:absorption-dialog-prefetch]
-		void queryClient.prefetchQuery(absorptionPlanQueryOptions({ projectId, target })).then(() => {
-			dispatch(projectActions.openAbsorptionDialog({ projectId, target }));
-		});
+	const enterAbsorbMode = (source: Operand, sourceTarget: AbsorptionTarget) => {
+		void queryClient
+			.fetchQuery(absorptionPlanQueryOptions({ projectId, target: sourceTarget }))
+			.then((absorptionPlan) => {
+				dispatch(projectActions.enterAbsorbMode({ projectId, source, absorptionPlan }));
+			});
 	};
 
 	const absorb = () => {
-		openAbsorptionDialog({ type: "all" });
+		enterAbsorbMode(operand, { type: "all" });
 	};
 
 	const { contextMenu: absorbContextMenuItem } = useCommand(absorb, {

@@ -10,7 +10,13 @@ import {
 } from "#ui/operands.ts";
 import { getOperation, getOperations, OperationType } from "#ui/operations/operation.ts";
 import { filterNavigationIndex, NavigationIndex } from "#ui/workspace/navigation-index.ts";
+import { CommitAbsorption } from "@gitbutler/but-sdk";
 
+/** @public */
+export type AbsorbOperationMode = {
+	source: Operand;
+	absorptionPlan: Array<CommitAbsorption>;
+};
 /** @public */
 export type RubOperationMode = { source: Operand };
 /** @public */
@@ -20,10 +26,21 @@ export type MoveOperationMode = { source: Operand };
 /** @public */
 export type DragAndDropOperationMode = { source: Operand; operationType: OperationType | null };
 export type OperationMode =
+	| ({ _tag: "Absorb" } & AbsorbOperationMode)
 	| ({ _tag: "Rub" } & RubOperationMode)
 	| ({ _tag: "Cut" } & CutOperationMode)
 	| ({ _tag: "Move" } & MoveOperationMode)
 	| ({ _tag: "DragAndDrop" } & DragAndDropOperationMode);
+
+/** @public */
+export const absorbOperationMode = ({
+	source,
+	absorptionPlan,
+}: AbsorbOperationMode): OperationMode => ({
+	_tag: "Absorb",
+	source,
+	absorptionPlan,
+});
 
 /** @public */
 export const rubOperationMode = ({ source }: RubOperationMode): OperationMode => ({
@@ -97,6 +114,7 @@ export const operationModeToOperationType = (operationMode: OperationMode): Oper
 	Match.value(operationMode).pipe(
 		Match.withReturnType<OperationType | null>(),
 		Match.tags({
+			Absorb: () => null,
 			Rub: () => "rub",
 			Cut: () => null,
 			// We should have the ability to move either above or below.
@@ -136,6 +154,10 @@ const operationModeHasOperation = ({
 }): boolean =>
 	Match.value(mode).pipe(
 		Match.tagsExhaustive({
+			Absorb: ({ absorptionPlan }) =>
+				absorptionPlan.some(({ stackId, commitId }) =>
+					operandEquals(commitOperand({ stackId, commitId }), operand),
+				),
 			DragAndDrop: ({ source }) => hasAnyOperation(source, operand),
 			Cut: ({ source }) => hasAnyOperation(source, operand),
 			Move: (mode) =>
@@ -168,6 +190,10 @@ export const filterNavigationIndexForOutlineMode = ({
 					navigationIndexUnfiltered,
 					(operand) =>
 						operandContains(operand, operationMode.source) ||
+						(operationMode._tag === "Absorb" &&
+							operationMode.absorptionPlan.some(({ stackId, commitId }) =>
+								operandEquals(commitOperand({ stackId, commitId }), operand),
+							)) ||
 						operationModeHasOperation({ mode: operationMode, operand }),
 				),
 			RenameBranch: (x) =>
