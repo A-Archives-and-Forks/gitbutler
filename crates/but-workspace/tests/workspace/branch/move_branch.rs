@@ -55,11 +55,11 @@ fn move_top_branch_to_top_of_another_stack() -> anyhow::Result<()> {
     ws.refresh_from_head(&repo, &meta)?;
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    *   bdcbf64 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    *   0ffeac6 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
     |\  
-    | * c813d8d (B) B
-    * | f2cc60d (C) C
-    * | 09d8e52 (A) A
+    | * f2cc60d (C) C
+    | * 09d8e52 (A) A
+    * | c813d8d (B) B
     |/  
     * 85efbe4 (origin/main, main) M
     ");
@@ -126,11 +126,11 @@ fn move_bottom_branch_to_top_of_another_stack() -> anyhow::Result<()> {
     ws.refresh_from_head(&repo, &meta)?;
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    *   1229630 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    *   9c6a201 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
     |\  
-    | * 8e00332 (C) C
-    * | f9061ed (B) B
-    * | 09d8e52 (A) A
+    | * f9061ed (B) B
+    | * 09d8e52 (A) A
+    * | 8e00332 (C) C
     |/  
     * 85efbe4 (origin/main, main) M
     ");
@@ -267,11 +267,11 @@ fn reorder_branch_in_stack() -> anyhow::Result<()> {
     ws.refresh_from_head(&repo, &meta)?;
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    *   268bc90 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    *   c6b8b22 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
     |\  
-    | * de0581e (B) B
-    | * 8e00332 (C) C
-    * | 09d8e52 (A) A
+    | * 09d8e52 (A) A
+    * | de0581e (B) B
+    * | 8e00332 (C) C
     |/  
     * 85efbe4 (origin/main, main) M
     ");

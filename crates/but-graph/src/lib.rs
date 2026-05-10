@@ -286,7 +286,7 @@ pub enum SegmentRelation {
 /// doesn't yet have a commit.
 /// The idea is to write code that keeps edge information consistent, and our visualization tools highlights
 /// issues with the inherent invariants.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Default, Copy, Clone)]
 pub struct Edge {
     /// `None` if the source segment has no commit.
     src: Option<CommitIndex>,
@@ -295,6 +295,10 @@ pub struct Edge {
     dst: Option<CommitIndex>,
     /// The commit id at `dst` in the segment commit list.
     dst_id: Option<gix::ObjectId>,
+    /// The position of this edge's destination among the source commit's parents.
+    /// For a merge commit with parents `[A, B]`, the edge to `A` has `parent_order = 0`
+    /// and the edge to `B` has `parent_order = 1`.
+    pub parent_order: usize,
 }
 
 impl Edge {

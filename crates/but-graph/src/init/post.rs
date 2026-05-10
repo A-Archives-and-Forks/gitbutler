@@ -203,6 +203,7 @@ impl Graph {
                             src_id: edge.weight.src_id,
                             dst: None,
                             dst_id: None,
+                            parent_order: edge.weight.parent_order,
                         },
                     );
                     self.inner.remove_edge(edge.id);
@@ -354,6 +355,7 @@ impl Graph {
             new_segment,
             0,
             tip_of_new_segment,
+            0,
         );
 
         let (src, src_id) = {
@@ -370,6 +372,7 @@ impl Graph {
                     src_id,
                     dst: edge.weight.dst,
                     dst_id: edge.weight.dst_id,
+                    parent_order: edge.weight.parent_order,
                 },
             );
             self.inner.remove_edge(edge.id);
@@ -1308,6 +1311,7 @@ fn delete_anon_if_empty_and_reconnect(graph: &mut Graph, sidx: SegmentIndex) {
                 src_id: edge.weight.src_id,
                 dst: target_commit_idx,
                 dst_id: target_commit_id,
+                parent_order: edge.weight.parent_order,
             },
         );
     }
@@ -1353,6 +1357,7 @@ fn create_independent_segments<T: RefMetadata>(
             new_segment,
             None,
             None,
+            0,
         );
         above = new_segment_sidx;
 
@@ -1462,6 +1467,7 @@ fn maybe_create_multiple_segments<T: RefMetadata>(
             new_segment,
             (is_last && commit.is_some()).then_some(0),
             is_last.then_some(commit.as_ref().map(|c| c.id)).flatten(),
+            0,
         );
         above_idx = new_segment;
         if is_first {
@@ -1492,6 +1498,7 @@ fn maybe_create_multiple_segments<T: RefMetadata>(
                         src_id: edge.weight.src_id,
                         dst: target_cidx,
                         dst_id: target_cidx.and_then(|_| commit.as_ref().map(|c| c.id)),
+                        parent_order: edge.weight.parent_order,
                     },
                 );
             }
@@ -1548,6 +1555,7 @@ fn reconnect_outgoing_edges(
                 src_id: target_first_commit_id,
                 dst: edge.weight.dst,
                 dst_id: edge.weight.dst_id,
+                parent_order: edge.weight.parent_order,
             },
         );
     }

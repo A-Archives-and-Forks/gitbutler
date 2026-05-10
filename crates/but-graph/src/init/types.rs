@@ -277,6 +277,8 @@ pub enum Instruction {
     ConnectNewSegment {
         parent_above: SegmentIndex,
         at_commit: CommitIndex,
+        /// The position of this parent among the source commit's parents (0-based).
+        parent_order: usize,
     },
 }
 
@@ -295,9 +297,11 @@ impl Instruction {
             Instruction::ConnectNewSegment {
                 parent_above: _,
                 at_commit,
+                parent_order,
             } => Instruction::ConnectNewSegment {
                 parent_above: sidx,
                 at_commit,
+                parent_order,
             },
         }
     }

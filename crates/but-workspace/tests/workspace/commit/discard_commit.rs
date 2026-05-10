@@ -117,10 +117,10 @@ fn discard_tip_commit_in_workspace_stack() -> Result<()> {
     assert_eq!(tip_of_c, b, "The C ref should now point to B");
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    *   95c53c4 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    *   c718ffa (HEAD -> gitbutler/workspace) GitButler Workspace Commit
     |\  
-    | * c813d8d (C, B) B
-    * | 09d8e52 (A) A
+    | * 09d8e52 (A) A
+    * | c813d8d (C, B) B
     |/  
     * 85efbe4 (origin/main, main) M
     ");
@@ -196,10 +196,10 @@ fn discard_bottom_commit_in_workspace_stack() -> Result<()> {
     assert_ne!(b, tip_of_c, "Discarded commit must not remain as C tip");
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    *   bae0ee9 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    *   d990652 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
     |\  
-    | * 8e00332 (C) C
-    * | 09d8e52 (A) A
+    | * 09d8e52 (A) A
+    * | 8e00332 (C) C
     |/  
     * 85efbe4 (origin/main, main, B) M
     ");

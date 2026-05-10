@@ -128,10 +128,10 @@ fn tear_off_bottom_most_branch() -> anyhow::Result<()> {
     ws.refresh_from_head(&repo, &meta)?;
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    *-.   af022f8 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    *-.   a3c9e85 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
     |\ \  
-    | | * 8e00332 (C) C
-    | * | 09d8e52 (A) A
+    | | * 09d8e52 (A) A
+    | * | 8e00332 (C) C
     | |/  
     * / c813d8d (B) B
     |/  
@@ -202,11 +202,11 @@ fn tear_off_only_branch_in_stack() -> anyhow::Result<()> {
     ws.refresh_from_head(&repo, &meta)?;
 
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
-    *   bb92c8b (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    *   f3e1bf2 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
     |\  
-    | * 09bc93e (C) C
-    | * c813d8d (B) B
-    * | 09d8e52 (A) A
+    | * 09d8e52 (A) A
+    * | 09bc93e (C) C
+    * | c813d8d (B) B
     |/  
     * 85efbe4 (origin/main, main) M
     ");

@@ -48,6 +48,7 @@ fn post_graph_traversal() -> anyhow::Result<()> {
         },
         0,
         None,
+        0,
     );
 
     let remote_to_local_target = Segment {
@@ -59,7 +60,7 @@ fn post_graph_traversal() -> anyhow::Result<()> {
         commits: vec![commit(id("c"), Some(init_commit_id), CommitFlags::empty())],
         ..Default::default()
     };
-    graph.connect_new_segment(local_target, None, remote_to_local_target, 0, None);
+    graph.connect_new_segment(local_target, None, remote_to_local_target, 0, None, 0);
 
     let branch = Segment {
         id: 3.into(),
@@ -77,7 +78,7 @@ fn post_graph_traversal() -> anyhow::Result<()> {
         ],
         metadata: None,
     };
-    let branch = graph.connect_new_segment(local_target, None, branch, 0, None);
+    let branch = graph.connect_new_segment(local_target, None, branch, 0, None, 0);
 
     let remote_to_root_branch = Segment {
         id: 4.into(),
@@ -94,7 +95,7 @@ fn post_graph_traversal() -> anyhow::Result<()> {
         ],
         ..Default::default()
     };
-    graph.connect_new_segment(branch, 1, remote_to_root_branch, 0, None);
+    graph.connect_new_segment(branch, 1, remote_to_root_branch, 0, None, 0);
 
     insta::assert_snapshot!(graph_tree(&graph), @r"
 

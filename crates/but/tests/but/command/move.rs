@@ -352,10 +352,10 @@ Moved 4 commits → before [..]
         b_messages_after,
         vec![
             "B: another 10 lines at the bottom",
-            "A: 10 lines on top",
             "C: add another 10 lines to new file",
             "C: add 10 lines to new file",
             "C: new file with 10 lines",
+            "A: 10 lines on top",
             "B: 10 lines at the bottom"
         ]
     );
@@ -372,10 +372,10 @@ Moved 4 commits → before [..]
 ┊
 ┊╭┄h0 [B]
 ┊●   [..] B: another 10 lines at the bottom
-┊●   [..] A: 10 lines on top
-┊●   [..] C: add another 10 lines to new file
-┊●   [..] C: add 10 lines to new file
-┊●   461deb3 C: new file with 10 lines
+┊●   c4ee0c5 C: add another 10 lines to new file
+┊●   4b3d452 C: add 10 lines to new file
+┊●   90250eb C: new file with 10 lines
+┊●   29bc6a0 A: 10 lines on top
 ┊●   62e05ba B: 10 lines at the bottom
 ├╯
 ┊
@@ -495,10 +495,10 @@ Moved 4 commits → after a748762
     assert_eq!(
         b_messages_after,
         vec![
-            "A: 10 lines on top",
             "C: add another 10 lines to new file",
             "C: add 10 lines to new file",
             "C: new file with 10 lines",
+            "A: 10 lines on top",
             "B: another 10 lines at the bottom",
             "B: 10 lines at the bottom"
         ]
@@ -515,10 +515,10 @@ Moved 4 commits → after a748762
 ├╯
 ┊
 ┊╭┄h0 [B]
-┊●   [..] A: 10 lines on top
-┊●   [..] C: add another 10 lines to new file
-┊●   [..] C: add 10 lines to new file
-┊●   5d69b97 C: new file with 10 lines
+┊●   79860aa C: add another 10 lines to new file
+┊●   cb938a1 C: add 10 lines to new file
+┊●   87f25cc C: new file with 10 lines
+┊●   d2689e7 A: 10 lines on top
 ┊●   a748762 B: another 10 lines at the bottom
 ┊●   62e05ba B: 10 lines at the bottom
 ├╯

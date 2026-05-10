@@ -696,6 +696,7 @@ impl Graph {
                             propagated_flags,
                             src_sidx,
                             limit,
+                            0,
                         )?;
                         continue;
                     }
@@ -716,6 +717,7 @@ impl Graph {
                 Instruction::ConnectNewSegment {
                     parent_above,
                     at_commit,
+                    parent_order,
                 } => match seen.entry(id) {
                     Entry::Occupied(_) => {
                         possibly_split_occupied_segment(
@@ -726,6 +728,7 @@ impl Graph {
                             propagated_flags,
                             parent_above,
                             limit,
+                            parent_order,
                         )?;
                         continue;
                     }
@@ -742,6 +745,7 @@ impl Graph {
                             segment_below,
                             0,
                             id,
+                            parent_order,
                         );
                         e.insert(segment_below);
                         segment_below
@@ -912,9 +916,10 @@ impl Graph {
         dst: SegmentIndex,
         dst_commit: impl Into<Option<CommitIndex>>,
     ) {
-        self.connect_segments_with_ids(src, src_commit, None, dst, dst_commit, None)
+        self.connect_segments_with_ids(src, src_commit, None, dst, dst_commit, None, 0)
     }
 
+    #[expect(clippy::too_many_arguments)]
     pub(crate) fn connect_segments_with_ids(
         &mut self,
         src: SegmentIndex,
@@ -923,6 +928,7 @@ impl Graph {
         dst: SegmentIndex,
         dst_commit: impl Into<Option<CommitIndex>>,
         dst_id: Option<gix::ObjectId>,
+        parent_order: usize,
     ) {
         let src_commit = src_commit.into();
         let dst_commit = dst_commit.into();
@@ -934,6 +940,7 @@ impl Graph {
                 src_id: src_id.or_else(|| self[src].commit_id_by_index(src_commit)),
                 dst: dst_commit,
                 dst_id: dst_id.or_else(|| self[dst].commit_id_by_index(dst_commit)),
+                parent_order,
             },
         );
     }

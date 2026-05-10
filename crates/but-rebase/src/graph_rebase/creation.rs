@@ -197,13 +197,10 @@ impl<'ws, 'meta, M: RefMetadata> Editor<'ws, 'meta, M> {
                 continue;
             };
 
-            'inner: for (order, edge) in workspace
+            'inner: for edge in workspace
                 .graph
                 .edges_directed(*sidx, Direction::Outgoing)
                 .collect::<Vec<_>>()
-                .into_iter()
-                .rev()
-                .enumerate()
             {
                 let Some(target) = segments.get(&edge.target()).and_then(|n| n.nodes.first())
                 else {
@@ -214,6 +211,7 @@ impl<'ws, 'meta, M: RefMetadata> Editor<'ws, 'meta, M> {
                     continue 'inner;
                 };
 
+                let order = edge.weight().parent_order;
                 graph.add_edge(*source, *target, Edge { order });
             }
         }

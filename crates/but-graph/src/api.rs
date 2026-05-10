@@ -58,6 +58,7 @@ impl Graph {
         dst: Segment,
         dst_commit: impl Into<Option<CommitIndex>>,
         dst_commit_id: impl Into<Option<gix::ObjectId>>,
+        parent_order: usize,
     ) -> SegmentIndex {
         let dst = self.inner.add_node(dst);
         self.inner[dst].id = dst;
@@ -68,6 +69,7 @@ impl Graph {
             dst,
             dst_commit,
             dst_commit_id.into(),
+            parent_order,
         );
         dst
     }
