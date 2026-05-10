@@ -4,9 +4,8 @@ import {
 	branchOperand,
 	CommitOperand,
 	commitOperand,
-	fileParentToOperand,
+	operandContains,
 	operandEquals,
-	operandFileParent,
 	type Operand,
 } from "#ui/operands.ts";
 import { getOperation, getOperations, OperationType } from "#ui/operations/operation.ts";
@@ -165,20 +164,12 @@ export const filterNavigationIndexForOutlineMode = ({
 		Match.tagsExhaustive({
 			Default: () => navigationIndexUnfiltered,
 			Operation: ({ value: operationMode }) =>
-				filterNavigationIndex(navigationIndexUnfiltered, (operand) => {
-					if (operandEquals(operand, operationMode.source)) return true;
-
-					const operationModeSourceFileParent = operandFileParent(operationMode.source);
-					if (
-						operationModeSourceFileParent &&
-						operandEquals(operand, fileParentToOperand(operationModeSourceFileParent))
-					)
-						return true;
-
-					if (operationModeHasOperation({ mode: operationMode, operand })) return true;
-
-					return false;
-				}),
+				filterNavigationIndex(
+					navigationIndexUnfiltered,
+					(operand) =>
+						operandContains(operand, operationMode.source) ||
+						operationModeHasOperation({ mode: operationMode, operand }),
+				),
 			RenameBranch: (x) =>
 				filterNavigationIndex(navigationIndexUnfiltered, (operand) =>
 					operandEquals(operand, branchOperand(x.operand)),

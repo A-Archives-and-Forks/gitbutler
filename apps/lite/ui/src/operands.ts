@@ -151,7 +151,7 @@ export const operandFileParent = (operand: Operand): FileParent | null =>
 		Match.orElse(() => null),
 	);
 
-export const fileParentToOperand = (fileParent: FileParent): Operand =>
+const fileParentToOperand = (fileParent: FileParent): Operand =>
 	Match.value(fileParent).pipe(
 		Match.tagsExhaustive({
 			Changes: () => changesSectionOperand,
@@ -159,3 +159,12 @@ export const fileParentToOperand = (fileParent: FileParent): Operand =>
 			Commit: ({ stackId, commitId }) => commitOperand({ stackId, commitId }),
 		}),
 	);
+
+export const operandContains = (a: Operand, b: Operand) => {
+	if (operandEquals(a, b)) return true;
+
+	const bFileParent = operandFileParent(b);
+	if (bFileParent && operandEquals(a, fileParentToOperand(bFileParent))) return true;
+
+	return false;
+};
