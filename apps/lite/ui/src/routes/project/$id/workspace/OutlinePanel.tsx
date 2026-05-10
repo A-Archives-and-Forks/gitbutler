@@ -169,7 +169,6 @@ const useNavigationIndex = (projectId: string) => {
 
 	const navigationIndex = filterNavigationIndexForOutlineMode({
 		navigationIndex: navigationIndexUnfiltered,
-		selection,
 		outlineMode,
 	});
 

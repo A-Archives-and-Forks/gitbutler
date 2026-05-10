@@ -4,7 +4,9 @@ import {
 	branchOperand,
 	CommitOperand,
 	commitOperand,
+	fileParentToOperand,
 	operandEquals,
+	operandFileParent,
 	type Operand,
 } from "#ui/operands.ts";
 import { getOperation, getOperations, OperationType } from "#ui/operations/operation.ts";
@@ -154,24 +156,29 @@ const operationModeHasOperation = ({
 
 export const filterNavigationIndexForOutlineMode = ({
 	navigationIndex: navigationIndexUnfiltered,
-	selection,
 	outlineMode,
 }: {
 	navigationIndex: NavigationIndex;
-	selection: Operand;
 	outlineMode: OutlineMode;
 }) =>
 	Match.value(outlineMode).pipe(
 		Match.tagsExhaustive({
 			Default: () => navigationIndexUnfiltered,
 			Operation: (operationMode) =>
-				filterNavigationIndex(
-					navigationIndexUnfiltered,
-					(operand) =>
-						operandEquals(selection, operand) ||
-						operandEquals(operationMode.value.source, operand) ||
-						operationModeHasOperation({ mode: operationMode.value, operand }),
-				),
+				filterNavigationIndex(navigationIndexUnfiltered, (operand) => {
+					if (operandEquals(operationMode.value.source, operand)) return true;
+
+					const operationModeSourceFileParent = operandFileParent(operationMode.value.source);
+					if (
+						operationModeSourceFileParent &&
+						operandEquals(fileParentToOperand(operationModeSourceFileParent), operand)
+					)
+						return true;
+
+					if (operationModeHasOperation({ mode: operationMode.value, operand })) return true;
+
+					return false;
+				}),
 			RenameBranch: (x) =>
 				filterNavigationIndex(navigationIndexUnfiltered, (operand) =>
 					operandEquals(operand, branchOperand(x.operand)),

@@ -150,3 +150,12 @@ export const operandFileParent = (operand: Operand): FileParent | null =>
 		}),
 		Match.orElse(() => null),
 	);
+
+export const fileParentToOperand = (fileParent: FileParent): Operand =>
+	Match.value(fileParent).pipe(
+		Match.tagsExhaustive({
+			Changes: () => changesSectionOperand,
+			Branch: ({ stackId, branchRef }) => branchOperand({ stackId, branchRef }),
+			Commit: ({ stackId, commitId }) => commitOperand({ stackId, commitId }),
+		}),
+	);

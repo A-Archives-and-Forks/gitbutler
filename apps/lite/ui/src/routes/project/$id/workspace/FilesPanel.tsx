@@ -81,7 +81,6 @@ const useNavigationIndex = (projectId: string, parent: Operand, files: Array<Ope
 
 	const navigationIndex = filterNavigationIndexForOutlineMode({
 		navigationIndex: navigationIndexUnfiltered,
-		selection,
 		outlineMode,
 	});
 
