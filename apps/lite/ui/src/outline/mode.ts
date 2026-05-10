@@ -164,18 +164,18 @@ export const filterNavigationIndexForOutlineMode = ({
 	Match.value(outlineMode).pipe(
 		Match.tagsExhaustive({
 			Default: () => navigationIndexUnfiltered,
-			Operation: (operationMode) =>
+			Operation: ({ value: operationMode }) =>
 				filterNavigationIndex(navigationIndexUnfiltered, (operand) => {
-					if (operandEquals(operationMode.value.source, operand)) return true;
+					if (operandEquals(operationMode.source, operand)) return true;
 
-					const operationModeSourceFileParent = operandFileParent(operationMode.value.source);
+					const operationModeSourceFileParent = operandFileParent(operationMode.source);
 					if (
 						operationModeSourceFileParent &&
 						operandEquals(fileParentToOperand(operationModeSourceFileParent), operand)
 					)
 						return true;
 
-					if (operationModeHasOperation({ mode: operationMode.value, operand })) return true;
+					if (operationModeHasOperation({ mode: operationMode, operand })) return true;
 
 					return false;
 				}),
