@@ -956,6 +956,7 @@ dependencies = [
  "boolean-enums",
  "bstr",
  "but-action",
+ "but-api",
  "but-api-macros",
  "but-askpass",
  "but-cherry-apply",
