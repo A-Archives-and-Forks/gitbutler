@@ -26,7 +26,7 @@ fn drop_and_add_regular_refs() -> anyhow::Result<()> {
     ");
 
     let graph = Graph::from_head(&repo, &*meta, standard_options())?;
-    insta::assert_snapshot!(graph_tree(&graph), @r"
+    insta::assert_snapshot!(graph_tree(&graph), @"
 
     └── 👉►:0[0]:merged[🌳]
         └── ·8a6c109 (⌂|1)
@@ -35,7 +35,7 @@ fn drop_and_add_regular_refs() -> anyhow::Result<()> {
             │       ├── ►:3[2]:anon:
             │       │   └── ·592abec (⌂|1)
             │       │       └── ►:7[3]:main
-            │       │           └── ·965998b (⌂|1)
+            │       │           └── 🏁·965998b (⌂|1)
             │       └── ►:4[2]:B
             │           └── ·f16dddf (⌂|1)
             │               └── →:7: (main)
@@ -70,7 +70,7 @@ fn drop_and_add_regular_refs() -> anyhow::Result<()> {
             │       ├── ►:3[2]:anon:
             │       │   └── ·592abec (⌂|1)
             │       │       └── ►:7[3]:main
-            │       │           └── ·965998b (⌂|1)
+            │       │           └── 🏁·965998b (⌂|1)
             │       └── ►:4[2]:B
             │           └── ·f16dddf (⌂|1)
             │               └── →:7: (main)
@@ -108,7 +108,7 @@ fn drop_head_ref() -> anyhow::Result<()> {
     ");
 
     let graph = Graph::from_head(&repo, &*meta, standard_options())?;
-    insta::assert_snapshot!(graph_tree(&graph), @r"
+    insta::assert_snapshot!(graph_tree(&graph), @"
 
     └── 👉►:0[0]:merged[🌳]
         └── ·8a6c109 (⌂|1)
@@ -117,7 +117,7 @@ fn drop_head_ref() -> anyhow::Result<()> {
             │       ├── ►:3[2]:anon:
             │       │   └── ·592abec (⌂|1)
             │       │       └── ►:7[3]:main
-            │       │           └── ·965998b (⌂|1)
+            │       │           └── 🏁·965998b (⌂|1)
             │       └── ►:4[2]:B
             │           └── ·f16dddf (⌂|1)
             │               └── →:7: (main)
@@ -144,7 +144,7 @@ fn drop_head_ref() -> anyhow::Result<()> {
             │       ├── ►:3[2]:anon:
             │       │   └── ·592abec (⌂|1)
             │       │       └── ►:7[3]:main
-            │       │           └── ·965998b (⌂|1)
+            │       │           └── 🏁·965998b (⌂|1)
             │       └── ►:4[2]:B
             │           └── ·f16dddf (⌂|1)
             │               └── →:7: (main)
@@ -182,7 +182,7 @@ fn overriding_references() -> anyhow::Result<()> {
     ");
 
     let graph = Graph::from_head(&repo, &*meta, standard_options())?;
-    insta::assert_snapshot!(graph_tree(&graph), @r"
+    insta::assert_snapshot!(graph_tree(&graph), @"
 
     └── 👉►:0[0]:merged[🌳]
         └── ·8a6c109 (⌂|1)
@@ -191,7 +191,7 @@ fn overriding_references() -> anyhow::Result<()> {
             │       ├── ►:3[2]:anon:
             │       │   └── ·592abec (⌂|1)
             │       │       └── ►:7[3]:main
-            │       │           └── ·965998b (⌂|1)
+            │       │           └── 🏁·965998b (⌂|1)
             │       └── ►:4[2]:B
             │           └── ·f16dddf (⌂|1)
             │               └── →:7: (main)
@@ -236,7 +236,7 @@ fn overriding_references() -> anyhow::Result<()> {
             │       ├── ►:3[2]:anon:
             │       │   └── ·592abec (⌂|1)
             │       │       └── ►:7[3]:main
-            │       │           └── ·965998b (⌂|1)
+            │       │           └── 🏁·965998b (⌂|1)
             │       └── ►:4[2]:B
             │           └── ·f16dddf (⌂|1)
             │               └── →:7: (main)
@@ -275,7 +275,7 @@ fn overriding_references() -> anyhow::Result<()> {
             │       ├── ►:3[2]:anon:
             │       │   └── ·592abec (⌂|1)
             │       │       └── ►:7[3]:main
-            │       │           └── ·965998b (⌂|1)
+            │       │           └── 🏁·965998b (⌂|1)
             │       └── ►:4[2]:B
             │           └── ·f16dddf (⌂|1)
             │               └── →:7: (main)
@@ -307,7 +307,7 @@ fn overriding_references() -> anyhow::Result<()> {
             │       ├── ►:3[2]:merged[🌳]
             │       │   └── ·592abec (⌂|1)
             │       │       └── ►:7[3]:main
-            │       │           └── ·965998b (⌂|1)
+            │       │           └── 🏁·965998b (⌂|1)
             │       └── ►:4[2]:B
             │           └── ·f16dddf (⌂|1)
             │               └── →:7: (main)

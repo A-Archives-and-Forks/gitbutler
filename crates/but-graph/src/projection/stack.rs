@@ -331,10 +331,12 @@ impl StackSegment {
             is_first = false;
         }
         // The last (actual) segment could be partial.
-        if let Some(commits) = commits_by_segment
-            .last_mut()
-            .and_then(|(sidx, commits)| graph.is_early_end_of_traversal(*sidx).then_some(commits))
-            && let Some(commit) = commits.last_mut()
+        if let Some(commits) = commits_by_segment.last_mut().and_then(|(sidx, commits)| {
+            graph
+                .stop_condition(*sidx)
+                .is_some_and(|condition| condition.at_limit())
+                .then_some(commits)
+        }) && let Some(commit) = commits.last_mut()
         {
             commit.flags |= StackCommitFlags::EarlyEnd;
         }
@@ -558,21 +560,23 @@ bitflags! {
         /// Note that when multiple workspaces are included in the traversal, this flag is set by
         /// any of many target branches.
         const Integrated = 1 << 2;
+        /// The commit is listed in the repository's shallow boundary file, it's 'grafted'.
+        const ShallowBoundary = 1 << 3;
         // --- END OVERLAP ---
 
         /// This commit was pushed to *our* remote and thus could have been observed by others.
         /// This definitely means manipulation will require a force-push afterward.
         /// Implies `ReachableByRemote`, which is then also set for convenience.
-        const ReachableByMatchingRemote = 1 << 3;
+        const ReachableByMatchingRemote = 1 << 4;
         /// Whether the commit is in a conflicted state, a GitButler concept.
         /// GitButler will perform rebasing/reordering etc. without interruptions and flag commits as conflicted if needed.
         /// Conflicts are resolved via the Edit Mode mechanism.
         ///
         /// Note that even though GitButler won't push branches with conflicts, the user can still push such branches at will.
-        const HasConflicts = 1 << 4;
+        const HasConflicts = 1 << 5;
         /// The commit will appear 'snipped off' as it has parents, but the traversal stopped there due to hitting limits
         /// or because the commits weren't interesting.
-        const EarlyEnd = 1 << 5;
+        const EarlyEnd = 1 << 6;
     }
 }
 
@@ -581,7 +585,7 @@ impl StackCommitFlags {
     ///
     /// Note that this only displays flags that are not used when displaying [the whole commit](StackCommit::debug_string()).
     pub fn debug_string(&self) -> String {
-        let flags = *self & (Self::InWorkspace | Self::Integrated);
+        let flags = *self & (Self::InWorkspace | Self::Integrated | Self::ShallowBoundary);
         if flags.is_empty() {
             "".into()
         } else {
@@ -591,6 +595,7 @@ impl StackCommitFlags {
                 .to_string()
                 .replace("InWorkspace", "🏘️")
                 .replace("Integrated", "✓")
+                .replace("ShallowBoundary", "⛰")
                 .replace(" ", "")
         }
     }
@@ -600,7 +605,11 @@ impl StackCommitFlags {
 impl From<CommitFlags> for StackCommitFlags {
     fn from(value: CommitFlags) -> Self {
         StackCommitFlags::from_bits_retain(
-            (value & (CommitFlags::Integrated | CommitFlags::InWorkspace)).bits() as u8,
+            (value
+                & (CommitFlags::Integrated
+                    | CommitFlags::InWorkspace
+                    | CommitFlags::ShallowBoundary))
+                .bits() as u8,
         )
     }
 }

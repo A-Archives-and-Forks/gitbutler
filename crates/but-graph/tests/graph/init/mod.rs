@@ -1,4 +1,4 @@
-use but_graph::Graph;
+use but_graph::{CommitFlags, Graph, StopCondition};
 use but_testsupport::{
     gix_testtools::{self, Creation, rust_fixture_writable},
     graph_tree, graph_workspace, visualize_commit_graph_all,
@@ -80,12 +80,12 @@ fn detached() -> anyhow::Result<()> {
     // Detached branches are forcefully made anonymous, and it's something
     // we only know by examining `HEAD`.
     let graph = Graph::from_head(&repo, &*meta, standard_options())?;
-    insta::assert_snapshot!(graph_tree(&graph), @r"
+    insta::assert_snapshot!(graph_tree(&graph), @"
 
     └── ►:0[0]:anon:
         └── 👉·541396b (⌂|1) ►tags/annotated, ►tags/release/v1, ►main
             └── ►:1[1]:other
-                └── ·fafd9d0 (⌂|1)
+                └── 🏁·fafd9d0 (⌂|1)
     ");
     insta::assert_debug_snapshot!(graph, @r#"
     Graph {
@@ -170,6 +170,19 @@ fn detached() -> anyhow::Result<()> {
         graph.managed_entrypoint_commit(&repo)?.is_none(),
         "but it's not managed"
     );
+    let root_sidx = graph
+        .base_segments()
+        .find(|sidx| {
+            graph[*sidx]
+                .commits
+                .last()
+                .is_some_and(|commit| commit.parent_ids.is_empty())
+        })
+        .expect("root segment is present");
+    assert_eq!(
+        graph.stop_condition(root_sidx),
+        Some(StopCondition::FirstCommit)
+    );
 
     insta::assert_snapshot!(graph_workspace(&graph.into_workspace()?), @"
     ⌂:0:DETACHED <> ✓!
@@ -178,6 +191,74 @@ fn detached() -> anyhow::Result<()> {
         │   └── ·541396b ►tags/annotated, ►tags/release/v1, ►main
         └── :1:other
             └── ·fafd9d0
+    ");
+    Ok(())
+}
+
+#[test]
+fn shallow_clone_stops_at_shallow_boundary() -> anyhow::Result<()> {
+    let (repo, meta) =
+        utils::named_read_only_in_memory_scenario("special-conditions", "shallow-clone-depth-2")?;
+    insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @"
+    * 71a64f3 (HEAD -> main, origin/main, origin/HEAD) commit 4
+    * 62d65ed (grafted) commit 3
+    ");
+
+    let shallow_commits = repo.shallow_commits()?.expect("clone is shallow");
+    let shallow_boundary_id = shallow_commits.head;
+    assert!(
+        shallow_commits.tail.is_empty(),
+        "the linear depth-2 clone should have exactly one shallow boundary"
+    );
+
+    let graph = Graph::from_head(&repo, &*meta, standard_options())?.validated()?;
+    insta::assert_snapshot!(graph_tree(&graph), @"
+
+    └── ►:1[0]:origin/main →:0:
+        └── 👉►:0[1]:main[🌳] <> origin/main →:1:
+            ├── ·71a64f3 (⌂|1)
+            └── ⛰·62d65ed (⌂|⛰|1)
+    ");
+    let (boundary_sidx, boundary_cidx) = graph
+        .segments()
+        .find_map(|sidx| {
+            graph[sidx]
+                .commits
+                .iter()
+                .position(|commit| commit.id == shallow_boundary_id)
+                .map(|cidx| (sidx, cidx))
+        })
+        .expect("boundary commit is included in the graph");
+    let boundary_commit = &graph[boundary_sidx].commits[boundary_cidx];
+    assert!(
+        boundary_commit.flags.contains(CommitFlags::ShallowBoundary),
+        "the boundary commit is explicitly flagged"
+    );
+    let missing_parent = boundary_commit
+        .parent_ids
+        .first()
+        .copied()
+        .expect("shallow boundary commit still records its grafted parent");
+    assert!(
+        graph.segments().all(|sidx| graph[sidx]
+            .commits
+            .iter()
+            .all(|commit| commit.id != missing_parent)),
+        "the grafted parent is not traversed"
+    );
+
+    let condition = graph
+        .stop_condition(boundary_sidx)
+        .expect("boundary segment has a cutoff condition");
+    assert!(condition.contains(StopCondition::ShallowBoundary));
+    assert!(!condition.contains(StopCondition::Limit));
+    assert!(!condition.contains(StopCondition::FirstCommit));
+
+    let ws = graph.into_workspace()?;
+    insta::assert_snapshot!(graph_workspace(&ws), @"
+    ⌂:0:main[🌳] <> ✓refs/remotes/origin/main on 71a64f3
+    └── ≡:0:main[🌳] <> origin/main →:1: {1}
+        └── :0:main[🌳] <> origin/main →:1:
     ");
     Ok(())
 }
@@ -194,13 +275,13 @@ fn main_advanced_remote_advanced() -> anyhow::Result<()> {
     ");
 
     let graph = Graph::from_head(&repo, &*meta, standard_options())?;
-    insta::assert_snapshot!(graph_tree(&graph), @r"
+    insta::assert_snapshot!(graph_tree(&graph), @"
 
     ├── 👉►:0[0]:main[🌳] <> origin/main →:1:
     │   └── ·971953d (⌂|01)
     │       └── ►:2[1]:anon:
     │           ├── ·ce09734 (⌂|11)
-    │           └── ·fafd9d0 (⌂|11)
+    │           └── 🏁·fafd9d0 (⌂|11)
     └── ►:1[0]:origin/main →:0:
         └── 🟣5d29d62 (0x0|10)
             └── →:2:
@@ -229,7 +310,7 @@ fn only_remote_advanced() -> anyhow::Result<()> {
     ");
 
     let graph = Graph::from_head(&repo, &*meta, standard_options())?;
-    insta::assert_snapshot!(graph_tree(&graph), @r"
+    insta::assert_snapshot!(graph_tree(&graph), @"
 
     └── ►:1[0]:origin/main →:0:
         └── 🟣085535d (0x0|10)
@@ -238,7 +319,7 @@ fn only_remote_advanced() -> anyhow::Result<()> {
                     └── 👉►:0[2]:main[🌳] <> origin/main →:1:
                         ├── ·971953d (⌂|11)
                         ├── ·ce09734 (⌂|11)
-                        └── ·fafd9d0 (⌂|11)
+                        └── 🏁·fafd9d0 (⌂|11)
     ");
 
     // TODO: it should detect that `main` has no own commits as it's fully integrated.
@@ -267,7 +348,7 @@ fn only_remote_advanced_with_special_branch_name() -> anyhow::Result<()> {
     ");
 
     let graph = Graph::from_head(&repo, &*meta, standard_options())?;
-    insta::assert_snapshot!(graph_tree(&graph), @r"
+    insta::assert_snapshot!(graph_tree(&graph), @"
 
     └── ►:1[0]:origin/main →:0:
         └── 🟣085535d (0x0|10)
@@ -277,7 +358,7 @@ fn only_remote_advanced_with_special_branch_name() -> anyhow::Result<()> {
                         └── ·971953d (⌂|11)
                             └── ►:2[3]:gitbutler/target
                                 ├── ·ce09734 (⌂|11)
-                                └── ·fafd9d0 (⌂|11)
+                                └── 🏁·fafd9d0 (⌂|11)
     ");
 
     // TODO: We'd actually have to recognise that the `origin/split-segment` branch
@@ -310,22 +391,22 @@ fn multi_root() -> anyhow::Result<()> {
     ");
 
     let graph = Graph::from_head(&repo, &*meta, standard_options())?;
-    insta::assert_snapshot!(graph_tree(&graph), @r"
+    insta::assert_snapshot!(graph_tree(&graph), @"
 
     └── 👉►:0[0]:main[🌳]
         └── ·c6c8c05 (⌂|1)
             ├── ►:1[1]:anon:
             │   └── ·76fc5c4 (⌂|1)
             │       ├── ►:3[2]:anon:
-            │       │   └── ·e5d0542 (⌂|1)
+            │       │   └── 🏁·e5d0542 (⌂|1)
             │       └── ►:4[2]:B
-            │           └── ·366d496 (⌂|1)
+            │           └── 🏁·366d496 (⌂|1)
             └── ►:2[1]:C
                 └── ·8631946 (⌂|1)
                     ├── ►:5[2]:anon:
-                    │   └── ·00fab2a (⌂|1)
+                    │   └── 🏁·00fab2a (⌂|1)
                     └── ►:6[2]:D
-                        └── ·f4955b6 (⌂|1)
+                        └── 🏁·f4955b6 (⌂|1)
     ");
     assert_eq!(
         graph.tip_segments().count(),
@@ -369,7 +450,7 @@ fn four_diamond() -> anyhow::Result<()> {
     ");
 
     let graph = Graph::from_head(&repo, &*meta, standard_options())?;
-    insta::assert_snapshot!(graph_tree(&graph), @r"
+    insta::assert_snapshot!(graph_tree(&graph), @"
 
     └── 👉►:0[0]:merged[🌳]
         └── ·8a6c109 (⌂|1)
@@ -378,7 +459,7 @@ fn four_diamond() -> anyhow::Result<()> {
             │       ├── ►:3[2]:anon:
             │       │   └── ·592abec (⌂|1)
             │       │       └── ►:7[3]:main
-            │       │           └── ·965998b (⌂|1)
+            │       │           └── 🏁·965998b (⌂|1)
             │       └── ►:4[2]:B
             │           └── ·f16dddf (⌂|1)
             │               └── →:7: (main)
@@ -433,14 +514,14 @@ fn stacked_rebased_remotes() -> anyhow::Result<()> {
     // A remote will always be able to find their non-remotes so they don't seem cut-off.
     let graph =
         Graph::from_head(&repo, &*meta, standard_options().with_limit_hint(1))?.validated()?;
-    insta::assert_snapshot!(graph_tree(&graph), @r"
+    insta::assert_snapshot!(graph_tree(&graph), @"
 
     ├── 👉►:0[0]:B[🌳] <> origin/B →:1:
     │   └── ·312f819 (⌂|0001)
     │       └── ►:2[1]:A <> origin/A →:3:
     │           └── ·e255adc (⌂|0101)
     │               └── ►:4[2]:main
-    │                   └── ·fafd9d0 (⌂|1111)
+    │                   └── 🏁·fafd9d0 (⌂|1111)
     └── ►:1[0]:origin/B →:0:
         └── 🟣682be32 (0x0|0010)
             └── ►:3[1]:origin/A →:2:
@@ -487,14 +568,14 @@ fn stacked_rebased_remotes() -> anyhow::Result<()> {
 
     // Everything we encounter is checked for remotes (no limit)
     let graph = Graph::from_head(&repo, &*meta, standard_options())?.validated()?;
-    insta::assert_snapshot!(graph_tree(&graph), @r"
+    insta::assert_snapshot!(graph_tree(&graph), @"
 
     ├── 👉►:0[0]:B[🌳] <> origin/B →:1:
     │   └── ·312f819 (⌂|0001)
     │       └── ►:2[1]:A <> origin/A →:3:
     │           └── ·e255adc (⌂|0101)
     │               └── ►:4[2]:main
-    │                   └── ·fafd9d0 (⌂|1111)
+    │                   └── 🏁·fafd9d0 (⌂|1111)
     └── ►:1[0]:origin/B →:0:
         └── 🟣682be32 (0x0|0010)
             └── ►:3[1]:origin/A →:2:
@@ -505,12 +586,12 @@ fn stacked_rebased_remotes() -> anyhow::Result<()> {
     // With a lower entrypoint, we don't see part of the graph.
     let (id, name) = id_at(&repo, "A");
     let graph = Graph::from_commit_traversal(id, name, &*meta, standard_options())?.validated()?;
-    insta::assert_snapshot!(graph_tree(&graph), @r"
+    insta::assert_snapshot!(graph_tree(&graph), @"
 
     ├── 👉►:0[0]:A <> origin/A →:1:
     │   └── ·e255adc (⌂|01)
     │       └── ►:2[1]:main
-    │           └── ·fafd9d0 (⌂|11)
+    │           └── 🏁·fafd9d0 (⌂|11)
     └── ►:1[0]:origin/A →:0:
         └── 🟣e29c23d (0x0|10)
             └── →:2: (main)
@@ -551,7 +632,7 @@ fn with_limits() -> anyhow::Result<()> {
 
     // Without limits
     let graph = Graph::from_head(&repo, &*meta, standard_options())?.validated()?;
-    insta::assert_snapshot!(graph_tree(&graph), @r"
+    insta::assert_snapshot!(graph_tree(&graph), @"
 
     └── 👉►:0[0]:C[🌳]
         └── ·2a95729 (⌂|1)
@@ -564,7 +645,7 @@ fn with_limits() -> anyhow::Result<()> {
             │           ├── ·01d0e1e (⌂|1)
             │           ├── ·4b3e5a8 (⌂|1)
             │           ├── ·34d0715 (⌂|1)
-            │           └── ·eb5f731 (⌂|1)
+            │           └── 🏁·eb5f731 (⌂|1)
             ├── ►:2[1]:A
             │   ├── ·20a823c (⌂|1)
             │   ├── ·442a12f (⌂|1)
@@ -757,7 +838,7 @@ fn with_limits() -> anyhow::Result<()> {
                 NodeIndex(0),
                 Some(
                     CommitFlags(
-                        NotInRemote | 0x8,
+                        NotInRemote | 0x10,
                     ),
                 ),
             ),
@@ -789,7 +870,7 @@ fn with_limits() -> anyhow::Result<()> {
     .validated()?;
 
     // This limits the reach of the stack naturally.
-    insta::assert_snapshot!(graph_tree(&graph), @r"
+    insta::assert_snapshot!(graph_tree(&graph), @"
 
     └── 👉►:0[0]:C[🌳]
         └── ·2a95729 (⌂|1)
@@ -802,7 +883,7 @@ fn with_limits() -> anyhow::Result<()> {
             │           ├── ·01d0e1e (⌂|✓|1)
             │           ├── ·4b3e5a8 (⌂|✓|1)
             │           ├── ·34d0715 (⌂|✓|1)
-            │           └── ·eb5f731 (⌂|✓|1)
+            │           └── 🏁·eb5f731 (⌂|✓|1)
             ├── ►:3[1]:A
             │   ├── ·20a823c (⌂|1)
             │   ├── ·442a12f (⌂|1)
@@ -838,14 +919,14 @@ fn special_branch_names_do_not_end_up_in_segment() -> anyhow::Result<()> {
 
     let graph = Graph::from_head(&repo, &*meta, standard_options())?.validated()?;
     // Standard handling after travrsal and post-processing.
-    insta::assert_snapshot!(graph_tree(&graph), @r"
+    insta::assert_snapshot!(graph_tree(&graph), @"
 
     └── 👉►:0[0]:main[🌳]
         └── ·3686017 (⌂|1)
             └── ►:1[1]:gitbutler/edit
                 └── ·9725482 (⌂|1)
                     └── ►:2[2]:gitbutler/target
-                        └── ·fafd9d0 (⌂|1)
+                        └── 🏁·fafd9d0 (⌂|1)
     ");
 
     // But special handling for workspace views.
@@ -866,10 +947,10 @@ fn ambiguous_worktrees() -> anyhow::Result<()> {
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @"* 85efbe4 (HEAD -> main, wt-outside-ambiguous-worktree, wt-inside-ambiguous-worktree) M");
 
     let graph = Graph::from_head(&repo, &*meta, standard_options())?.validated()?;
-    insta::assert_snapshot!(graph_tree(&graph), @r"
+    insta::assert_snapshot!(graph_tree(&graph), @"
 
     └── 👉►:0[0]:main[🌳]
-        └── ·85efbe4 (⌂|1) ►wt-inside-ambiguous-worktree[📁], ►wt-outside-ambiguous-worktree[📁]
+        └── 🏁·85efbe4 (⌂|1) ►wt-inside-ambiguous-worktree[📁], ►wt-outside-ambiguous-worktree[📁]
     ");
 
     insta::assert_snapshot!(graph_workspace(&graph.into_workspace()?), @"
@@ -926,7 +1007,7 @@ fn commit_with_two_parents() -> anyhow::Result<()> {
     └── 👉►:0[0]:main[🌳]
         └── ·06470d7 (⌂|1)
             ├── ►:1[1]:anon:
-            │   └── ·86719d5 (⌂|1)
+            │   └── 🏁·86719d5 (⌂|1)
             └── →:1:
     ");
     Ok(())

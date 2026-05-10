@@ -39,7 +39,7 @@ fn by_default_conflicts_are_allowed() -> Result<()> {
         ├── ·04d1892 (⌂|1) ►c
         └── ·5e0ba46 (⌂|1) ►a, ►b
             └── ►:1[1]:base
-                └── ·6155f21 (⌂|1)
+                └── 🏁·6155f21 (⌂|1)
     ");
     let outcome = outcome.materialize()?;
     assert_eq!(overlayed, graph_tree(&outcome.workspace.graph).to_string());
@@ -156,7 +156,7 @@ fn if_a_commit_has_been_configured_not_to_conflict_and_doesnt_end_up_conflicted_
                     └── ►:2[2]:a
                         └── ·5e0ba46 (⌂|1)
                             └── ►:3[3]:base
-                                └── ·6155f21 (⌂|1)
+                                └── 🏁·6155f21 (⌂|1)
     ");
     let outcome = outcome.materialize()?;
     assert_eq!(overlayed, graph_tree(&outcome.workspace.graph).to_string());

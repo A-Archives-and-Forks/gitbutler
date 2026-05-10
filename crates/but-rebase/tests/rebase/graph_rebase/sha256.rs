@@ -50,7 +50,7 @@ fn inserting_a_step_rewrites_sha256_commits() -> Result<()> {
                     ├── ►:2[2]:A
                     │   └── ·2ff29ff (⌂|1)
                     │       └── ►:4[3]:main
-                    │           └── ·8dcf66f (⌂|1) ►tags/base
+                    │           └── 🏁·8dcf66f (⌂|1) ►tags/base
                     └── ►:3[2]:B
                         └── ·8f04e4a (⌂|1)
                             └── →:4: (main)
@@ -118,7 +118,7 @@ fn replacing_a_step_rewrites_sha256_descendants() -> Result<()> {
                     ├── ►:2[2]:A
                     │   └── ·b5c16ab (⌂|1)
                     │       └── ►:4[3]:main
-                    │           └── ·8dcf66f (⌂|1) ►tags/base
+                    │           └── 🏁·8dcf66f (⌂|1) ►tags/base
                     └── ►:3[2]:B
                         └── ·8f04e4a (⌂|1)
                             └── →:4: (main)
@@ -191,7 +191,7 @@ fn changing_edges_rewrites_sha256_parentage() -> Result<()> {
             └── ►:1[1]:A
                 └── ·9d083f9 (⌂|1)
                     ├── ►:2[3]:main
-                    │   └── ·8dcf66f (⌂|1) ►tags/base
+                    │   └── 🏁·8dcf66f (⌂|1) ►tags/base
                     └── ►:3[2]:B
                         └── ·8f04e4a (⌂|1)
                             └── →:2: (main)

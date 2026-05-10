@@ -31,7 +31,7 @@ fn four_commits() -> Result<()> {
         ├── ·120e3a9 (⌂|1)
         ├── ·a96434e (⌂|1)
         ├── ·d591dfe (⌂|1)
-        └── ·35b8235 (⌂|1)
+        └── 🏁·35b8235 (⌂|1)
     ");
     let outcome = outcome.materialize()?;
     assert_eq!(overlayed, graph_tree(&outcome.workspace.graph).to_string());
@@ -114,7 +114,7 @@ fn merge_in_the_middle() -> Result<()> {
                     ├── ►:2[2]:A
                     │   └── ·add59d2 (⌂|1)
                     │       └── ►:4[3]:main
-                    │           └── ·8f0d338 (⌂|1) ►tags/base
+                    │           └── 🏁·8f0d338 (⌂|1) ►tags/base
                     └── ►:3[2]:B
                         └── ·984fd1c (⌂|1)
                             └── →:4: (main)
@@ -160,7 +160,7 @@ fn three_branches_merged() -> Result<()> {
             ├── ►:1[1]:A
             │   └── ·add59d2 (⌂|1)
             │       └── ►:4[2]:anon:
-            │           └── ·8f0d338 (⌂|1) ►tags/base
+            │           └── 🏁·8f0d338 (⌂|1) ►tags/base
             ├── ►:2[1]:B
             │   ├── ·a748762 (⌂|1)
             │   └── ·62e05ba (⌂|1)

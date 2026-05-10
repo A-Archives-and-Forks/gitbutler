@@ -50,7 +50,7 @@ fn workspace_remains_unchanged_with_no_operations() -> Result<()> {
                     └── ►:2[2]:a
                         └── ·3bfeb52 (⌂|1)
                             └── ►:3[3]:base
-                                └── ·b6e2f57 (⌂|1)
+                                └── 🏁·b6e2f57 (⌂|1)
     ");
 
     let step = outcome.lookup_step(selector)?;
@@ -109,7 +109,7 @@ fn workspace_commit_is_not_signed_after_cherry_pick() -> Result<()> {
         ├── ·06106c2 (⌂|1) ►c, ►main
         └── ·3bfeb52 (⌂|1) ►a, ►b
             └── ►:1[1]:base
-                └── ·b6e2f57 (⌂|1)
+                └── 🏁·b6e2f57 (⌂|1)
     ");
     let outcome = outcome.materialize()?;
     assert_eq!(overlayed, graph_tree(&outcome.workspace.graph).to_string());
@@ -196,7 +196,7 @@ fn ad_hoc_workspace_keeps_regular_defaults() -> Result<()> {
         ├── ·120e3a9 (⌂|1)
         ├── ·a96434e (⌂|1)
         ├── ·d591dfe (⌂|1)
-        └── ·35b8235 (⌂|1)
+        └── 🏁·35b8235 (⌂|1)
     ");
 
     let step = outcome.lookup_step(selector)?;

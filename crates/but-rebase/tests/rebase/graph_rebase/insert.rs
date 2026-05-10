@@ -54,7 +54,7 @@ fn insert_below_merge_commit() -> Result<()> {
                     ├── ►:2[2]:A
                     │   └── ·add59d2 (⌂|1)
                     │       └── ►:4[3]:main
-                    │           └── ·8f0d338 (⌂|1) ►tags/base
+                    │           └── 🏁·8f0d338 (⌂|1) ►tags/base
                     └── ►:3[2]:B
                         └── ·984fd1c (⌂|1)
                             └── →:4: (main)
@@ -136,7 +136,7 @@ fn insert_below_merge_commit_excluded_mappings() -> Result<()> {
                     ├── ►:2[2]:A
                     │   └── ·add59d2 (⌂|1)
                     │       └── ►:4[3]:main
-                    │           └── ·8f0d338 (⌂|1) ►tags/base
+                    │           └── 🏁·8f0d338 (⌂|1) ►tags/base
                     └── ►:3[2]:B
                         └── ·984fd1c (⌂|1)
                             └── →:4: (main)
@@ -213,7 +213,7 @@ fn insert_above_commit_with_two_children() -> Result<()> {
                     │   └── ·72d9d9b (⌂|1)
                     │       └── ►:4[3]:main
                     │           ├── ·3dc4e45 (⌂|1) ►tags/base
-                    │           └── ·8f0d338 (⌂|1)
+                    │           └── 🏁·8f0d338 (⌂|1)
                     └── ►:3[2]:B
                         └── ·df0cf44 (⌂|1)
                             └── →:4: (main)
