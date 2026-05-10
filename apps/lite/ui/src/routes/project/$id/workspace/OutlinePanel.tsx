@@ -773,7 +773,7 @@ const ChangesSectionRow: FC<{
 		shortcutsBar: { label: "Absorb" },
 		hotkeys: [{ hotkey: "A" }],
 		contextMenu: {
-			label: "Absorb changes",
+			label: "Absorb",
 			enabled: changes.length > 0,
 		},
 	});
