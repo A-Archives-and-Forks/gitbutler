@@ -333,8 +333,8 @@ impl StackSegment {
         // The last (actual) segment could be partial.
         if let Some(commits) = commits_by_segment.last_mut().and_then(|(sidx, commits)| {
             graph
-                .traversal_condition(*sidx)
-                .is_some_and(|condition| condition.hit_limit())
+                .stop_condition(*sidx)
+                .is_some_and(|condition| condition.at_limit())
                 .then_some(commits)
         }) && let Some(commit) = commits.last_mut()
         {

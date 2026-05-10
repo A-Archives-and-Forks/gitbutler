@@ -129,8 +129,8 @@ impl Graph {
 
         for sidx in self.inner.node_indices() {
             *commits_at_cutoff += usize::from(
-                self.traversal_condition(sidx)
-                    .is_some_and(|condition| condition.traversal_ended_unnaturally()),
+                self.stop_condition(sidx)
+                    .is_some_and(|condition| condition.is_unnatural()),
             );
         }
         out

@@ -1,4 +1,4 @@
-use but_graph::{CommitFlags, CutoffCondition, Graph};
+use but_graph::{CommitFlags, Graph, StopCondition};
 use but_testsupport::{
     gix_testtools::{self, Creation, rust_fixture_writable},
     graph_tree, graph_workspace, visualize_commit_graph_all,
@@ -180,8 +180,8 @@ fn detached() -> anyhow::Result<()> {
         })
         .expect("root segment is present");
     assert_eq!(
-        graph.traversal_condition(root_sidx),
-        Some(CutoffCondition::FirstCommit)
+        graph.stop_condition(root_sidx),
+        Some(StopCondition::FirstCommit)
     );
 
     insta::assert_snapshot!(graph_workspace(&graph.into_workspace()?), @"
@@ -248,11 +248,11 @@ fn shallow_clone_stops_at_shallow_boundary() -> anyhow::Result<()> {
     );
 
     let condition = graph
-        .traversal_condition(boundary_sidx)
+        .stop_condition(boundary_sidx)
         .expect("boundary segment has a cutoff condition");
-    assert!(condition.contains(CutoffCondition::ShallowBoundary));
-    assert!(!condition.contains(CutoffCondition::Limit));
-    assert!(!condition.contains(CutoffCondition::FirstCommit));
+    assert!(condition.contains(StopCondition::ShallowBoundary));
+    assert!(!condition.contains(StopCondition::Limit));
+    assert!(!condition.contains(StopCondition::FirstCommit));
 
     let ws = graph.into_workspace()?;
     insta::assert_snapshot!(graph_workspace(&ws), @"

@@ -110,14 +110,14 @@ fn no_first_commit_on_named_segments(mut ep: EntryPoint<'_>) -> EntryPoint<'_> {
 fn tree_for_commit(
     commit: &but_graph::Commit,
     is_entrypoint: bool,
-    cutoff_condition: Option<but_graph::CutoffCondition>,
+    stop_condition: Option<but_graph::StopCondition>,
     hard_limit_hit: bool,
     max_goals: Option<usize>,
 ) -> StringTree {
     Graph::commit_debug_string(
         commit,
         is_entrypoint,
-        cutoff_condition,
+        stop_condition,
         hard_limit_hit,
         max_goals,
     )
@@ -211,7 +211,7 @@ fn recurse_segment(
             if cidx + 1 != segment.commits.len() {
                 None
             } else {
-                graph.traversal_condition(sidx)
+                graph.stop_condition(sidx)
             },
             graph.hard_limit_hit(),
             max_goals,

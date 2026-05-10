@@ -13,8 +13,8 @@ use petgraph::{
 };
 
 use crate::{
-    Commit, CommitFlags, CommitIndex, CutoffCondition, Edge, EntryPoint, Graph, Segment,
-    SegmentFlags, SegmentIndex, SegmentRelation, init::PetGraph,
+    Commit, CommitFlags, CommitIndex, Edge, EntryPoint, Graph, Segment, SegmentFlags, SegmentIndex,
+    SegmentRelation, StopCondition, init::PetGraph,
     projection::commit::is_managed_workspace_by_message,
 };
 
@@ -498,8 +498,8 @@ impl Graph {
     /// isn't fully defined as traversal stopped due to some abort condition.
     /// Valid partial segments always have at least one commit.
     fn is_partial_segment(&self, sidx: SegmentIndex) -> bool {
-        self.traversal_condition(sidx)
-            .is_some_and(|c| c.traversal_ended_unnaturally())
+        self.stop_condition(sidx)
+            .is_some_and(|condition| condition.is_unnatural())
     }
 
     /// Return all segments that sit on top of the `sidx` segment as `(source_commit_index(of sidx), destination_segment_index)`,
@@ -537,8 +537,9 @@ impl Graph {
         edges
     }
 
-    /// Return the condition under which traversal stopped at `sidx`, or `None` if nothing special applies.
-    pub fn traversal_condition(&self, sidx: SegmentIndex) -> Option<CutoffCondition> {
+    /// Return the condition under which traversal stopped at `sidx`,
+    /// or `None` if the traversal didn't stop.
+    pub fn stop_condition(&self, sidx: SegmentIndex) -> Option<StopCondition> {
         if self
             .inner
             .edges_directed(sidx, Direction::Outgoing)
@@ -548,15 +549,15 @@ impl Graph {
             return None;
         }
         let commit = self[sidx].commits.last()?;
-        let mut condition = CutoffCondition::empty();
+        let mut condition = StopCondition::empty();
         if commit.parent_ids.is_empty() {
-            condition |= CutoffCondition::FirstCommit;
+            condition |= StopCondition::FirstCommit;
         }
         if commit.flags.contains(CommitFlags::ShallowBoundary) {
-            condition |= CutoffCondition::ShallowBoundary;
+            condition |= StopCondition::ShallowBoundary;
         }
-        if !commit.parent_ids.is_empty() && !condition.contains(CutoffCondition::ShallowBoundary) {
-            condition |= CutoffCondition::Limit;
+        if !commit.parent_ids.is_empty() && !condition.contains(StopCondition::ShallowBoundary) {
+            condition |= StopCondition::Limit;
         }
         (!condition.is_empty()).then_some(condition)
     }

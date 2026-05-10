@@ -5,7 +5,7 @@ use bstr::{BString, ByteSlice, ByteVec};
 use gix::reference::Category;
 use petgraph::{prelude::EdgeRef, stable_graph::EdgeReference};
 
-use crate::{CutoffCondition, Edge, Graph, Segment, SegmentIndex, SegmentMetadata, init::PetGraph};
+use crate::{Edge, Graph, Segment, SegmentIndex, SegmentMetadata, StopCondition, init::PetGraph};
 
 /// Debugging
 impl Graph {
@@ -124,14 +124,16 @@ impl Graph {
     pub fn commit_debug_string(
         commit: &crate::Commit,
         is_entrypoint: bool,
-        cutoff_condition: Option<CutoffCondition>,
+        stop_condition: Option<StopCondition>,
         hard_limit: bool,
         max_goals: Option<usize>,
     ) -> String {
         format!(
             "{ep}{end}{kind}{hex}{flags}{refs}",
             ep = if is_entrypoint { "👉" } else { "" },
-            end = cutoff_debug_string(cutoff_condition, hard_limit),
+            end = stop_condition
+                .map(|condition| condition.debug_string(hard_limit))
+                .unwrap_or_default(),
             kind = if commit.flags.is_remote() {
                 "🟣"
             } else {
@@ -338,7 +340,7 @@ impl Graph {
                         if cidx + 1 != s.commits.len() {
                             None
                         } else {
-                            self.traversal_condition(sidx)
+                            self.stop_condition(sidx)
                         },
                         self.hard_limit_hit,
                         max_goals,
@@ -403,21 +405,4 @@ impl Graph {
         let dot = petgraph::dot::Dot::with_attr_getters(&self.inner, &[], &edge_attrs, &node_attrs);
         format!("{dot:?}")
     }
-}
-
-fn cutoff_debug_string(condition: Option<CutoffCondition>, hard_limit: bool) -> String {
-    let mut out = String::new();
-    let Some(condition) = condition else {
-        return out;
-    };
-    if condition.contains(CutoffCondition::Limit) {
-        out.push_str(if hard_limit { "❌" } else { "✂" });
-    }
-    if condition.contains(CutoffCondition::FirstCommit) {
-        out.push('🏁');
-    }
-    if condition.contains(CutoffCondition::ShallowBoundary) {
-        out.push('⛰');
-    }
-    out
 }

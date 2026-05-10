@@ -103,7 +103,7 @@ bitflags! {
     ///
     /// Multiple flags can be present at once if multiple conditions apply to the same commit.
     #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
-    pub struct CutoffCondition: u8 {
+    pub struct StopCondition: u8 {
         /// Traversal stopped before following parents due to configured traversal limits.
         ///
         /// If this was a *hard* limit, the graph may not contain all the *interesting* portions of the commit-graph,
@@ -117,15 +117,32 @@ bitflags! {
     }
 }
 
-impl CutoffCondition {
+impl StopCondition {
+    /// Return a concise symbolic representation of this stop condition for debug output.
+    pub fn debug_string(&self, hard_limit: bool) -> String {
+        let mut out = String::new();
+        if self.contains(StopCondition::Limit) {
+            out.push_str(if hard_limit { "❌" } else { "✂" });
+        }
+        if self.contains(StopCondition::FirstCommit) {
+            out.push('🏁');
+        }
+        if self.contains(StopCondition::ShallowBoundary) {
+            out.push('⛰');
+        }
+        out
+    }
+
     /// Return `true` if traversal stopped because the configured traversal limit was reached.
-    pub fn hit_limit(&self) -> bool {
-        self.contains(CutoffCondition::Limit)
+    pub fn at_limit(&self) -> bool {
+        self.contains(StopCondition::Limit)
     }
 
     /// Return `true` if traversal stopped due to an artificial boundary, not because history naturally ended.
-    pub fn traversal_ended_unnaturally(&self) -> bool {
-        self.intersects(CutoffCondition::Limit | CutoffCondition::ShallowBoundary)
+    ///
+    /// This also means that the traversal would have continued otherwise.
+    pub fn is_unnatural(&self) -> bool {
+        self.intersects(StopCondition::Limit | StopCondition::ShallowBoundary)
     }
 }
 
