@@ -166,12 +166,12 @@ export const filterNavigationIndexForOutlineMode = ({
 			Default: () => navigationIndexUnfiltered,
 			Operation: ({ value: operationMode }) =>
 				filterNavigationIndex(navigationIndexUnfiltered, (operand) => {
-					if (operandEquals(operationMode.source, operand)) return true;
+					if (operandEquals(operand, operationMode.source)) return true;
 
 					const operationModeSourceFileParent = operandFileParent(operationMode.source);
 					if (
 						operationModeSourceFileParent &&
-						operandEquals(fileParentToOperand(operationModeSourceFileParent), operand)
+						operandEquals(operand, fileParentToOperand(operationModeSourceFileParent))
 					)
 						return true;
 
