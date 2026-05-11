@@ -1119,6 +1119,14 @@ pub enum Subcommands {
     #[clap(verbatim_doc_comment)]
     Skill(skill::Platform),
 
+    /// AI: capture agent logs into GitMeta.
+    #[cfg(feature = "agentlog")]
+    #[clap(name = "agentlog", hide = true)]
+    AgentLog {
+        #[clap(subcommand)]
+        cmd: but_agentlog::Command,
+    },
+
     /// Serve the GitButler UI over HTTP.
     ///
     /// Starts the embedded GitButler frontend and API on a local port.

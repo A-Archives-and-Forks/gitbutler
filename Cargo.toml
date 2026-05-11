@@ -21,6 +21,7 @@ members = [
     "crates/but-feedback",       # 📄It's very small and very special, but documented and well-enough tested.
     "crates/but-askpass",        # 📄Broker prompts from Git back to the application.
     "crates/but-project-handle", # 📄Temporary home of ProjectHandle until `gitbutler-project` is gone and it can merge back into `but-ctx`.
+    "crates/but-agentlog",       # 📄Capture coding-agent logs into Git metadata.
 
     ##
     ### 👷Needs work
@@ -186,6 +187,7 @@ but-forge = { path = "crates/but-forge" }
 but-oplog = { path = "crates/but-oplog" }
 but-llm = { path = "crates/but-llm" }
 but-server = { path = "crates/but-server" }
+but-agentlog = { path = "crates/but-agentlog" }
 
 gitbutler-git = { path = "crates/gitbutler-git" }
 gitbutler-watcher = { path = "crates/gitbutler-watcher" }

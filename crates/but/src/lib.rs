@@ -116,7 +116,6 @@ pub async fn handle_args(args: impl Iterator<Item = OsString>) -> Result<()> {
             "PATH cannot be used together with a subcommand. To run a subcommand in a different directory, use `-C <path>` before the subcommand, for example: `but -C <path> status`"
         );
     }
-    let app_settings = AppSettings::load_from_default_path_creating_without_customization()?;
     let output_format = if args.json {
         OutputFormat::Json
     } else {
@@ -147,6 +146,16 @@ pub async fn handle_args(args: impl Iterator<Item = OsString>) -> Result<()> {
     but_secret::secret::set_application_namespace(namespace);
 
     let mut out = OutputChannel::new_with_optional_pager(output_format, use_pager);
+
+    #[cfg(feature = "agentlog")]
+    if let Some(Subcommands::AgentLog { .. }) = &args.cmd {
+        let Some(Subcommands::AgentLog { cmd }) = args.cmd.take() else {
+            unreachable!("agentlog command was checked above")
+        };
+        return run_agentlog_command(&args.current_dir, cmd, &mut out);
+    }
+
+    let app_settings = AppSettings::load_from_default_path_creating_without_customization()?;
 
     match args.cmd.take() {
         None if args.path.is_some() => {
@@ -213,6 +222,15 @@ async fn match_subcommand(
     mut output: OutputChannel,
 ) -> Result<()> {
     let out = &mut output;
+
+    #[cfg(feature = "agentlog")]
+    let cmd = match cmd {
+        Subcommands::AgentLog { cmd } => {
+            return run_agentlog_command(&args.current_dir, cmd, out);
+        }
+        cmd => cmd,
+    };
+
     let metrics_ctx = cmd.to_metrics_context(&app_settings);
 
     match cmd {
@@ -1450,6 +1468,56 @@ async fn match_subcommand(
                 .emit_metrics(metrics_ctx)
                 .show_root_cause_error_then_exit_without_destructors(output)
         }
+        #[cfg(feature = "agentlog")]
+        Subcommands::AgentLog { .. } => {
+            unreachable!("agentlog capture is handled before metrics setup")
+        }
+    }
+}
+
+#[cfg(feature = "agentlog")]
+fn run_agentlog_command(
+    current_dir: &std::path::Path,
+    mut cmd: but_agentlog::Command,
+    out: &mut OutputChannel,
+) -> Result<()> {
+    let quiet = matches!(cmd, but_agentlog::Command::Hook { .. });
+    match &mut cmd {
+        but_agentlog::Command::Capture { agent, .. } if agent.is_none() => {
+            *agent = Some(detect_agentlog_agent()?);
+        }
+        but_agentlog::Command::Hook { agent, .. } if agent.is_none() => {
+            *agent = detect_agentlog_agent().ok();
+        }
+        _ => {}
+    }
+
+    let report = but_agentlog::run_from_dir(current_dir, cmd)?;
+    if quiet {
+        return Ok(());
+    }
+    if let Some(writer) = out.for_human_or_shell() {
+        writeln!(writer, "{report}")?;
+    } else if let Some(json_out) = out.for_json() {
+        json_out.write_value(&report)?;
+    }
+    Ok(())
+}
+
+#[cfg(feature = "agentlog")]
+fn detect_agentlog_agent() -> Result<but_agentlog::Agent> {
+    use utils::detect_agent::Agent as DetectedAgent;
+
+    let Some(agent) = utils::detect_agent::detect() else {
+        anyhow::bail!("agentlog requires --agent when no supported agent is detected");
+    };
+
+    match agent {
+        DetectedAgent::Codex => Ok(but_agentlog::Agent::Codex),
+        DetectedAgent::ClaudeCode | DetectedAgent::ClaudeCodeCowork => {
+            Ok(but_agentlog::Agent::Claude)
+        }
+        agent => anyhow::bail!("detected agent '{agent}' is not supported by agentlog capture"),
     }
 }
 
