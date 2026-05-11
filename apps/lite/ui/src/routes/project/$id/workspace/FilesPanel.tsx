@@ -38,7 +38,7 @@ import { AbsorptionTarget, TreeChange } from "@gitbutler/but-sdk";
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { Array, Match } from "effect";
-import { ComponentProps, FC, Suspense, useEffect } from "react";
+import { ComponentProps, createContext, FC, Suspense, use, useEffect } from "react";
 import { Panel, PanelProps } from "react-resizable-panels";
 import styles from "./FilesPanel.module.css";
 import workspaceItemRowStyles from "./WorkspaceItemRow.module.css";
@@ -54,6 +54,13 @@ import {
 	navigationIndexIncludes,
 } from "#ui/workspace/navigation-index.ts";
 import { useCommand } from "#ui/commands/manager.ts";
+
+const NavigationIndexContext = createContext<NavigationIndex | null>(null);
+
+const assert = <T,>(t: T | null | undefined): T => {
+	if (t == null) throw new Error("Expected value to be non-null and defined");
+	return t;
+};
 
 const useNavigationIndex = (projectId: string, parent: Operand, files: Array<Operand>) => {
 	const dispatch = useAppDispatch();
@@ -145,7 +152,6 @@ const CommitFilesTreePanel: FC<{ projectId: string; commit: CommitOperand } & Pa
 									key={path}
 									path={path}
 									projectId={projectId}
-									navigationIndex={navigationIndex}
 								/>
 							))}
 
@@ -159,7 +165,6 @@ const CommitFilesTreePanel: FC<{ projectId: string; commit: CommitOperand } & Pa
 									key={change.path}
 									change={change}
 									projectId={projectId}
-									navigationIndex={navigationIndex}
 								/>
 							))}
 					</div>
@@ -206,7 +211,6 @@ const ChangesFilesTreePanel: FC<
 								change={change}
 								dependencyCommitIds={dependencyCommitIds}
 								projectId={projectId}
-								navigationIndex={navigationIndex}
 							/>
 						);
 					})}
@@ -254,7 +258,6 @@ const BranchFilesTreePanel: FC<
 							key={change.path}
 							change={change}
 							projectId={projectId}
-							navigationIndex={navigationIndex}
 						/>
 					))}
 				</div>
@@ -307,35 +310,37 @@ const FilesTreePanel: FC<{ navigationIndex: NavigationIndex } & PanelProps> = ({
 	const selection = useAppSelector((state) => selectProjectSelectionFiles(state, projectId));
 
 	return (
-		<Panel
-			{...panelProps}
-			tabIndex={0}
-			role="tree"
-			aria-activedescendant={treeItemId(selection)}
-			className={classes(className, styles.tree)}
-		>
-			<TreeItem
-				projectId={projectId}
-				operand={outlineSelection}
-				label="All changes"
-				expanded
-				className={workspaceItemRowStyles.section}
-				render={<OperationSourceC projectId={projectId} source={outlineSelection} />}
+		<NavigationIndexContext value={navigationIndex}>
+			<Panel
+				{...panelProps}
+				tabIndex={0}
+				role="tree"
+				aria-activedescendant={treeItemId(selection)}
+				className={classes(className, styles.tree)}
 			>
-				<ItemRow projectId={projectId} operand={outlineSelection} navigationIndex={navigationIndex}>
-					<div
-						className={classes(
-							workspaceItemRowStyles.itemRowLabel,
-							workspaceItemRowStyles.sectionLabel,
-						)}
-					>
-						All changes
-					</div>
-				</ItemRow>
+				<TreeItem
+					projectId={projectId}
+					operand={outlineSelection}
+					label="All changes"
+					expanded
+					className={workspaceItemRowStyles.section}
+					render={<OperationSourceC projectId={projectId} source={outlineSelection} />}
+				>
+					<ItemRow projectId={projectId} operand={outlineSelection}>
+						<div
+							className={classes(
+								workspaceItemRowStyles.itemRowLabel,
+								workspaceItemRowStyles.sectionLabel,
+							)}
+						>
+							All changes
+						</div>
+					</ItemRow>
 
-				{children}
-			</TreeItem>
-		</Panel>
+					{children}
+				</TreeItem>
+			</Panel>
+		</NavigationIndexContext>
 	);
 };
 
@@ -365,10 +370,10 @@ const ItemRow: FC<
 	{
 		projectId: string;
 		operand: Operand;
-		navigationIndex: NavigationIndex;
 	} & Omit<ComponentProps<typeof WorkspaceItemRow>, "inert" | "isSelected" | "onSelect">
-> = ({ projectId, operand, navigationIndex, ...props }) => {
+> = ({ projectId, operand, ...props }) => {
 	const dispatch = useAppDispatch();
+	const navigationIndex = assert(use(NavigationIndexContext));
 	const isSelected = useIsSelected({ projectId, operand });
 	const selectItem = () => {
 		dispatch(projectActions.selectFiles({ projectId, selection: operand }));
@@ -411,8 +416,7 @@ const TreeChangeRow: FC<{
 	change: TreeChange;
 	operand: Operand;
 	projectId: string;
-	navigationIndex: NavigationIndex;
-}> = ({ change, operand, projectId, navigationIndex }) => (
+}> = ({ change, operand, projectId }) => (
 	<TreeItem
 		projectId={projectId}
 		operand={operand}
@@ -421,9 +425,7 @@ const TreeChangeRow: FC<{
 			<OperationSourceC
 				projectId={projectId}
 				source={operand}
-				render={
-					<ItemRow projectId={projectId} operand={operand} navigationIndex={navigationIndex} />
-				}
+				render={<ItemRow projectId={projectId} operand={operand} />}
 			/>
 		}
 	>
@@ -435,8 +437,7 @@ const ConflictedFileRow: FC<{
 	path: string;
 	operand: Operand;
 	projectId: string;
-	navigationIndex: NavigationIndex;
-}> = ({ path, operand, projectId, navigationIndex }) => {
+}> = ({ path, operand, projectId }) => {
 	const label = `C ${path}`;
 	return (
 		<TreeItem
@@ -447,9 +448,7 @@ const ConflictedFileRow: FC<{
 				<OperationSourceC
 					projectId={projectId}
 					source={operand}
-					render={
-						<ItemRow projectId={projectId} operand={operand} navigationIndex={navigationIndex} />
-					}
+					render={<ItemRow projectId={projectId} operand={operand} />}
 				/>
 			}
 		>
@@ -463,8 +462,7 @@ const ChangesFileRow: FC<{
 	dependencyCommitIds: Array.NonEmptyArray<string> | undefined;
 
 	projectId: string;
-	navigationIndex: NavigationIndex;
-}> = ({ change, dependencyCommitIds, projectId, navigationIndex }) => {
+}> = ({ change, dependencyCommitIds, projectId }) => {
 	const operand = fileOperand({ parent: changesFileParent, path: change.path });
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 	const isSelected = useIsSelected({ projectId, operand });
@@ -515,9 +513,7 @@ const ChangesFileRow: FC<{
 				<OperationSourceC
 					projectId={projectId}
 					source={operand}
-					render={
-						<ItemRow projectId={projectId} operand={operand} navigationIndex={navigationIndex} />
-					}
+					render={<ItemRow projectId={projectId} operand={operand} />}
 				/>
 			}
 		>
