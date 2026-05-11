@@ -143,8 +143,8 @@ fn detached() -> anyhow::Result<()> {
         entrypoint: Some(
             (
                 NodeIndex(0),
-                InSegment(
-                    0,
+                AtCommit(
+                    Sha1(541396b24e13b8ac45b7905c3fe8691c7fc5fbd0),
                 ),
             ),
         ),

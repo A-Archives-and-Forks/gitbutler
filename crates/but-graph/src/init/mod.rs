@@ -864,14 +864,8 @@ impl Graph {
                 };
                 let tip = tip
                     .or_else(|| commit.object_id())
-                    .or_else(|| {
-                        commit
-                            .index()
-                            .and_then(|index| entrypoint_segment.commits.get(index))
-                            .map(|commit| commit.id)
-                    })
                     .context(
-                        "BUG: entrypoint must either contain a commit index, remember the original commit id, or have a resolvable ref",
+                        "BUG: entrypoint must either remember the original commit id or have a resolvable ref",
                     )?;
                 (tip, ref_name)
             }

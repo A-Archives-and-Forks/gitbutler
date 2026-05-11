@@ -802,7 +802,6 @@ fn two_dependent_branches_first_merged_no_ff_second_merged_on_remote_into_base_b
                         ],
                         commits_on_remote: [
                             Commit(059cc4f, "Merge branch \'B-on-A\' into new-origin-A\n"),
-                            Commit(de11c03, "change in B\n"),
                         ],
                         commits_outside: None,
                         metadata: Branch,

@@ -64,8 +64,9 @@ impl Graph {
 
         self.rebuild_edges_in_parent_order();
 
-        // For the first id to be inserted into our entrypoint segment, set commit index.
-        self.update_entrypoint_commit_index(tip);
+        // Keep the original traversal tip available even if post-processing moves the
+        // entrypoint to a segment that doesn't contain it.
+        self.update_entrypoint_commit_id(tip);
 
         if dangerously_skip_postprocessing_for_debugging {
             return Ok(self);
@@ -86,8 +87,6 @@ impl Graph {
 
         // Point entrypoint to the right spot after all the virtual branches were added.
         self.set_entrypoint_to_ref_name(meta)?;
-        // After the entrypoint changed, also update its commit-index again, for good measure.
-        self.update_entrypoint_commit_index(tip);
 
         // However, when it comes to using remotes to disambiguate, it's better to
         // *not* do that before workspaces are sorted as it might incorrectly place
@@ -130,17 +129,12 @@ impl Graph {
         }
     }
 
-    /// Ensure the entrypoint commit-index is updated to match the actual tip commit.
+    /// Ensure the entrypoint commit-id is updated to match the actual tip commit.
     /// This may get out of sync when we do our graph manipulations, and it's easier
     /// to set it right in post than to let everything deal with this.
-    fn update_entrypoint_commit_index(&mut self, tip: ObjectId) {
-        if let Some((segment, ep_commit)) = self.entrypoint.as_mut() {
-            *ep_commit = self
-                .inner
-                .node_weight(*segment)
-                .and_then(|s| s.commit_index_of(tip))
-                .map(EntryPointCommit::InSegment)
-                .unwrap_or(EntryPointCommit::AtCommit(tip));
+    fn update_entrypoint_commit_id(&mut self, tip: ObjectId) {
+        if let Some((_segment, ep_commit)) = self.entrypoint.as_mut() {
+            *ep_commit = EntryPointCommit::AtCommit(tip);
         }
     }
 
@@ -154,7 +148,7 @@ impl Graph {
         &mut self,
         meta: &OverlayMetadata<'_, T>,
     ) -> anyhow::Result<()> {
-        let Some(((ep_sidx, _commit_idx), desired_ref_name)) =
+        let Some(((ep_sidx, ep_commit), desired_ref_name)) =
             self.entrypoint.zip(self.entrypoint_ref.clone())
         else {
             return Ok(());
@@ -184,7 +178,7 @@ impl Graph {
             })
             .unwrap_or_default();
         if let Some(new_ep_sidx) = sidx_with_desired_name {
-            self.entrypoint = Some((new_ep_sidx, EntryPointCommit::Unborn));
+            self.entrypoint = Some((new_ep_sidx, ep_commit));
         } else if let Some((new_ep_sidx, ref_idx)) = sidx_with_first_commit_with_desired_name {
             let s = &mut self.inner[new_ep_sidx];
             let desired_ref_name = s
@@ -197,7 +191,7 @@ impl Graph {
                 // ref-name is known to not be the desired one, and the first commit of this segment has the name
                 // we seek. For that, we now create a new
                 let new_ep_sidx_first_commit_idx = s.commits.first().map(|_| 0);
-                let incoming_edges = collect_edges_at_commit_reverse_order(
+                let incoming_edges = collect_edges_at_commit_in_traversal_order(
                     &self.inner,
                     (new_ep_sidx, new_ep_sidx_first_commit_idx),
                     Direction::Incoming,
@@ -218,7 +212,9 @@ impl Graph {
                     new_ep_sidx,
                     new_ep_sidx_first_commit_idx,
                 );
-                for edge in incoming_edges {
+                // Preserve incoming traversal order after moving the edges to
+                // the new entrypoint segment.
+                for edge in incoming_edges.into_iter().rev() {
                     self.inner.add_edge(
                         edge.source,
                         entrypoint_sidx,
@@ -232,9 +228,17 @@ impl Graph {
                     );
                     self.inner.remove_edge(edge.id);
                 }
-                self.entrypoint = Some((entrypoint_sidx, EntryPointCommit::Unborn));
+                self.entrypoint = Some((entrypoint_sidx, ep_commit));
             } else {
-                self.entrypoint = Some((new_ep_sidx, EntryPointCommit::InSegment(0)));
+                let entrypoint_commit_id = s
+                    .commits
+                    .first()
+                    .context("BUG: the desired entry-point ref was found on the first commit/segment empty unexpectedly")?
+                    .id;
+                self.entrypoint = Some((
+                    new_ep_sidx,
+                    EntryPointCommit::AtCommit(entrypoint_commit_id),
+                ));
                 // It's really important to get the name, as the HEAD is pointing to this segment.
                 // So find the segment with the ambiguous ref we desire, and rewrite it to be non-ambiguous.
                 // The reason we wait till now is to not disturb the workspace upgrades, which act differently
@@ -387,6 +391,8 @@ impl Graph {
             let last = s.commits.len() - 1;
             (Some(last), Some(s.commits[last].id))
         };
+        // Preserve outgoing traversal order after moving all outgoing edges
+        // from the old segment to the new segment.
         for edge in edges_to_reconnect.into_iter().rev() {
             self.inner.add_edge(
                 new_segment_sidx,
@@ -793,7 +799,7 @@ impl Graph {
                     continue;
                 };
 
-                let edges_from_segment_above = collect_edges_at_commit_reverse_order(
+                let edges_from_segment_above = collect_edges_at_commit_in_traversal_order(
                     self,
                     (
                         last_segment_id,
@@ -885,6 +891,7 @@ impl Graph {
             })
         });
 
+        // Re-add in reverse because petgraph traverses newest edges first.
         for (eid, target_sidx, _) in edges_pointing_to_named_segment.into_iter().rev() {
             let weight = self
                 .inner
@@ -1326,6 +1333,7 @@ fn delete_anon_if_empty_and_reconnect(graph: &mut Graph, sidx: SegmentIndex) {
         .first()
         .map(|c| (Some(c.id), Some(0)))
         .unwrap_or_default();
+    // Preserve incoming traversal order after moving the edges to `new_target`.
     for edge in incoming.iter().rev() {
         graph.inner.add_edge(
             edge.source,
@@ -1402,11 +1410,10 @@ fn create_independent_segments<T: RefMetadata>(
                 graph[new_segment_sidx].sibling_segment_id = sibling;
                 graph[new_segment_sidx].remote_tracking_branch_segment_id = remote;
 
-                if let Some((ep_sidx, ep_commit_idx)) = graph.entrypoint.as_mut()
+                if let Some((ep_sidx, _)) = graph.entrypoint.as_mut()
                     && *ep_sidx == below_idx
                 {
                     *ep_sidx = new_segment_sidx;
-                    *ep_commit_idx = EntryPointCommit::Unborn;
                 }
             }
             Some(pos) => {
@@ -1497,7 +1504,7 @@ fn maybe_create_multiple_segments<T: RefMetadata>(
         if is_first {
             // connect incoming edges (and disconnect from source)
             // Connect to the commit if we have one.
-            let edges = collect_edges_at_commit_reverse_order(
+            let edges = collect_edges_at_commit_in_traversal_order(
                 &graph.inner,
                 (commit_parent_below, commit_idx),
                 Direction::Incoming,
@@ -1505,6 +1512,8 @@ fn maybe_create_multiple_segments<T: RefMetadata>(
             for edge in &edges {
                 graph.inner.remove_edge(edge.id);
             }
+            // Preserve incoming traversal order after moving the edges to
+            // the newly created segment.
             for edge in edges.into_iter().rev() {
                 let (target, target_cidx) = if commit_idx == Some(0) {
                     // the current target of the edge will be empty after we steal its commit.
@@ -1552,7 +1561,7 @@ fn reconnect_outgoing(
     (source_sidx, source_cidx): (SegmentIndex, CommitIndex),
     (target_sidx, target_cidx): (SegmentIndex, gix::ObjectId),
 ) {
-    let edges = collect_edges_at_commit_reverse_order(
+    let edges = collect_edges_at_commit_in_traversal_order(
         graph,
         (source_sidx, Some(source_cidx)),
         Direction::Outgoing,
@@ -1560,7 +1569,10 @@ fn reconnect_outgoing(
     reconnect_outgoing_edges(graph, edges, (target_sidx, Some(target_cidx)))
 }
 
-/// Delete all `edges` and recreate the edges with `target` as new source.
+/// Delete all `edges` and recreate them with `target` as new source.
+///
+/// `edges` are expected in traversal order. Petgraph traverses edges in reverse insertion order,
+/// so they are re-added in reverse to preserve the same traversal order after reconnection.
 fn reconnect_outgoing_edges(
     graph: &mut PetGraph,
     edges: Vec<EdgeOwned>,
@@ -1585,7 +1597,11 @@ fn reconnect_outgoing_edges(
     }
 }
 
-fn collect_edges_at_commit_reverse_order(
+/// Collect edges at `commit` in the order petgraph currently traverses them.
+///
+/// Callers that remove and re-add the returned edges must insert them in reverse
+/// if they want to preserve this traversal order.
+fn collect_edges_at_commit_in_traversal_order(
     graph: &PetGraph,
     (segment, commit): (SegmentIndex, Option<CommitIndex>),
     direction: Direction,

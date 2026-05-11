@@ -420,7 +420,7 @@ impl Graph {
         start: SegmentIndex,
         mut stop: impl FnMut(&Segment) -> bool,
     ) {
-        let mut edge = self.inner.edges_directed(start, Direction::Outgoing).last();
+        let mut edge = self.inner.edges_directed(start, Direction::Outgoing).next();
         let mut seen = BTreeSet::new();
         while let Some(first_edge) = edge {
             let next = &self[first_edge.target()];
@@ -431,7 +431,7 @@ impl Graph {
                 edge = self
                     .inner
                     .edges_directed(next.id, Direction::Outgoing)
-                    .last();
+                    .next();
             }
         }
     }
@@ -474,10 +474,10 @@ impl Graph {
         let (segment_index, commit) = self
             .entrypoint
             .context("BUG: must always set the entrypoint")?;
-        let commit_index = commit.index();
         let segment = &self.inner.node_weight(segment_index).with_context(|| {
             format!("BUG: entrypoint segment at {segment_index:?} wasn't present")
         })?;
+        let commit_index = commit.index_in(segment);
         Ok(EntryPoint {
             segment_index,
             commit_index,

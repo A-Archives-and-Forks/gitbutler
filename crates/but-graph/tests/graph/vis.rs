@@ -122,8 +122,8 @@ fn detached_head() {
     });
     insta::assert_snapshot!(graph_tree(&graph), @"
 
-    └── 👉►:0[0]:anon:
-        └── 🏁🟣aaaaaaa
+    └── ►:0[0]:anon:
+        └── 👉🏁🟣aaaaaaa
     ");
 }
 

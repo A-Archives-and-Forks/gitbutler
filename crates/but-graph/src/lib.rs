@@ -231,7 +231,7 @@ pub struct Graph {
     /// entrypoint, even for unborn refs; in that case the segment is present and the commit is
     /// [`EntryPointCommit::Unborn`].
     ///
-    /// The second value is the traversal tip if it can still be represented relative to that segment.
+    /// The second value is the traversal tip, if there is one.
     ///
     /// Post-processing may move the entrypoint to an empty synthetic segment, for example a named workspace ref
     /// without a workspace commit. The segment still marks the ref's place in the graph, but it has no local
@@ -260,16 +260,11 @@ pub struct Graph {
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum EntryPointCommit {
-    /// The traversal tip is available in the entrypoint segment.
-    ///
-    /// This is a [`CommitIndex`] because it addresses a commit within a specific segment, not a global commit
-    /// position. A plain integer without the segment has no meaning after post-processing splits or moves
-    /// segments.
-    InSegment(CommitIndex),
-    /// The traversal tip is known, but not present in the entrypoint segment.
+    /// The traversal tip is known.
     ///
     /// This is an object id rather than a synthetic index because an empty entrypoint segment has no commit slot
-    /// to index into, nor is it reliably reachable by traversing the graph.
+    /// to index into, nor is it reliably reachable by traversing the graph. If the commit is present in the
+    /// entrypoint segment, its [`CommitIndex`] can be derived from the segment and this id.
     /// This happens when a workspace reference doesn't have an (unneeded) workspace merge commit,
     /// and is connected to one or more named empty segments which themselves only point to the workspace base.
     /// Then from Git's point of view, all involved refs point to the workspace base, but for use it's
@@ -281,18 +276,32 @@ pub(crate) enum EntryPointCommit {
 }
 
 impl EntryPointCommit {
-    pub(crate) fn index(self) -> Option<CommitIndex> {
+    fn index_in(self, segment: &Segment) -> Option<CommitIndex> {
         match self {
-            EntryPointCommit::InSegment(index) => Some(index),
-            EntryPointCommit::AtCommit(_) | EntryPointCommit::Unborn => None,
+            EntryPointCommit::AtCommit(id) => segment.commit_index_of(id),
+            EntryPointCommit::Unborn => None,
         }
     }
 
     pub(crate) fn object_id(self) -> Option<gix::ObjectId> {
         match self {
             EntryPointCommit::AtCommit(id) => Some(id),
-            EntryPointCommit::Unborn | EntryPointCommit::InSegment(_) => None,
+            EntryPointCommit::Unborn => None,
         }
+    }
+}
+
+impl Graph {
+    /// Return the entrypoint as a segment plus the optional position of its tip commit in that segment.
+    ///
+    /// The graph stores the tip as an object id so it survives post-processing that moves the entrypoint to
+    /// an empty or otherwise synthetic segment. Some graph-local consumers, like debug rendering and
+    /// statistics, still need the segment-relative commit position to mark where the entrypoint appears in
+    /// the current graph shape, so it is derived here instead of being stored as mutable state.
+    fn entrypoint_location(&self) -> Option<(SegmentIndex, Option<CommitIndex>)> {
+        let (segment_index, commit) = self.entrypoint?;
+        let segment = self.inner.node_weight(segment_index)?;
+        Some((segment_index, commit.index_in(segment)))
     }
 }
 
