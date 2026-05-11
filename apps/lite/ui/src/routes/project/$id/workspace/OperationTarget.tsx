@@ -183,7 +183,7 @@ export const OperationTarget: FC<
 		Match.value(operationMode).pipe(
 			Match.tagsExhaustive({
 				DragAndDrop: ({ operationType }) => isActiveDropTarget && operationType === "rub",
-				Absorb: () => operationModeHasOperation({ mode: operationMode, operand: target }),
+				Absorb: () => operationModeHasOperation({ mode: operationMode, target }),
 				Cut: () => isSelected,
 				Rub: () => isSelected,
 				Move: () => isSelected,
