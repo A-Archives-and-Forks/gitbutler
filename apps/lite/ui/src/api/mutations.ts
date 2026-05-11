@@ -29,13 +29,6 @@ export const commitInsertBlankMutationOptions = mutationOptions({
 	},
 });
 
-export const commitMoveMutationOptions = mutationOptions({
-	mutationFn: window.lite.commitMove,
-	onSuccess: async (_data, _input, _ctx, { client }) => {
-		await client.invalidateQueries();
-	},
-});
-
 export const commitMoveChangesBetweenMutationOptions = mutationOptions({
 	mutationFn: window.lite.commitMoveChangesBetween,
 	onSuccess: async (_data, _input, _ctx, { client }) => {

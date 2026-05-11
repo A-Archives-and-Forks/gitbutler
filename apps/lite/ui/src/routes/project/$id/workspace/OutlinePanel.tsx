@@ -3,7 +3,6 @@ import {
 	commitCreateMutationOptions,
 	commitDiscardMutationOptions,
 	commitInsertBlankMutationOptions,
-	commitMoveMutationOptions,
 	commitRewordMutationOptions,
 	unapplyStackMutationOptions,
 	updateBranchNameMutationOptions,
@@ -501,7 +500,6 @@ const CommitRow: FC<
 			await commitDiscardMutationOptions.onSuccess?.(response, input, context, mutation);
 		},
 	});
-	const commitMove = useMutation(commitMoveMutationOptions);
 	const commitReword = useMutation({
 		...commitRewordMutationOptions,
 		onSuccess: async (response, input, context, mutation) => {
@@ -645,21 +643,13 @@ const CommitRow: FC<
 	});
 
 	useCommand(() => moveCommit(-1), {
-		enabled:
-			!commitMove.isPending &&
-			isSelected &&
-			focusedPanel === "outline" &&
-			outlineMode._tag === "Default",
+		enabled: isSelected && focusedPanel === "outline" && outlineMode._tag === "Default",
 		group: "Commit",
 		hotkeys: [{ hotkey: "Alt+ArrowUp" }],
 	});
 
 	useCommand(() => moveCommit(1), {
-		enabled:
-			!commitMove.isPending &&
-			isSelected &&
-			focusedPanel === "outline" &&
-			outlineMode._tag === "Default",
+		enabled: isSelected && focusedPanel === "outline" && outlineMode._tag === "Default",
 		group: "Commit",
 		hotkeys: [{ hotkey: "Alt+ArrowDown" }],
 	});
