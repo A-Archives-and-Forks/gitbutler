@@ -7,3 +7,26 @@
 		text-align: center;
 	}
 }
+
+.operationTypeToggleGroup {
+	--group-radius: 8px;
+	--group-padding: 2px;
+
+	display: flex;
+	row-gap: 2px;
+	flex-direction: column;
+	padding: var(--group-padding);
+	border: var(--button-border);
+	border-radius: var(--group-radius);
+}
+
+.operationTypeToggle {
+	padding-inline: var(--row-inline-padding);
+	padding-block: var(--row-block-padding);
+	/* Concentric */
+	border-radius: calc(var(--group-radius) - var(--group-padding));
+
+	&[data-pressed] {
+		background-color: var(--button-ghost-hover-bg);
+	}
+}

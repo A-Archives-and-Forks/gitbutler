@@ -127,6 +127,17 @@ const projectSlice = createSlice({
 			const projectState = ensureProjectState(state, projectId);
 			workspace.updateDragAndDropMode(projectState.workspace, operationType);
 		},
+		updateCutMode: (
+			state,
+			action: PayloadAction<{
+				projectId: string;
+				operationType: OperationType;
+			}>,
+		) => {
+			const { projectId, operationType } = action.payload;
+			const projectState = ensureProjectState(state, projectId);
+			workspace.updateCutMode(projectState.workspace, operationType);
+		},
 		exitMode: (state, action: PayloadAction<{ projectId: string }>) => {
 			workspace.exitMode(ensureProjectState(state, action.payload.projectId).workspace);
 		},

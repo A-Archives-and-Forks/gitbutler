@@ -5,11 +5,14 @@ import {
 	operationLabel,
 	useRunOperationMutationOptions,
 	type Operation,
+	type OperationType,
 	type OperationsByType,
 } from "#ui/operations/operation.ts";
 import { ShortcutButton } from "#ui/ui/ShortcutButton.tsx";
 import uiStyles from "#ui/ui/ui.module.css";
 import { Tooltip, useRender } from "@base-ui/react";
+import { Toggle } from "@base-ui/react/toggle";
+import { ToggleGroup } from "@base-ui/react/toggle-group";
 import { FC } from "react";
 import styles from "./OperationTooltip.module.css";
 import { Operand, operandEquals } from "#ui/operands.ts";
@@ -77,11 +80,13 @@ const OperationModeControls: FC<{
 const CutOperationControls: FC<{
 	projectId: string;
 	operations: OperationsByType;
-}> = ({ projectId, operations }) => {
+	operationType: OperationType;
+}> = ({ projectId, operations, operationType }) => {
 	const dispatch = useAppDispatch();
 	const { mutate: runOperation } = useMutation(useRunOperationMutationOptions());
+	const operation = operations[operationType];
 
-	const run = (operation: Operation | null) => {
+	const run = () => {
 		dispatch(projectActions.exitMode({ projectId }));
 
 		if (!operation) return;
@@ -91,36 +96,39 @@ const CutOperationControls: FC<{
 
 	const cancel = () => dispatch(projectActions.exitMode({ projectId }));
 
-	const moveAboveCommand = useCommand(() => run(operations.moveAbove), {
-		enabled: !!operations.moveAbove,
+	const setOperationType = (operationType: OperationType) =>
+		dispatch(projectActions.updateCutMode({ projectId, operationType }));
+
+	const moveAboveCommand = useCommand(() => setOperationType("moveAbove"), {
 		group: "Operation mode",
 		commandPalette: operations.moveAbove
-			? { label: operationLabel(operations.moveAbove) }
-			: undefined,
-		shortcutsBar: operations.moveAbove
-			? { label: operationLabel(operations.moveAbove) }
+			? { label: `Select ${operationLabel(operations.moveAbove)}` }
 			: undefined,
 		hotkeys: [{ hotkey: "A" }],
 	});
 
-	const rubCommand = useCommand(() => run(operations.rub), {
-		enabled: !!operations.rub,
+	const rubCommand = useCommand(() => setOperationType("rub"), {
 		group: "Operation mode",
-		commandPalette: operations.rub ? { label: operationLabel(operations.rub) } : undefined,
-		shortcutsBar: operations.rub ? { label: operationLabel(operations.rub) } : undefined,
-		hotkeys: [{ hotkey: "Mod+V", ignoreInputs: true }],
+		commandPalette: operations.rub
+			? { label: `Select ${operationLabel(operations.rub)}` }
+			: undefined,
+		hotkeys: [{ hotkey: "R" }],
 	});
 
-	const moveBelowCommand = useCommand(() => run(operations.moveBelow), {
-		enabled: !!operations.moveBelow,
+	const moveBelowCommand = useCommand(() => setOperationType("moveBelow"), {
 		group: "Operation mode",
 		commandPalette: operations.moveBelow
-			? { label: operationLabel(operations.moveBelow) }
-			: undefined,
-		shortcutsBar: operations.moveBelow
-			? { label: operationLabel(operations.moveBelow) }
+			? { label: `Select ${operationLabel(operations.moveBelow)}` }
 			: undefined,
 		hotkeys: [{ hotkey: "B" }],
+	});
+
+	const confirmCommand = useCommand(run, {
+		enabled: !!operation,
+		group: "Operation mode",
+		commandPalette: operation ? { label: operationLabel(operation) } : undefined,
+		shortcutsBar: operation ? { label: operationLabel(operation) } : undefined,
+		hotkeys: [{ hotkey: "Mod+V", ignoreInputs: true }, { hotkey: "Enter" }],
 	});
 
 	const cancelCommand = useCommand(cancel, {
@@ -130,35 +138,52 @@ const CutOperationControls: FC<{
 		hotkeys: [{ hotkey: "Escape" }],
 	});
 
+	const onValueChange = (value: Array<string>) => {
+		if (value.length === 0) return;
+		const nextOperationType = value[0] as OperationType;
+
+		setOperationType(nextOperationType);
+	};
+
 	return (
 		<>
-			{operations.moveAbove && (
-				<ShortcutButton
-					className={uiStyles.button}
-					hotkeys={moveAboveCommand.hotkeys}
-					onClick={moveAboveCommand.commandFn}
+			<ToggleGroup
+				aria-label="Operation type"
+				value={[operationType]}
+				onValueChange={onValueChange}
+				className={styles.operationTypeToggleGroup}
+				orientation="vertical"
+			>
+				<Toggle
+					value={"moveAbove" satisfies OperationType}
+					className={styles.operationTypeToggle}
+					render={<ShortcutButton hotkeys={moveAboveCommand.hotkeys} />}
 				>
-					{operationLabel(operations.moveAbove)}
-				</ShortcutButton>
-			)}
-			{operations.rub && (
-				<ShortcutButton
-					className={uiStyles.button}
-					hotkeys={rubCommand.hotkeys}
-					onClick={rubCommand.commandFn}
+					{operations.moveAbove ? operationLabel(operations.moveAbove) : "Move above"}
+				</Toggle>
+				<Toggle
+					value={"rub" satisfies OperationType}
+					className={styles.operationTypeToggle}
+					render={<ShortcutButton hotkeys={rubCommand.hotkeys} />}
 				>
-					{operationLabel(operations.rub)}
-				</ShortcutButton>
-			)}
-			{operations.moveBelow && (
-				<ShortcutButton
-					className={uiStyles.button}
-					hotkeys={moveBelowCommand.hotkeys}
-					onClick={moveBelowCommand.commandFn}
+					{operations.rub ? operationLabel(operations.rub) : "Rub"}
+				</Toggle>
+				<Toggle
+					value={"moveBelow" satisfies OperationType}
+					className={styles.operationTypeToggle}
+					render={<ShortcutButton hotkeys={moveBelowCommand.hotkeys} />}
 				>
-					{operationLabel(operations.moveBelow)}
-				</ShortcutButton>
-			)}
+					{operations.moveBelow ? operationLabel(operations.moveBelow) : "Move below"}
+				</Toggle>
+			</ToggleGroup>
+			<ShortcutButton
+				className={uiStyles.button}
+				hotkeys={confirmCommand.hotkeys}
+				onClick={confirmCommand.commandFn}
+				disabled={!operation}
+			>
+				Confirm
+			</ShortcutButton>
 			<ShortcutButton
 				className={uiStyles.button}
 				hotkeys={cancelCommand.hotkeys}
@@ -197,12 +222,13 @@ export const OperationTooltip: FC<
 
 							return <>{operationLabel(operation)}</>;
 						},
-						Cut: ({ source }) => (
+						Cut: ({ source, operationType }) => (
 							<>
 								{operandEquals(operationMode.source, target) && <>Select a target</>}
 								<CutOperationControls
 									projectId={projectId}
 									operations={getOperations(source, target)}
+									operationType={operationType}
 								/>
 							</>
 						),

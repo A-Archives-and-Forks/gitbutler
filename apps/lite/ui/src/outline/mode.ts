@@ -20,7 +20,7 @@ export type AbsorbOperationMode = {
 /** @public */
 export type RubOperationMode = { source: Operand };
 /** @public */
-export type CutOperationMode = { source: Operand };
+export type CutOperationMode = { source: Operand; operationType: OperationType };
 /** @public */
 export type MoveOperationMode = { source: Operand };
 /** @public */
@@ -49,9 +49,10 @@ export const rubOperationMode = ({ source }: RubOperationMode): OperationMode =>
 });
 
 /** @public */
-export const cutOperationMode = ({ source }: CutOperationMode): OperationMode => ({
+export const cutOperationMode = ({ source, operationType }: CutOperationMode): OperationMode => ({
 	_tag: "Cut",
 	source,
+	operationType,
 });
 
 /** @public */
@@ -116,7 +117,7 @@ const operationModeToOperationType = (operationMode: OperationMode): OperationTy
 		Match.tags({
 			Absorb: () => null,
 			Rub: () => "rub",
-			Cut: () => null,
+			Cut: ({ operationType }) => operationType,
 			// We should have the ability to move either above or below.
 			Move: ({ source }) => (source._tag === "Branch" ? "moveAbove" : "moveBelow"),
 			DragAndDrop: ({ operationType }) => operationType,

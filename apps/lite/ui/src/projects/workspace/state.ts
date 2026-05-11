@@ -61,7 +61,7 @@ export const enterRubMode = (state: WorkspaceState, source: Operand) => {
 };
 
 export const enterCutMode = (state: WorkspaceState, source: Operand) => {
-	state.mode = operationOutlineMode(cutOperationMode({ source }));
+	state.mode = operationOutlineMode(cutOperationMode({ source, operationType: "rub" }));
 };
 
 export const enterAbsorbMode = (
@@ -84,6 +84,17 @@ export const updateDragAndDropMode = (
 		Match.when({ _tag: "Operation", value: { _tag: "DragAndDrop" } }, (mode) => {
 			state.mode = operationOutlineMode(
 				dragAndDropOperationMode({ source: mode.value.source, operationType }),
+			);
+		}),
+		Match.orElse(() => {}),
+	);
+};
+
+export const updateCutMode = (state: WorkspaceState, operationType: OperationType) => {
+	Match.value(state.mode).pipe(
+		Match.when({ _tag: "Operation", value: { _tag: "Cut" } }, (mode) => {
+			state.mode = operationOutlineMode(
+				cutOperationMode({ source: mode.value.source, operationType }),
 			);
 		}),
 		Match.orElse(() => {}),
