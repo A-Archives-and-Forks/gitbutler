@@ -1,5 +1,5 @@
 import { Toast } from "@base-ui/react";
-import { QueryClient, useMutation, useQueryClient } from "@tanstack/react-query";
+import { mutationOptions, QueryClient, useQueryClient } from "@tanstack/react-query";
 import { Match } from "effect";
 import {
 	type CommitAmendParams,
@@ -316,11 +316,12 @@ const runOperation = async (projectId: string, operation: Operation, queryClient
 		}),
 	);
 
-export const useRunOperation = () => {
+export const useRunOperationMutationOptions = () => {
 	const dispatch = useAppDispatch();
 	const toastManager = Toast.useToastManager();
 	const queryClient = useQueryClient();
-	const mutation = useMutation({
+
+	return mutationOptions({
 		mutationFn: ({ projectId, operation }: { projectId: string; operation: Operation }) =>
 			runOperation(projectId, operation, queryClient),
 		onSuccess: async (response, input, _ctx, { client }) => {
@@ -344,10 +345,6 @@ export const useRunOperation = () => {
 			await client.invalidateQueries();
 		},
 	});
-
-	return (projectId: string, operation: Operation): void => {
-		mutation.mutate({ projectId, operation });
-	};
 };
 
 /**

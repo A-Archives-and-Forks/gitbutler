@@ -86,7 +86,7 @@ import { Panel, PanelProps } from "react-resizable-panels";
 import styles from "./OutlinePanel.module.css";
 import workspaceItemRowStyles from "./WorkspaceItemRow.module.css";
 import { WorkspaceItemRow, WorkspaceItemRowToolbar } from "./WorkspaceItemRow.tsx";
-import { moveOperation, useRunOperation } from "#ui/operations/operation.ts";
+import { moveOperation, useRunOperationMutationOptions } from "#ui/operations/operation.ts";
 import { isNonEmptyArray, NonEmptyArray } from "effect/Array";
 import { defaultOutlineSelection } from "#ui/projects/workspace/state.ts";
 import { ShortcutButton } from "#ui/ui/ShortcutButton.tsx";
@@ -540,7 +540,7 @@ const CommitRow: FC<
 		});
 	};
 
-	const runOperation = useRunOperation();
+	const runOperationMutation = useMutation(useRunOperationMutationOptions());
 
 	const moveCommit = (offset: -1 | 1) => {
 		const selectionIdx = navigationIndex.indexByKey.get(operandIdentityKey(operand));
@@ -556,7 +556,7 @@ const CommitRow: FC<
 		});
 		if (!operation) return;
 
-		runOperation(projectId, operation);
+		runOperationMutation.mutate({ projectId, operation });
 	};
 
 	const cutCommit = () => {
