@@ -440,8 +440,12 @@ pub fn queue_parents(
         for (parent_order, pid) in parent_ids.iter().enumerate() {
             let instruction = Instruction::ConnectNewSegment {
                 parent_above: current_sidx,
-                at_commit: current_cidx,
-                parent_order,
+                at_commit: current_cidx
+                    .try_into()
+                    .context("commit index does not fit into u32")?,
+                parent_order: parent_order
+                    .try_into()
+                    .context("commit parent position does not fit into u32")?,
             };
             let info = find(commit_graph, objects, *pid, buf)?;
             if next.push_back_exhausted((info, flags, instruction, limit_per_parent)) {
@@ -1014,7 +1018,7 @@ pub fn possibly_split_occupied_segment(
     propagated_flags: CommitFlags,
     src_sidx: SegmentIndex,
     limit: Limit,
-    parent_order: usize,
+    parent_order: u32,
 ) -> anyhow::Result<()> {
     let Entry::Occupied(mut existing_sidx) = seen.entry(id) else {
         bail!("BUG: Can only work with occupied entries")

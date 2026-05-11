@@ -741,7 +741,7 @@ impl Graph {
                         )?;
                         let segment_below = graph.connect_new_segment(
                             parent_above,
-                            at_commit,
+                            at_commit as CommitIndex,
                             segment_below,
                             0,
                             id,
@@ -928,7 +928,7 @@ impl Graph {
         dst: SegmentIndex,
         dst_commit: impl Into<Option<CommitIndex>>,
         dst_id: Option<gix::ObjectId>,
-        parent_order: usize,
+        parent_order: u32,
     ) {
         let src_commit = src_commit.into();
         let dst_commit = dst_commit.into();

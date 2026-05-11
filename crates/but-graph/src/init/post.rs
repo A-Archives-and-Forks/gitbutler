@@ -62,6 +62,8 @@ impl Graph {
     ) -> anyhow::Result<Self> {
         self.hard_limit_hit = hard_limit;
 
+        self.rebuild_edges_in_parent_order();
+
         // For the first id to be inserted into our entrypoint segment, set commit index.
         self.update_entrypoint_commit_index(tip);
 
@@ -105,6 +107,47 @@ impl Graph {
 
         self.symbolic_remote_names = symbolic_remote_names.to_vec();
         Ok(self)
+    }
+
+    /// Rebuild outgoing edges so their creation order follows the source commit's
+    /// `parent_order`. Petgraph traverses edges in reverse creation order, and
+    /// several graph consumers reverse that order again to recover commit parent
+    /// order.
+    fn rebuild_edges_in_parent_order(&mut self) {
+        for sidx in self.segments().collect::<Vec<_>>() {
+            let mut outgoing_edges = self.inner.edges_directed(sidx, Direction::Outgoing);
+            let Some(first_edge) = outgoing_edges.next() else {
+                continue;
+            };
+            let mut previous_parent_order = first_edge.weight().parent_order;
+            let mut must_reorder = false;
+            for edge in outgoing_edges {
+                let parent_order = edge.weight().parent_order;
+                // `edges_directed()` yields newest edges first, so correctly inserted
+                // parent edges appear in descending `parent_order` here.
+                if previous_parent_order < parent_order {
+                    must_reorder = true;
+                    break;
+                }
+                previous_parent_order = parent_order;
+            }
+            if !must_reorder {
+                continue;
+            }
+            let mut outgoing_edges: Vec<_> = self
+                .inner
+                .edges_directed(sidx, Direction::Outgoing)
+                .map(EdgeOwned::from)
+                .collect();
+            outgoing_edges.sort_by_key(|e| e.weight.parent_order);
+
+            for edge in &outgoing_edges {
+                self.inner.remove_edge(edge.id);
+            }
+            for edge in outgoing_edges {
+                self.inner.add_edge(edge.source, edge.target, edge.weight);
+            }
+        }
     }
 
     /// Ensure the entrypoint commit-index is updated to match the actual tip commit.

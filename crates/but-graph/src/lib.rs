@@ -286,7 +286,7 @@ pub enum SegmentRelation {
 /// doesn't yet have a commit.
 /// The idea is to write code that keeps edge information consistent, and our visualization tools highlights
 /// issues with the inherent invariants.
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct Edge {
     /// `None` if the source segment has no commit.
     src: Option<CommitIndex>,
@@ -298,7 +298,11 @@ pub struct Edge {
     /// The position of this edge's destination among the source commit's parents.
     /// For a merge commit with parents `[A, B]`, the edge to `A` has `parent_order = 0`
     /// and the edge to `B` has `parent_order = 1`.
-    pub parent_order: usize,
+    /// Deliberately not `usize`: `Edge` is stored in every petgraph edge slot,
+    /// and widening this field pushes hot edge storage over an important size boundary.
+    ///
+    /// This limit would only be reached if there is a merge with 4.3 billion commits.
+    pub parent_order: u32,
 }
 
 impl Edge {

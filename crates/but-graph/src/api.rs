@@ -50,6 +50,10 @@ impl Graph {
     /// `dst_commit_id` can be provided if the connection is to a future commit that isn't yet available
     /// in the `segment`. If `None`, it will be looked up in the `segment` itself.
     ///
+    /// `parent_order` is the 0-based position of `dst_commit_id` among the source commit's
+    /// parents. For a merge commit with parents `[A, B]`, the edge to `A` must use `0`,
+    /// and the edge to `B` must use `1`, even if traversal discovers `B` before `A`.
+    ///
     /// Return the newly added segment.
     pub fn connect_new_segment(
         &mut self,
@@ -58,7 +62,7 @@ impl Graph {
         dst: Segment,
         dst_commit: impl Into<Option<CommitIndex>>,
         dst_commit_id: impl Into<Option<gix::ObjectId>>,
-        parent_order: usize,
+        parent_order: u32,
     ) -> SegmentIndex {
         let dst = self.inner.add_node(dst);
         self.inner[dst].id = dst;

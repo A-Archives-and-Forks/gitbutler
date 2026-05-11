@@ -211,7 +211,7 @@ impl<'ws, 'meta, M: RefMetadata> Editor<'ws, 'meta, M> {
                     continue 'inner;
                 };
 
-                let order = edge.weight().parent_order;
+                let order = edge.weight().parent_order as usize;
                 graph.add_edge(*source, *target, Edge { order });
             }
         }
