@@ -12,7 +12,7 @@ import {
 	changesInWorktreeQueryOptions,
 	headInfoQueryOptions,
 } from "#ui/api/queries.ts";
-import { getCommonBaseCommitId } from "#ui/api/ref-info.ts";
+import { findCommit, getCommonBaseCommitId } from "#ui/api/ref-info.ts";
 import { encodeRefName } from "#ui/api/ref-name.ts";
 import { commitTitle, shortCommitId } from "#ui/commit.ts";
 import {
@@ -32,7 +32,7 @@ import {
 	type CommitOperand,
 	type Operand,
 } from "#ui/operands.ts";
-import { filterNavigationIndexForOutlineMode } from "#ui/outline/mode.ts";
+import { filterNavigationIndexForOutlineMode, getBinaryOperation } from "#ui/outline/mode.ts";
 import { focusPanel, useFocusedProjectPanel, useNavigationIndexHotkeys } from "#ui/panels.ts";
 import {
 	projectActions,
@@ -65,6 +65,7 @@ import {
 	Segment,
 	Stack,
 	TreeChange,
+	WorkspaceState,
 } from "@gitbutler/but-sdk";
 import { formatForDisplay } from "@tanstack/react-hotkeys";
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
@@ -88,7 +89,11 @@ import { Panel, PanelProps } from "react-resizable-panels";
 import styles from "./OutlinePanel.module.css";
 import workspaceItemRowStyles from "./WorkspaceItemRow.module.css";
 import { WorkspaceItemRow, WorkspaceItemRowToolbar } from "./WorkspaceItemRow.tsx";
-import { moveOperation, useRunOperationMutationOptions } from "#ui/operations/operation.ts";
+import {
+	moveOperation,
+	useDryRunOperation,
+	useRunOperationMutationOptions,
+} from "#ui/operations/operation.ts";
 import { isNonEmptyArray, NonEmptyArray } from "effect/Array";
 import { defaultOutlineSelection } from "#ui/projects/workspace/state.ts";
 import { ShortcutButton } from "#ui/ui/ShortcutButton.tsx";
@@ -98,6 +103,16 @@ import { useCommand } from "#ui/commands/manager.ts";
 import { assert } from "#ui/assert.ts";
 
 const NavigationIndexContext = createContext<NavigationIndex | null>(null);
+
+const DryRunWorkspaceContext = createContext<WorkspaceState | null>(null);
+
+const useDryRunCommit = (commitId: string) => {
+	const dryRunWorkspace = use(DryRunWorkspaceContext);
+	if (!dryRunWorkspace) return null;
+
+	const dryRunCommitId = dryRunWorkspace.replacedCommits[commitId] ?? commitId;
+	return findCommit({ headInfo: dryRunWorkspace.headInfo, commitId: dryRunCommitId });
+};
 
 const sections = (headInfo: RefInfo): NonEmptyArray<Section> => {
 	const changesSection: Section = {
@@ -247,6 +262,14 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 		selectProjectOperationModeState(state, projectId),
 	);
 
+	const dryRunOperation = operationMode
+		? (getBinaryOperation({ mode: operationMode, target: selection }) ?? undefined)
+		: undefined;
+
+	// TODO: debounce?
+	const dryRunOperationQuery = useDryRunOperation({ projectId, operation: dryRunOperation });
+	const dryRunWorkspace = dryRunOperationQuery.data?.workspace ?? null;
+
 	const { data: headInfo } = useSuspenseQuery(headInfoQueryOptions(projectId));
 
 	const openBranchPicker = () => {
@@ -262,35 +285,37 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 
 	return (
 		<NavigationIndexContext value={navigationIndex}>
-			<Panel
-				{...panelProps}
-				tabIndex={0}
-				role="tree"
-				aria-activedescendant={treeItemId(selection)}
-				className={classes(panelProps.className, styles.panel)}
-			>
-				<div className={styles.panelPadding}>
-					<Changes projectId={projectId} />
-				</div>
+			<DryRunWorkspaceContext value={dryRunWorkspace}>
+				<Panel
+					{...panelProps}
+					tabIndex={0}
+					role="tree"
+					aria-activedescendant={treeItemId(selection)}
+					className={classes(panelProps.className, styles.panel)}
+				>
+					<div className={styles.panelPadding}>
+						<Changes projectId={projectId} />
+					</div>
 
-				<div className={styles.scroller}>
-					{headInfo.stacks.map((stack) => (
-						<StackC key={stack.id} projectId={projectId} stack={stack} />
-					))}
+					<div className={styles.scroller}>
+						{headInfo.stacks.map((stack) => (
+							<StackC key={stack.id} projectId={projectId} stack={stack} />
+						))}
 
-					<BaseCommit projectId={projectId} commitId={getCommonBaseCommitId(headInfo)} />
-				</div>
+						<BaseCommit projectId={projectId} commitId={getCommonBaseCommitId(headInfo)} />
+					</div>
 
-				{Match.value(operationMode).pipe(
-					Match.when(null, () => null),
-					Match.tag("DragAndDrop", () => null),
-					Match.orElse(({ source }) => (
-						<div className={styles.operationModePreview}>
-							<OperationSourceLabel headInfo={headInfo} source={source} />
-						</div>
-					)),
-				)}
-			</Panel>
+					{Match.value(operationMode).pipe(
+						Match.when(null, () => null),
+						Match.tag("DragAndDrop", () => null),
+						Match.orElse(({ source }) => (
+							<div className={styles.operationModePreview}>
+								<OperationSourceLabel headInfo={headInfo} source={source} />
+							</div>
+						)),
+					)}
+				</Panel>
+			</DryRunWorkspaceContext>
 		</NavigationIndexContext>
 	);
 };
@@ -454,6 +479,7 @@ const CommitRow: FC<
 	const isHighlighted = useAppSelector((state) =>
 		selectProjectHighlightedCommitIds(state, projectId).includes(commit.id),
 	);
+	const dryRunCommit = useDryRunCommit(commit.id);
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
 	const dispatch = useAppDispatch();
@@ -477,6 +503,7 @@ const CommitRow: FC<
 		...commit,
 		message: optimisticMessage,
 	};
+	const { hasConflicts } = dryRunCommit ? dryRunCommit : commitWithOptimisticMessage;
 
 	const commitInsertBlank = useMutation({
 		...commitInsertBlankMutationOptions,
@@ -560,7 +587,7 @@ const CommitRow: FC<
 		});
 		if (!operation) return;
 
-		runOperationMutation.mutate({ projectId, operation });
+		runOperationMutation.mutate(operation);
 	};
 
 	const cutCommit = () => {
@@ -751,7 +778,7 @@ const CommitRow: FC<
 						}
 					>
 						{commitTitle(commitWithOptimisticMessage.message)}
-						{commitWithOptimisticMessage.hasConflicts && " ⚠️"}
+						{hasConflicts && " ⚠️"}
 					</div>
 					{outlineMode._tag === "Default" && (
 						<WorkspaceItemRowToolbar aria-label="Commit actions">

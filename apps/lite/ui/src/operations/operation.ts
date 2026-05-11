@@ -1,5 +1,5 @@
 import { Toast } from "@base-ui/react";
-import { mutationOptions } from "@tanstack/react-query";
+import { mutationOptions, useQuery } from "@tanstack/react-query";
 import { Match } from "effect";
 import {
 	type CommitAmendParams,
@@ -22,6 +22,7 @@ import { projectActions, selectProjectOperationModeState } from "#ui/projects/st
 import { useAppDispatch } from "#ui/store.ts";
 import { useAppSelector } from "#ui/store.ts";
 import { useParams } from "@tanstack/react-router";
+import { Hash } from "effect";
 
 /** @public */
 export type CommitAmendOperation = Omit<CommitAmendParams, "dryRun" | "projectId" | "changes"> & {
@@ -298,6 +299,34 @@ const runOperation = async (
 		}),
 	);
 
+export const useDryRunOperation = ({
+	projectId,
+	operation,
+}: {
+	projectId: string;
+	operation?: Operation;
+}) => {
+	const operationMode = useAppSelector((state) =>
+		selectProjectOperationModeState(state, projectId),
+	);
+
+	const changes = useResolveDiffSpecs({
+		projectId,
+		source: operationMode?.source,
+	});
+
+	return useQuery({
+		// We hash because the object may contain large data due to path bytes.
+		queryKey: ["dryRun", Hash.string(JSON.stringify({ projectId, operation, changes }))],
+		queryFn: () => {
+			if (!operation) return null;
+			return runOperation(projectId, operation, changes, true);
+		},
+		// We may have a lot of different dry runs in a short amount of time.
+		gcTime: 10_000,
+	});
+};
+
 export const useRunOperationMutationOptions = () => {
 	const { id: projectId } = useParams({ from: "/project/$id/workspace" });
 	const dispatch = useAppDispatch();
@@ -313,13 +342,12 @@ export const useRunOperationMutationOptions = () => {
 	});
 
 	return mutationOptions({
-		mutationFn: ({ projectId, operation }: { projectId: string; operation: Operation }) =>
-			runOperation(projectId, operation, changes, false),
+		mutationFn: (operation: Operation) => runOperation(projectId, operation, changes, false),
 		onSuccess: async (response, input, _ctx, { client }) => {
 			if (response) {
 				dispatch(
 					projectActions.addReplacedCommits({
-						projectId: input.projectId,
+						projectId,
 						replacedCommits: response.workspace.replacedCommits,
 					}),
 				);

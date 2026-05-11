@@ -143,7 +143,7 @@ const useOperationDropTarget = ({ target, projectId }: { target: Operand; projec
 				});
 				if (!operation) return;
 
-				runOperation({ projectId, operation });
+				runOperation(operation);
 			},
 		});
 	}, [dispatch, projectId, runOperation]);

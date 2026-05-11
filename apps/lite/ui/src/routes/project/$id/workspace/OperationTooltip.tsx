@@ -32,7 +32,7 @@ const OperationModeControls: FC<{
 
 		if (!operation) return;
 
-		runOperation({ projectId, operation });
+		runOperation(operation);
 	};
 
 	const cancel = () => dispatch(projectActions.exitMode({ projectId }));
@@ -86,7 +86,7 @@ const CutOperationControls: FC<{
 
 		if (!operation) return;
 
-		runOperation({ projectId, operation });
+		runOperation(operation);
 	};
 
 	const cancel = () => dispatch(projectActions.exitMode({ projectId }));
