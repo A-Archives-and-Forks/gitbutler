@@ -79,7 +79,11 @@ fn detect_with(lookup: impl Fn(&str) -> Option<OsString>) -> Option<Agent> {
     if is_set("CURSOR_TRACE_ID") {
         return Some(Agent::Cursor);
     }
-    if is_set("CODEX_SANDBOX") || is_set("CODEX_CI") || is_set("CODEX_THREAD_ID") {
+    if is_set("CODEX_SANDBOX")
+        || is_set("CODEX_CI")
+        || is_set("CODEX_THREAD_ID")
+        || is_set("CODEX_SHELL")
+    {
         return Some(Agent::Codex);
     }
     if is_set("GEMINI_CLI") {
@@ -184,6 +188,14 @@ mod tests {
     fn detect_codex() {
         assert_eq!(
             detect_with(env_from(&[("CODEX_SANDBOX", "seatbelt")])),
+            Some(Agent::Codex),
+        );
+    }
+
+    #[test]
+    fn detect_codex_shell() {
+        assert_eq!(
+            detect_with(env_from(&[("CODEX_SHELL", "1")])),
             Some(Agent::Codex),
         );
     }
