@@ -12,6 +12,11 @@ export type FileParent =
 	| ({ _tag: "Commit" } & CommitFileParent);
 
 /** @public */
+export const changesFileParent: FileParent = {
+	_tag: "Changes",
+};
+
+/** @public */
 export const branchFileParent = ({ stackId, branchRef }: BranchFileParent): FileParent => ({
 	_tag: "Branch",
 	stackId,
@@ -24,11 +29,6 @@ export const commitFileParent = ({ stackId, commitId }: CommitFileParent): FileP
 	stackId,
 	commitId,
 });
-
-/** @public */
-export const changesFileParent: FileParent = {
-	_tag: "Changes",
-};
 
 /** @public */
 export type StackOperand = {
@@ -150,3 +150,21 @@ export const operandFileParent = (operand: Operand): FileParent | null =>
 		}),
 		Match.orElse(() => null),
 	);
+
+const fileParentToOperand = (fileParent: FileParent): Operand =>
+	Match.value(fileParent).pipe(
+		Match.tagsExhaustive({
+			Changes: () => changesSectionOperand,
+			Branch: ({ stackId, branchRef }) => branchOperand({ stackId, branchRef }),
+			Commit: ({ stackId, commitId }) => commitOperand({ stackId, commitId }),
+		}),
+	);
+
+export const operandContains = (a: Operand, b: Operand) => {
+	if (operandEquals(a, b)) return true;
+
+	const bFileParent = operandFileParent(b);
+	if (bFileParent && operandEquals(a, fileParentToOperand(bFileParent))) return true;
+
+	return false;
+};

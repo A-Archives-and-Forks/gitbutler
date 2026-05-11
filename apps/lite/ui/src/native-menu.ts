@@ -5,6 +5,7 @@ type NativeMenuAction = () => void | Promise<void>;
 
 export type NativeMenuItemData = {
 	label: string;
+	accelerator?: string;
 	enabled?: boolean;
 	onSelect?: NativeMenuAction;
 	submenu?: Array<NativeMenuItem>;
@@ -24,6 +25,7 @@ const serializeNativeMenuItems = (
 			return {
 				_tag: "Item",
 				label: item.label,
+				accelerator: item.accelerator,
 				enabled: item.enabled,
 				submenu: serializeNativeMenuItems(item.submenu, handlers, nextActionId),
 			};
@@ -34,6 +36,7 @@ const serializeNativeMenuItems = (
 		return {
 			_tag: "Item",
 			label: item.label,
+			accelerator: item.accelerator,
 			enabled: item.enabled,
 			itemId,
 		};

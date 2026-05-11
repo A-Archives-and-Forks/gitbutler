@@ -4,6 +4,7 @@ import {
 	branchOperand,
 	CommitOperand,
 	commitOperand,
+	operandContains,
 	operandEquals,
 	type Operand,
 } from "#ui/operands.ts";
@@ -154,28 +155,20 @@ const operationModeHasOperation = ({
 
 export const filterNavigationIndexForOutlineMode = ({
 	navigationIndex: navigationIndexUnfiltered,
-	selection,
 	outlineMode,
 }: {
 	navigationIndex: NavigationIndex;
-	selection: Operand;
 	outlineMode: OutlineMode;
 }) =>
 	Match.value(outlineMode).pipe(
 		Match.tagsExhaustive({
 			Default: () => navigationIndexUnfiltered,
-			Operation: (operationMode) =>
+			Operation: ({ value: operationMode }) =>
 				filterNavigationIndex(
 					navigationIndexUnfiltered,
 					(operand) =>
-						// When entering operation mode, the selection must still be
-						// selectable otherwise the details panel will suddenly appear to
-						// change and the user may lose sight of their source operand (e.g.
-						// hunk).
-						operandEquals(selection, operand) ||
-						// After selection moves, allow returning selection to the source operand.
-						operandEquals(operationMode.value.source, operand) ||
-						operationModeHasOperation({ mode: operationMode.value, operand }),
+						operandContains(operand, operationMode.source) ||
+						operationModeHasOperation({ mode: operationMode, operand }),
 				),
 			RenameBranch: (x) =>
 				filterNavigationIndex(navigationIndexUnfiltered, (operand) =>

@@ -71,13 +71,7 @@ const getDropOperationType = ({
 	);
 };
 
-const useOperationDropTarget = ({
-	operand,
-	projectId,
-}: {
-	operand: Operand;
-	projectId: string;
-}) => {
+const useOperationDropTarget = ({ target, projectId }: { target: Operand; projectId: string }) => {
 	const dispatch = useAppDispatch();
 	const runOperation = useRunOperation();
 	const dropRef = useRef<HTMLElement>(null);
@@ -89,13 +83,13 @@ const useOperationDropTarget = ({
 
 		const operationType = getDropOperationType({
 			source: dragData.source,
-			target: operand,
+			target,
 			input,
 			element,
 		});
 		if (operationType === null) return null;
 
-		return { operationType, target: operand };
+		return { operationType, target };
 	});
 
 	useEffect(() => {
@@ -157,12 +151,12 @@ const useOperationDropTarget = ({
 
 export const OperationTarget: FC<
 	{
-		operand: Operand;
+		target: Operand;
 		projectId: string;
 		isSelected: boolean;
 	} & useRender.ComponentProps<"div">
-> = ({ operand, projectId, isSelected, render, ...props }) => {
-	const { dropRef, isActiveDropTarget } = useOperationDropTarget({ operand, projectId });
+> = ({ target, projectId, isSelected, render, ...props }) => {
+	const { dropRef, isActiveDropTarget } = useOperationDropTarget({ target, projectId });
 	const operationMode = useAppSelector((state) =>
 		selectProjectOperationModeState(state, projectId),
 	);
@@ -192,7 +186,7 @@ export const OperationTarget: FC<
 			}),
 		);
 
-	const target = useRender({
+	const targetEl = useRender({
 		render,
 		ref: dropRef,
 		props: mergeProps<"div">(props, {
@@ -204,16 +198,16 @@ export const OperationTarget: FC<
 		<div className={styles.target}>
 			<OperationTooltip
 				projectId={projectId}
-				operand={operand}
+				target={target}
 				isActive={isMainTargetActive}
 				operationMode={operationMode}
-				render={target}
+				render={targetEl}
 			/>
 
 			{insertTargetOperationType !== null && (
 				<OperationTooltip
 					projectId={projectId}
-					operand={operand}
+					target={target}
 					isActive
 					operationMode={operationMode}
 					className={classes(

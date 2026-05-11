@@ -38,15 +38,15 @@ const OperationModeControls: FC<{
 
 	const confirmCommand = useCommand(confirm, {
 		enabled: !!operation,
-		layer: "global",
-		commandPalette: { group: "Operation mode", label: "Confirm" },
+		group: "Operation mode",
+		commandPalette: { label: "Confirm" },
 		shortcutsBar: { label: "Confirm" },
 		hotkeys: [{ hotkey: "Enter" }],
 	});
 
 	const cancelCommand = useCommand(cancel, {
-		layer: "global",
-		commandPalette: { group: "Operation mode", label: "Cancel" },
+		group: "Operation mode",
+		commandPalette: { label: "Cancel" },
 		shortcutsBar: { label: "Cancel" },
 		hotkeys: [{ hotkey: "Escape" }],
 	});
@@ -92,9 +92,9 @@ const CutOperationControls: FC<{
 
 	const moveAboveCommand = useCommand(() => run(operations.moveAbove), {
 		enabled: !!operations.moveAbove,
-		layer: "global",
+		group: "Operation mode",
 		commandPalette: operations.moveAbove
-			? { group: "Operation mode", label: operationLabel(operations.moveAbove) }
+			? { label: operationLabel(operations.moveAbove) }
 			: undefined,
 		shortcutsBar: operations.moveAbove
 			? { label: operationLabel(operations.moveAbove) }
@@ -104,19 +104,17 @@ const CutOperationControls: FC<{
 
 	const rubCommand = useCommand(() => run(operations.rub), {
 		enabled: !!operations.rub,
-		layer: "global",
-		commandPalette: operations.rub
-			? { group: "Operation mode", label: operationLabel(operations.rub) }
-			: undefined,
+		group: "Operation mode",
+		commandPalette: operations.rub ? { label: operationLabel(operations.rub) } : undefined,
 		shortcutsBar: operations.rub ? { label: operationLabel(operations.rub) } : undefined,
 		hotkeys: [{ hotkey: "Mod+V", ignoreInputs: true }],
 	});
 
 	const moveBelowCommand = useCommand(() => run(operations.moveBelow), {
 		enabled: !!operations.moveBelow,
-		layer: "global",
+		group: "Operation mode",
 		commandPalette: operations.moveBelow
-			? { group: "Operation mode", label: operationLabel(operations.moveBelow) }
+			? { label: operationLabel(operations.moveBelow) }
 			: undefined,
 		shortcutsBar: operations.moveBelow
 			? { label: operationLabel(operations.moveBelow) }
@@ -125,8 +123,8 @@ const CutOperationControls: FC<{
 	});
 
 	const cancelCommand = useCommand(cancel, {
-		layer: "global",
-		commandPalette: { group: "Operation mode", label: "Cancel" },
+		group: "Operation mode",
+		commandPalette: { label: "Cancel" },
 		shortcutsBar: { label: "Cancel" },
 		hotkeys: [{ hotkey: "Escape" }],
 	});
@@ -174,11 +172,11 @@ const CutOperationControls: FC<{
 export const OperationTooltip: FC<
 	{
 		projectId: string;
-		operand: Operand;
+		target: Operand;
 		operationMode: OperationMode | null;
 		isActive: boolean;
 	} & useRender.ComponentProps<"div">
-> = ({ projectId, operand, operationMode, isActive, render, ...props }) => {
+> = ({ projectId, target, operationMode, isActive, render, ...props }) => {
 	const tooltip =
 		isActive && !!operationMode
 			? Match.value(operationMode).pipe(
@@ -186,7 +184,7 @@ export const OperationTooltip: FC<
 						DragAndDrop: ({ operationType }) => {
 							const operation = getOperation({
 								source: operationMode.source,
-								target: operand,
+								target,
 								operationType,
 							});
 							if (!operation) return null;
@@ -195,10 +193,10 @@ export const OperationTooltip: FC<
 						},
 						Cut: ({ source }) => (
 							<>
-								{operandEquals(operationMode.source, operand) && <>Select a target</>}
+								{operandEquals(operationMode.source, target) && <>Select a target</>}
 								<CutOperationControls
 									projectId={projectId}
-									operations={getOperations(source, operand)}
+									operations={getOperations(source, target)}
 								/>
 							</>
 						),
@@ -206,12 +204,12 @@ export const OperationTooltip: FC<
 					Match.orElse(() => {
 						const operation = getOperation({
 							source: operationMode.source,
-							target: operand,
+							target,
 							operationType: operationModeToOperationType(operationMode),
 						});
 						return (
 							<>
-								{operandEquals(operationMode.source, operand) && <>Select a target</>}
+								{operandEquals(operationMode.source, target) && <>Select a target</>}
 								<OperationModeControls projectId={projectId} operation={operation} />
 							</>
 						);
