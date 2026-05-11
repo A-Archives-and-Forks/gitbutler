@@ -525,12 +525,18 @@ const CommitRow: FC<
 		startCommitMessageTransition(async () => {
 			setOptimisticMessage(trimmed);
 			try {
-				await commitReword.mutateAsync({
+				const response = await commitReword.mutateAsync({
 					projectId,
 					commitId: commit.id,
 					message: trimmed,
 					dryRun: false,
 				});
+				dispatch(
+					projectActions.selectOutline({
+						projectId,
+						selection: commitOperand({ commitId: response.newCommit, stackId }),
+					}),
+				);
 			} catch {
 				// Use the global mutation error handler (shows toast) instead of React
 				// error boundaries.
