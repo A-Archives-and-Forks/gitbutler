@@ -243,13 +243,13 @@ fn journey_no_ws_commit_no_target() -> anyhow::Result<()> {
     let ws = graph.into_workspace()?;
     insta::assert_snapshot!(graph_workspace(&ws), @"
     📕🏘️⚠️:0:gitbutler/workspace[🌳] <> ✓! on 3183e43
-    ├── ≡📙:5:D on 3183e43 {1}
-    │   ├── 📙:5:D
-    │   └── 📙:6:E
-    └── ≡📙:2:A on 3183e43 {0}
-        ├── 📙:2:A
-        ├── 📙:3:B
-        └── 📙:4:C
+    ├── ≡📙:2:A on 3183e43 {0}
+    │   ├── 📙:2:A
+    │   ├── 📙:3:B
+    │   └── 📙:4:C
+    └── ≡📙:5:D on 3183e43 {1}
+        ├── 📙:5:D
+        └── 📙:6:E
     ");
 
     let ref_name = r("refs/heads/A");
@@ -267,12 +267,12 @@ fn journey_no_ws_commit_no_target() -> anyhow::Result<()> {
 
     insta::assert_snapshot!(graph_workspace(&ws), @"
     📕🏘️⚠️:0:gitbutler/workspace[🌳] <> ✓! on 3183e43
-    ├── ≡📙:4:D on 3183e43 {1}
-    │   ├── 📙:4:D
-    │   └── 📙:5:E
-    └── ≡📙:2:B on 3183e43 {0}
-        ├── 📙:2:B
-        └── 📙:3:C
+    ├── ≡📙:2:B on 3183e43 {0}
+    │   ├── 📙:2:B
+    │   └── 📙:3:C
+    └── ≡📙:4:D on 3183e43 {1}
+        ├── 📙:4:D
+        └── 📙:5:E
     ");
 
     let main_id = repo.head_id()?;
@@ -286,13 +286,13 @@ fn journey_no_ws_commit_no_target() -> anyhow::Result<()> {
     let ws = ws.graph.into_workspace_of_redone_traversal(&repo, &meta)?;
     insta::assert_snapshot!(graph_workspace(&ws), @"
     📕🏘️⚠️:0:gitbutler/workspace[🌳] <> ✓! on 3183e43
-    ├── ≡📙:5:D on 3183e43 {1}
-    │   ├── 📙:5:D
-    │   └── 📙:6:E
-    └── ≡📙:2:A on 3183e43 {0}
-        ├── 📙:2:A
-        ├── 📙:3:B
-        └── 📙:4:C
+    ├── ≡📙:2:A on 3183e43 {0}
+    │   ├── 📙:2:A
+    │   ├── 📙:3:B
+    │   └── 📙:4:C
+    └── ≡📙:5:D on 3183e43 {1}
+        ├── 📙:5:D
+        └── 📙:6:E
     ");
 
     let mut ws = but_workspace::branch::remove_reference(
@@ -312,12 +312,12 @@ fn journey_no_ws_commit_no_target() -> anyhow::Result<()> {
 
     insta::assert_snapshot!(graph_workspace(&ws), @"
     📕🏘️⚠️:0:gitbutler/workspace[🌳] <> ✓! on 3183e43
-    ├── ≡📙:4:D on 3183e43 {1}
-    │   ├── 📙:4:D
-    │   └── 📙:5:E
-    └── ≡📙:2:B on 3183e43 {0}
-        ├── 📙:2:B
-        └── 📙:3:C
+    ├── ≡📙:2:B on 3183e43 {0}
+    │   ├── 📙:2:B
+    │   └── 📙:3:C
+    └── ≡📙:4:D on 3183e43 {1}
+        ├── 📙:4:D
+        └── 📙:5:E
     ");
 
     // Try to delete it again, just to see that it doesn't try to touch it as it's outside the workspace.

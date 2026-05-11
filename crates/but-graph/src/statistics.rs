@@ -47,7 +47,7 @@ impl Graph {
             })
             .collect();
         *segments_at_bottom = self.base_segments().count();
-        *entrypoint = self.entrypoint.unwrap_or_default();
+        *entrypoint = self.entrypoint_location().unwrap_or_default();
 
         if let Ok(ep) = self.lookup_entrypoint() {
             *entrypoint_in_workspace = ep

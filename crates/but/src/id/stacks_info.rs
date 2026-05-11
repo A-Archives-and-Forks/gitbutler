@@ -14,9 +14,7 @@ fn stacks_info_without_short_ids(stacks: Vec<Stack>) -> StacksInfo {
         id_usage: IdUsage::default(),
         short_ids_to_count: HashMap::new(),
     };
-    // Reverse the stacks to match graph_to_ref_info() in
-    // crates/but-workspace/src/ref_info.rs.
-    for stack in stacks.into_iter().rev() {
+    for stack in stacks {
         let mut stack_with_id = StackWithId {
             id: stack.id,
             segments: Vec::with_capacity(stack.segments.len()),

@@ -3846,7 +3846,7 @@ fn advanced_workspace_single_stack() -> anyhow::Result<()> {
     let opts = standard_options();
     let err = head_info(&repo, &meta, opts).unwrap_err();
     insta::assert_snapshot!(err.to_string(), @"
-    Found 5 commit(s) on top of the workspace commit.
+    Found 4 commit(s) on top of the workspace commit.
 
     Run the following command in your working directory to fix this while leaving your worktree unchanged.
     Worktree changes need to be re-committed manually for now.

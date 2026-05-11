@@ -515,7 +515,7 @@ impl Graph {
         let mut edge = self
             .inner
             .edges_directed(start.id, Direction::Outgoing)
-            .last();
+            .next();
         let mut stopped_at = None;
         let mut seen = BTreeSet::new();
         while let Some(first_edge) = edge {
@@ -534,7 +534,7 @@ impl Graph {
                 edge = self
                     .inner
                     .edges_directed(next.id, Direction::Outgoing)
-                    .last();
+                    .next();
             }
         }
         (out, stopped_at)

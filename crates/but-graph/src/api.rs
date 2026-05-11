@@ -13,8 +13,8 @@ use petgraph::{
 };
 
 use crate::{
-    Commit, CommitFlags, CommitIndex, Edge, EntryPoint, Graph, Segment, SegmentFlags, SegmentIndex,
-    SegmentRelation, StopCondition, init::PetGraph,
+    Commit, CommitFlags, CommitIndex, Edge, EntryPoint, EntryPointCommit, Graph, Segment,
+    SegmentFlags, SegmentIndex, SegmentRelation, StopCondition, init::PetGraph,
     projection::commit::is_managed_workspace_by_message,
 };
 
@@ -25,9 +25,14 @@ impl Graph {
     /// Note that as a side effect, the [entrypoint](Self::lookup_entrypoint()) will also be set if it's not
     /// set yet.
     pub fn insert_segment_set_entrypoint(&mut self, segment: Segment) -> SegmentIndex {
+        let entrypoint = segment
+            .commits
+            .first()
+            .map(|commit| EntryPointCommit::AtCommit(commit.id))
+            .unwrap_or(EntryPointCommit::Unborn);
         let index = self.insert_segment(segment);
         if self.entrypoint.is_none() {
-            self.entrypoint = Some((index, None))
+            self.entrypoint = Some((index, entrypoint))
         }
         index
     }
@@ -50,6 +55,10 @@ impl Graph {
     /// `dst_commit_id` can be provided if the connection is to a future commit that isn't yet available
     /// in the `segment`. If `None`, it will be looked up in the `segment` itself.
     ///
+    /// `parent_order` is the 0-based position of `dst_commit_id` among the source commit's
+    /// parents. For a merge commit with parents `[A, B]`, the edge to `A` must use `0`,
+    /// and the edge to `B` must use `1`, even if traversal discovers `B` before `A`.
+    ///
     /// Return the newly added segment.
     pub fn connect_new_segment(
         &mut self,
@@ -58,6 +67,7 @@ impl Graph {
         dst: Segment,
         dst_commit: impl Into<Option<CommitIndex>>,
         dst_commit_id: impl Into<Option<gix::ObjectId>>,
+        parent_order: u32,
     ) -> SegmentIndex {
         let dst = self.inner.add_node(dst);
         self.inner[dst].id = dst;
@@ -68,6 +78,7 @@ impl Graph {
             dst,
             dst_commit,
             dst_commit_id.into(),
+            parent_order,
         );
         dst
     }
@@ -409,7 +420,7 @@ impl Graph {
         start: SegmentIndex,
         mut stop: impl FnMut(&Segment) -> bool,
     ) {
-        let mut edge = self.inner.edges_directed(start, Direction::Outgoing).last();
+        let mut edge = self.inner.edges_directed(start, Direction::Outgoing).next();
         let mut seen = BTreeSet::new();
         while let Some(first_edge) = edge {
             let next = &self[first_edge.target()];
@@ -420,7 +431,7 @@ impl Graph {
                 edge = self
                     .inner
                     .edges_directed(next.id, Direction::Outgoing)
-                    .last();
+                    .next();
             }
         }
     }
@@ -460,12 +471,13 @@ impl Graph {
     ///
     /// Note that this method only fails if the entrypoint wasn't set correctly due to a bug.
     pub fn lookup_entrypoint(&self) -> anyhow::Result<EntryPoint<'_>> {
-        let (segment_index, commit_index) = self
+        let (segment_index, commit) = self
             .entrypoint
             .context("BUG: must always set the entrypoint")?;
         let segment = &self.inner.node_weight(segment_index).with_context(|| {
             format!("BUG: entrypoint segment at {segment_index:?} wasn't present")
         })?;
+        let commit_index = commit.index_in(segment);
         Ok(EntryPoint {
             segment_index,
             commit_index,
@@ -514,27 +526,13 @@ impl Graph {
         &self,
         sidx: SegmentIndex,
     ) -> impl Iterator<Item = (Option<CommitIndex>, SegmentIndex)> {
-        self.edges_directed_in_order_of_creation(sidx, Direction::Outgoing)
-            .into_iter()
+        self.inner
+            .edges_directed(sidx, Direction::Outgoing)
             .filter_map(|edge| {
                 let dst = edge.weight().dst;
                 dst.is_none_or(|dst| dst == 0)
                     .then_some((edge.weight().src, edge.target()))
             })
-    }
-
-    /// Just like [petgraph::Graph::edges_directed()](petgraph::Graph::edges_directed()), but it returns the edges
-    /// in the order in which they were added, and *not* in reverse.
-    ///
-    /// Use this whenever you need to maintain a certain order of operation.
-    pub fn edges_directed_in_order_of_creation(
-        &self,
-        sidx: SegmentIndex,
-        direction: Direction,
-    ) -> Vec<EdgeReference<'_, Edge>> {
-        let mut edges: Vec<_> = self.inner.edges_directed(sidx, direction).collect();
-        edges.reverse();
-        edges
     }
 
     /// Return the condition under which traversal stopped at `sidx`,

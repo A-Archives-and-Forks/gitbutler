@@ -73,7 +73,7 @@ impl Stack {
         }) {
             let first_parent_sidx = graph
                 .neighbors_directed(last_aggregated_sidx, Direction::Outgoing)
-                .last();
+                .next();
             last_segment.base = first_parent_sidx.and_then(|sidx| {
                 graph[sidx].commits.first().and_then(|c| {
                     if c.parent_ids.is_empty() || graph[sidx].commits.get(1).is_some() {

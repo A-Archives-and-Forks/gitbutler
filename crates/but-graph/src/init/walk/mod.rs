@@ -164,9 +164,14 @@ pub fn split_commit_into_segment(
     let top_commit_index = graph[sidx].last_commit_index();
     let bottom_commit_id = bottom_segment.commits[0].id;
     let bottom_segment = match standin {
-        None => {
-            graph.connect_new_segment(sidx, top_commit_index, bottom_segment, 0, bottom_commit_id)
-        }
+        None => graph.connect_new_segment(
+            sidx,
+            top_commit_index,
+            bottom_segment,
+            0,
+            bottom_commit_id,
+            0,
+        ),
         Some(standin_sidx) => {
             let outgoing_edges: Vec<_> = graph
                 .edges_directed(standin_sidx, Direction::Outgoing)
@@ -184,6 +189,7 @@ pub fn split_commit_into_segment(
                 standin_sidx,
                 0,
                 Some(bottom_commit_id),
+                0,
             );
             let s = &mut graph[standin_sidx];
             s.commits = bottom_segment.commits;
@@ -295,6 +301,7 @@ fn split_connections(
                     })
                     .transpose()?,
                 dst_id: edge.weight.dst_id,
+                parent_order: edge.weight.parent_order,
             },
         );
     }
@@ -399,6 +406,7 @@ pub fn try_split_non_empty_segment_at_branch<T: RefMetadata>(
         segment_below,
         0,
         info.id,
+        0,
     );
     Ok(Some(segment_below))
 }
@@ -428,12 +436,17 @@ pub fn queue_parents(
         return Ok(false);
     }
     if parent_ids.len() > 1 {
-        let instruction = Instruction::ConnectNewSegment {
-            parent_above: current_sidx,
-            at_commit: current_cidx,
-        };
         let limit_per_parent = limit.per_parent(parent_ids.len());
-        for pid in parent_ids {
+        for (parent_order, pid) in parent_ids.iter().enumerate() {
+            let instruction = Instruction::ConnectNewSegment {
+                parent_above: current_sidx,
+                at_commit: current_cidx
+                    .try_into()
+                    .context("commit index does not fit into u32")?,
+                parent_order: parent_order
+                    .try_into()
+                    .context("commit parent position does not fit into u32")?,
+            };
             let info = find(commit_graph, objects, *pid, buf)?;
             if next.push_back_exhausted((info, flags, instruction, limit_per_parent)) {
                 return Ok(true);
@@ -996,6 +1009,7 @@ pub fn try_queue_remote_tracking_branches<T: RefMetadata>(
     })
 }
 
+#[expect(clippy::too_many_arguments)]
 pub fn possibly_split_occupied_segment(
     graph: &mut Graph,
     seen: &mut gix::revwalk::graph::IdMap<SegmentIndex>,
@@ -1004,6 +1018,7 @@ pub fn possibly_split_occupied_segment(
     propagated_flags: CommitFlags,
     src_sidx: SegmentIndex,
     limit: Limit,
+    parent_order: u32,
 ) -> anyhow::Result<()> {
     let Entry::Occupied(mut existing_sidx) = seen.entry(id) else {
         bail!("BUG: Can only work with occupied entries")
@@ -1075,7 +1090,15 @@ pub fn possibly_split_occupied_segment(
 
     // Standins will cause this, avoid self-connection.
     if top_sidx != bottom_sidx {
-        graph.connect_segments(top_sidx, top_cidx, bottom_sidx, bottom_cidx);
+        graph.connect_segments_with_ids(
+            top_sidx,
+            top_cidx,
+            None,
+            bottom_sidx,
+            bottom_cidx,
+            None,
+            parent_order,
+        );
     }
     let top_flags = top_cidx
         .map(|cidx| graph[top_sidx].commits[cidx].flags)

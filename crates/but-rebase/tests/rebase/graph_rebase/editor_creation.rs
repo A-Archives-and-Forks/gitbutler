@@ -492,3 +492,65 @@ fn includes_extra_refs_in_editor_creation() -> Result<()> {
 
     Ok(())
 }
+
+/// When the first parent of a merge has an earlier committer timestamp
+/// than the second parent, the but-graph traversal queue sort processes
+/// the second parent first. This causes edges to be created in an order
+/// that doesn't match parent_ids, which the editor must correct.
+#[test]
+fn merge_first_parent_older_than_second() -> Result<()> {
+    let (repo, mut meta) = fixture("merge-first-parent-older")?;
+
+    insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
+    * 738ea18 (HEAD -> first-parent) commit on top of merge
+    *   408ca26 merge second-parent into first-parent
+    |\  
+    | * 75369b0 (second-parent) new commit 3 on second-parent
+    | * 553bbf7 new commit 2 on second-parent
+    | * 72614bb new commit 1 on second-parent
+    * | 2854fa2 old commit on first-parent
+    |/  
+    * 793a434 (tag: base, main) base
+    ");
+
+    let graph = Graph::from_head(&repo, &*meta, standard_options())?.validated()?;
+
+    insta::assert_snapshot!(graph_tree(&graph), @"
+
+    └── 👉►:0[0]:first-parent[🌳]
+        └── ·738ea18 (⌂|1)
+            └── ►:1[1]:anon:
+                └── ·408ca26 (⌂|1)
+                    ├── ►:3[2]:anon:
+                    │   └── ·2854fa2 (⌂|1)
+                    │       └── ►:4[3]:main
+                    │           └── 🏁·793a434 (⌂|1) ►tags/base
+                    └── ►:2[2]:second-parent
+                        ├── ·75369b0 (⌂|1)
+                        ├── ·553bbf7 (⌂|1)
+                        └── ·72614bb (⌂|1)
+                            └── →:4: (main)
+    ");
+
+    let mut ws = graph.into_workspace()?;
+    let editor = Editor::create(&mut ws, &mut *meta, &repo)?;
+
+    insta::assert_snapshot!(editor.steps_ascii(), @r"
+    ◎ refs/heads/first-parent
+    ● 738ea18 commit on top of merge
+    ● 408ca26 merge second-parent into first-parent
+    ├─╮
+    ● │ 2854fa2 old commit on first-parent
+    │ ◎ refs/heads/second-parent
+    │ ● 75369b0 new commit 3 on second-parent
+    │ ● 553bbf7 new commit 2 on second-parent
+    │ ● 72614bb new commit 1 on second-parent
+    ├─╯
+    ◎ refs/heads/main
+    ◎ refs/tags/base
+    ● 793a434 base
+    ╵
+    ");
+
+    Ok(())
+}

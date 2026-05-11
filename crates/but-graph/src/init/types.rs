@@ -276,7 +276,16 @@ pub enum Instruction {
     /// at the last commit (at the time) via `at_commit`.
     ConnectNewSegment {
         parent_above: SegmentIndex,
-        at_commit: CommitIndex,
+        /// Deliberately not [`CommitIndex`]/`usize`: this instruction is stored in
+        /// the traversal queue, and widening it increases the hot `QueueItem` size.
+        ///
+        /// This limit should never be reached either unless there is a repository with a trunk of 4.3 billion commits.
+        at_commit: u32,
+        /// The position of this parent among the source commit's parents (0-based).
+        /// Deliberately not `usize` for the same traversal-queue layout reason as `at_commit`.
+        ///
+        /// This limit would only be reached if there is a merge with 4.3 billion commits.
+        parent_order: u32,
     },
 }
 
@@ -295,9 +304,11 @@ impl Instruction {
             Instruction::ConnectNewSegment {
                 parent_above: _,
                 at_commit,
+                parent_order,
             } => Instruction::ConnectNewSegment {
                 parent_above: sidx,
                 at_commit,
+                parent_order,
             },
         }
     }

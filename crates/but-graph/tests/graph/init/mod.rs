@@ -38,7 +38,7 @@ fn unborn() -> anyhow::Result<()> {
         entrypoint: Some(
             (
                 NodeIndex(0),
-                None,
+                Unborn,
             ),
         ),
         entrypoint_ref: None,
@@ -134,6 +134,7 @@ fn detached() -> anyhow::Result<()> {
                     dst_id: Some(
                         Sha1(fafd9d08a839d99db60b222cd58e2e0bfaf1f7b2),
                     ),
+                    parent_order: 0,
                 },
             },
             free_node: NodeIndex(4294967295),
@@ -142,8 +143,8 @@ fn detached() -> anyhow::Result<()> {
         entrypoint: Some(
             (
                 NodeIndex(0),
-                Some(
-                    0,
+                AtCommit(
+                    Sha1(541396b24e13b8ac45b7905c3fe8691c7fc5fbd0),
                 ),
             ),
         ),
@@ -259,6 +260,56 @@ fn shallow_clone_stops_at_shallow_boundary() -> anyhow::Result<()> {
     ⌂:0:main[🌳] <> ✓refs/remotes/origin/main on 71a64f3
     └── ≡:0:main[🌳] <> origin/main →:1: {1}
         └── :0:main[🌳] <> origin/main →:1:
+    ");
+    Ok(())
+}
+
+#[test]
+fn merge_first_parent_older_non_workspace_maintains_graph_order() -> anyhow::Result<()> {
+    let (repo, meta) = utils::named_read_only_in_memory_scenario(
+        "special-conditions",
+        "merge-first-parent-older",
+    )?;
+
+    insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
+    * 738ea18 (HEAD -> first-parent) commit on top of merge
+    *   408ca26 merge second-parent into first-parent
+    |\  
+    | * 75369b0 (second-parent) new commit 3 on second-parent
+    | * 553bbf7 new commit 2 on second-parent
+    | * 72614bb new commit 1 on second-parent
+    * | 2854fa2 old commit on first-parent
+    |/  
+    * 793a434 (tag: base, main) base
+    ");
+
+    let graph = Graph::from_head(&repo, &*meta, standard_options())?.validated()?;
+    insta::assert_snapshot!(graph_tree(&graph), @"
+
+    └── 👉►:0[0]:first-parent[🌳]
+        └── ·738ea18 (⌂|1)
+            └── ►:1[1]:anon:
+                └── ·408ca26 (⌂|1)
+                    ├── ►:3[2]:anon:
+                    │   └── ·2854fa2 (⌂|1)
+                    │       └── ►:4[3]:main
+                    │           └── 🏁·793a434 (⌂|1) ►tags/base
+                    └── ►:2[2]:second-parent
+                        ├── ·75369b0 (⌂|1)
+                        ├── ·553bbf7 (⌂|1)
+                        └── ·72614bb (⌂|1)
+                            └── →:4: (main)
+    ");
+
+    insta::assert_snapshot!(graph_workspace(&graph.into_workspace()?), "we see only first-parent with two commits, not the 'second-parent' ref because it *seems* to be traversed first", @"
+    ⌂:0:first-parent[🌳] <> ✓!
+    └── ≡:0:first-parent[🌳] {1}
+        ├── :0:first-parent[🌳]
+        │   ├── ·738ea18
+        │   ├── ·408ca26
+        │   └── ·2854fa2
+        └── :4:main
+            └── ·793a434 ►tags/base
     ");
     Ok(())
 }

@@ -226,9 +226,19 @@ pub struct Graph {
     inner: init::PetGraph,
     /// From where the graph was created. This is useful if one wants to focus on a subset of the graph.
     ///
-    /// The [`CommitIndex`] is empty if the entry point is an empty segment, to indicate that the traversal
-    /// tip isn't contained in it.
-    entrypoint: Option<(SegmentIndex, Option<CommitIndex>)>,
+    /// This is `None` only for a freshly default-initialized graph, or while a graph is being assembled before
+    /// the first segment is inserted. Graphs returned by the traversal constructors are expected to have an
+    /// entrypoint, even for unborn refs; in that case the segment is present and the commit is
+    /// [`EntryPointCommit::Unborn`].
+    ///
+    /// The second value is the traversal tip, if there is one.
+    ///
+    /// Post-processing may move the entrypoint to an empty synthetic segment, for example a named workspace ref
+    /// without a workspace commit. The segment still marks the ref's place in the graph, but it has no local
+    /// commit slot that can hold the ref target. In that case the commit id is kept here so
+    /// [`Graph::redo_traversal_with_overlay()`] can keep using the original traversal tip if the ref can no
+    /// longer be resolved in the overlay/repository.
+    entrypoint: Option<(SegmentIndex, EntryPointCommit)>,
     /// The ref_name used when starting the graph traversal. It is set to help assure that the entrypoint stays
     /// on the correctly named segment, knowing that the post-process may alter segments quite substantially
     /// when crating independent and dependent branches.
@@ -246,6 +256,53 @@ pub struct Graph {
     /// They are useful to extract remote names from remote tracking refs like `refs/remotes/origin/master`,
     /// which may have slashes in them.
     pub symbolic_remote_names: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum EntryPointCommit {
+    /// The traversal tip is known.
+    ///
+    /// This is an object id rather than a synthetic index because an empty entrypoint segment has no commit slot
+    /// to index into, nor is it reliably reachable by traversing the graph. If the commit is present in the
+    /// entrypoint segment, its [`CommitIndex`] can be derived from the segment and this id.
+    /// This happens when a workspace reference doesn't have an (unneeded) workspace merge commit,
+    /// and is connected to one or more named empty segments which themselves only point to the workspace base.
+    /// Then from Git's point of view, all involved refs point to the workspace base, but for use it's
+    /// already a graph, and one that isn't representable even with symbolic refs as the workspace ref segment
+    /// can easily point to multiple refs at the same time.
+    AtCommit(gix::ObjectId),
+    /// The traversal started from an unborn ref and has no tip commit.
+    Unborn,
+}
+
+impl EntryPointCommit {
+    fn index_in(self, segment: &Segment) -> Option<CommitIndex> {
+        match self {
+            EntryPointCommit::AtCommit(id) => segment.commit_index_of(id),
+            EntryPointCommit::Unborn => None,
+        }
+    }
+
+    pub(crate) fn object_id(self) -> Option<gix::ObjectId> {
+        match self {
+            EntryPointCommit::AtCommit(id) => Some(id),
+            EntryPointCommit::Unborn => None,
+        }
+    }
+}
+
+impl Graph {
+    /// Return the entrypoint as a segment plus the optional position of its tip commit in that segment.
+    ///
+    /// The graph stores the tip as an object id so it survives post-processing that moves the entrypoint to
+    /// an empty or otherwise synthetic segment. Some graph-local consumers, like debug rendering and
+    /// statistics, still need the segment-relative commit position to mark where the entrypoint appears in
+    /// the current graph shape, so it is derived here instead of being stored as mutable state.
+    fn entrypoint_location(&self) -> Option<(SegmentIndex, Option<CommitIndex>)> {
+        let (segment_index, commit) = self.entrypoint?;
+        let segment = self.inner.node_weight(segment_index)?;
+        Some((segment_index, commit.index_in(segment)))
+    }
 }
 
 /// A resolved entry point into the graph for easy access to the segment, commit,
@@ -295,6 +352,14 @@ pub struct Edge {
     dst: Option<CommitIndex>,
     /// The commit id at `dst` in the segment commit list.
     dst_id: Option<gix::ObjectId>,
+    /// The position of this edge's destination among the source commit's parents.
+    /// For a merge commit with parents `[A, B]`, the edge to `A` has `parent_order = 0`
+    /// and the edge to `B` has `parent_order = 1`.
+    /// Deliberately not `usize`: `Edge` is stored in every petgraph edge slot,
+    /// and widening this field pushes hot edge storage over an important size boundary.
+    ///
+    /// This limit would only be reached if there is a merge with 4.3 billion commits.
+    pub parent_order: u32,
 }
 
 impl Edge {
