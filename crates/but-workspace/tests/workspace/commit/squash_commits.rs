@@ -397,12 +397,12 @@ fn squash_across_stacks_subject_into_target() -> Result<()> {
     ");
     insta::assert_snapshot!(graph_workspace(&ws), @"
     📕🏘️:0:gitbutler/workspace[🌳] <> ✓refs/remotes/origin/main on 85efbe4
-    ├── ≡📙:4:B on 85efbe4 {2}
-    │   └── 📙:4:B
-    │       └── ·c813d8d (🏘️)
-    └── ≡📙:3:A on 85efbe4 {1}
-        └── 📙:3:A
-            └── ·09d8e52 (🏘️)
+    ├── ≡📙:3:A on 85efbe4 {1}
+    │   └── 📙:3:A
+    │       └── ·09d8e52 (🏘️)
+    └── ≡📙:4:B on 85efbe4 {2}
+        └── 📙:4:B
+            └── ·c813d8d (🏘️)
     ");
 
     let subject_id = repo.rev_parse_single("A")?.detach();
@@ -433,11 +433,11 @@ fn squash_across_stacks_subject_into_target() -> Result<()> {
     ");
     insta::assert_snapshot!(graph_workspace(&ws), @"
     📕🏘️:0:gitbutler/workspace[🌳] <> ✓refs/remotes/origin/main on 85efbe4
-    ├── ≡📙:3:B on 85efbe4 {2}
-    │   └── 📙:3:B
-    │       └── ·82d6f41 (🏘️)
-    └── ≡📙:4:A on 85efbe4 {1}
-        └── 📙:4:A
+    ├── ≡📙:4:A on 85efbe4 {1}
+    │   └── 📙:4:A
+    └── ≡📙:3:B on 85efbe4 {2}
+        └── 📙:3:B
+            └── ·82d6f41 (🏘️)
     ");
 
     Ok(())
@@ -465,12 +465,12 @@ fn squash_across_stacks_target_into_subject() -> Result<()> {
 
     insta::assert_snapshot!(graph_workspace(&ws), @"
     📕🏘️:0:gitbutler/workspace[🌳] <> ✓refs/remotes/origin/main on 85efbe4
-    ├── ≡📙:4:B on 85efbe4 {2}
-    │   └── 📙:4:B
-    │       └── ·c813d8d (🏘️)
-    └── ≡📙:3:A on 85efbe4 {1}
-        └── 📙:3:A
-            └── ·09d8e52 (🏘️)
+    ├── ≡📙:3:A on 85efbe4 {1}
+    │   └── 📙:3:A
+    │       └── ·09d8e52 (🏘️)
+    └── ≡📙:4:B on 85efbe4 {2}
+        └── 📙:4:B
+            └── ·c813d8d (🏘️)
     ");
 
     let subject_id = repo.rev_parse_single("B")?.detach();
@@ -501,11 +501,11 @@ fn squash_across_stacks_target_into_subject() -> Result<()> {
     ");
     insta::assert_snapshot!(graph_workspace(&ws), @"
     📕🏘️:0:gitbutler/workspace[🌳] <> ✓refs/remotes/origin/main on 85efbe4
-    ├── ≡📙:4:B on 85efbe4 {2}
-    │   └── 📙:4:B
-    └── ≡📙:3:A on 85efbe4 {1}
-        └── 📙:3:A
-            └── ·17e27b0 (🏘️)
+    ├── ≡📙:3:A on 85efbe4 {1}
+    │   └── 📙:3:A
+    │       └── ·17e27b0 (🏘️)
+    └── ≡📙:4:B on 85efbe4 {2}
+        └── 📙:4:B
     ");
 
     Ok(())

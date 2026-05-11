@@ -29,14 +29,14 @@ fn tear_off_top_most_branch() -> anyhow::Result<()> {
     let mut ws = graph.into_workspace()?;
     insta::assert_snapshot!(graph_workspace(&ws), @"
     📕🏘️:0:gitbutler/workspace[🌳] <> ✓refs/remotes/origin/main on 85efbe4
-    ├── ≡📙:4:C on 85efbe4 {2}
-    │   ├── 📙:4:C
-    │   │   └── ·09bc93e (🏘️)
-    │   └── 📙:5:B
-    │       └── ·c813d8d (🏘️)
-    └── ≡📙:3:A on 85efbe4 {1}
-        └── 📙:3:A
-            └── ·09d8e52 (🏘️)
+    ├── ≡📙:3:A on 85efbe4 {1}
+    │   └── 📙:3:A
+    │       └── ·09d8e52 (🏘️)
+    └── ≡📙:4:C on 85efbe4 {2}
+        ├── 📙:4:C
+        │   └── ·09bc93e (🏘️)
+        └── 📙:5:B
+            └── ·c813d8d (🏘️)
     ");
 
     let editor = Editor::create(&mut ws, &mut meta, &repo)?;
@@ -66,15 +66,15 @@ fn tear_off_top_most_branch() -> anyhow::Result<()> {
 
     insta::assert_snapshot!(graph_workspace(&ws), @"
     📕🏘️:0:gitbutler/workspace[🌳] <> ✓refs/remotes/origin/main on 85efbe4
-    ├── ≡📙:5:C on 85efbe4 {3}
-    │   └── 📙:5:C
-    │       └── ·8e00332 (🏘️)
+    ├── ≡📙:3:A on 85efbe4 {1}
+    │   └── 📙:3:A
+    │       └── ·09d8e52 (🏘️)
     ├── ≡📙:4:B on 85efbe4 {2}
     │   └── 📙:4:B
     │       └── ·c813d8d (🏘️)
-    └── ≡📙:3:A on 85efbe4 {1}
-        └── 📙:3:A
-            └── ·09d8e52 (🏘️)
+    └── ≡📙:5:C on 85efbe4 {3}
+        └── 📙:5:C
+            └── ·8e00332 (🏘️)
     ");
 
     Ok(())
@@ -103,14 +103,14 @@ fn tear_off_bottom_most_branch() -> anyhow::Result<()> {
     let mut ws = graph.into_workspace()?;
     insta::assert_snapshot!(graph_workspace(&ws), @"
     📕🏘️:0:gitbutler/workspace[🌳] <> ✓refs/remotes/origin/main on 85efbe4
-    ├── ≡📙:4:C on 85efbe4 {2}
-    │   ├── 📙:4:C
-    │   │   └── ·09bc93e (🏘️)
-    │   └── 📙:5:B
-    │       └── ·c813d8d (🏘️)
-    └── ≡📙:3:A on 85efbe4 {1}
-        └── 📙:3:A
-            └── ·09d8e52 (🏘️)
+    ├── ≡📙:3:A on 85efbe4 {1}
+    │   └── 📙:3:A
+    │       └── ·09d8e52 (🏘️)
+    └── ≡📙:4:C on 85efbe4 {2}
+        ├── 📙:4:C
+        │   └── ·09bc93e (🏘️)
+        └── 📙:5:B
+            └── ·c813d8d (🏘️)
     ");
 
     let editor = Editor::create(&mut ws, &mut meta, &repo)?;
@@ -140,15 +140,15 @@ fn tear_off_bottom_most_branch() -> anyhow::Result<()> {
 
     insta::assert_snapshot!(graph_workspace(&ws), @"
     📕🏘️:0:gitbutler/workspace[🌳] <> ✓refs/remotes/origin/main on 85efbe4
-    ├── ≡📙:5:B on 85efbe4 {3}
-    │   └── 📙:5:B
-    │       └── ·c813d8d (🏘️)
+    ├── ≡📙:3:A on 85efbe4 {1}
+    │   └── 📙:3:A
+    │       └── ·09d8e52 (🏘️)
     ├── ≡📙:4:C on 85efbe4 {2}
     │   └── 📙:4:C
     │       └── ·8e00332 (🏘️)
-    └── ≡📙:3:A on 85efbe4 {1}
-        └── 📙:3:A
-            └── ·09d8e52 (🏘️)
+    └── ≡📙:5:B on 85efbe4 {3}
+        └── 📙:5:B
+            └── ·c813d8d (🏘️)
     ");
 
     Ok(())
@@ -177,14 +177,14 @@ fn tear_off_only_branch_in_stack() -> anyhow::Result<()> {
     let mut ws = graph.into_workspace()?;
     insta::assert_snapshot!(graph_workspace(&ws), @"
     📕🏘️:0:gitbutler/workspace[🌳] <> ✓refs/remotes/origin/main on 85efbe4
-    ├── ≡📙:4:C on 85efbe4 {2}
-    │   ├── 📙:4:C
-    │   │   └── ·09bc93e (🏘️)
-    │   └── 📙:5:B
-    │       └── ·c813d8d (🏘️)
-    └── ≡📙:3:A on 85efbe4 {1}
-        └── 📙:3:A
-            └── ·09d8e52 (🏘️)
+    ├── ≡📙:3:A on 85efbe4 {1}
+    │   └── 📙:3:A
+    │       └── ·09d8e52 (🏘️)
+    └── ≡📙:4:C on 85efbe4 {2}
+        ├── 📙:4:C
+        │   └── ·09bc93e (🏘️)
+        └── 📙:5:B
+            └── ·c813d8d (🏘️)
     ");
 
     let editor = Editor::create(&mut ws, &mut meta, &repo)?;
@@ -213,14 +213,14 @@ fn tear_off_only_branch_in_stack() -> anyhow::Result<()> {
 
     insta::assert_snapshot!(graph_workspace(&ws), @"
     📕🏘️:0:gitbutler/workspace[🌳] <> ✓refs/remotes/origin/main on 85efbe4
-    ├── ≡📙:4:C on 85efbe4 {2}
-    │   ├── 📙:4:C
-    │   │   └── ·09bc93e (🏘️)
-    │   └── 📙:5:B
-    │       └── ·c813d8d (🏘️)
-    └── ≡📙:3:A on 85efbe4 {1}
-        └── 📙:3:A
-            └── ·09d8e52 (🏘️)
+    ├── ≡📙:3:A on 85efbe4 {1}
+    │   └── 📙:3:A
+    │       └── ·09d8e52 (🏘️)
+    └── ≡📙:4:C on 85efbe4 {2}
+        ├── 📙:4:C
+        │   └── ·09bc93e (🏘️)
+        └── 📙:5:B
+            └── ·c813d8d (🏘️)
     ");
 
     Ok(())
@@ -275,12 +275,12 @@ fn tear_off_from_single_stack_in_ws_top() -> anyhow::Result<()> {
 
     insta::assert_snapshot!(graph_workspace(&ws), @"
     📕🏘️:0:gitbutler/workspace[🌳] <> ✓refs/remotes/origin/main on 85efbe4
-    ├── ≡📙:4:B on 85efbe4 {2}
-    │   └── 📙:4:B
-    │       └── ·1273ba9 (🏘️)
-    └── ≡📙:3:A on 85efbe4 {1}
-        └── 📙:3:A
-            └── ·09d8e52 (🏘️)
+    ├── ≡📙:3:A on 85efbe4 {1}
+    │   └── 📙:3:A
+    │       └── ·09d8e52 (🏘️)
+    └── ≡📙:4:B on 85efbe4 {2}
+        └── 📙:4:B
+            └── ·1273ba9 (🏘️)
     ");
 
     Ok(())
@@ -335,12 +335,12 @@ fn tear_off_from_single_stack_in_ws_bottom() -> anyhow::Result<()> {
 
     insta::assert_snapshot!(graph_workspace(&ws), @"
     📕🏘️:0:gitbutler/workspace[🌳] <> ✓refs/remotes/origin/main on 85efbe4
-    ├── ≡📙:4:A on 85efbe4 {1}
-    │   └── 📙:4:A
-    │       └── ·09d8e52 (🏘️)
-    └── ≡📙:3:B on 85efbe4 {2}
-        └── 📙:3:B
-            └── ·1273ba9 (🏘️)
+    ├── ≡📙:3:B on 85efbe4 {2}
+    │   └── 📙:3:B
+    │       └── ·1273ba9 (🏘️)
+    └── ≡📙:4:A on 85efbe4 {1}
+        └── 📙:4:A
+            └── ·09d8e52 (🏘️)
     ");
 
     Ok(())
@@ -394,11 +394,11 @@ fn tear_off_empty_branch() -> anyhow::Result<()> {
 
     insta::assert_snapshot!(graph_workspace(&ws), @"
     📕🏘️:0:gitbutler/workspace[🌳] <> ✓refs/remotes/origin/main on 85efbe4
-    ├── ≡📙:4:B on 85efbe4 {3}
-    │   └── 📙:4:B
-    └── ≡📙:3:A on 85efbe4 {1}
-        └── 📙:3:A
-            └── ·09d8e52 (🏘️)
+    ├── ≡📙:3:A on 85efbe4 {1}
+    │   └── 📙:3:A
+    │       └── ·09d8e52 (🏘️)
+    └── ≡📙:4:B on 85efbe4 {3}
+        └── 📙:4:B
     ");
 
     Ok(())
@@ -452,11 +452,11 @@ fn tear_off_non_empty_branch() -> anyhow::Result<()> {
 
     insta::assert_snapshot!(graph_workspace(&ws), @"
     📕🏘️:0:gitbutler/workspace[🌳] <> ✓refs/remotes/origin/main on 85efbe4
-    ├── ≡📙:3:A on 85efbe4 {3}
-    │   └── 📙:3:A
-    │       └── ·09d8e52 (🏘️)
-    └── ≡📙:4:B on 85efbe4 {1}
-        └── 📙:4:B
+    ├── ≡📙:4:B on 85efbe4 {1}
+    │   └── 📙:4:B
+    └── ≡📙:3:A on 85efbe4 {3}
+        └── 📙:3:A
+            └── ·09d8e52 (🏘️)
     ");
 
     Ok(())

@@ -349,11 +349,6 @@ impl Graph {
             target.compute_and_set_commits_ahead(self, lower_bound_segment_id);
         }
 
-        // Stack display order is the reverse of merge-parent order: the first
-        // parent is the integrated base, while workspace stacks are shown from
-        // the last workspace parent back toward the first.
-        // TODO(ST): this should probably be done at display time, right?
-        stacks.reverse();
         let mut ws = WorkspaceState {
             id,
             kind,
