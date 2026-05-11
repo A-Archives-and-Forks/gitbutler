@@ -1535,6 +1535,83 @@ EOF
   #
   # With target at "init", A and B are above the target and should be kept
   # even though they're marked integrated.
+  # A ref (tag or branch) points at the workspace commit itself,
+  # and that ref is the entrypoint for traversal.
+  git init entrypoint-on-workspace-commit
+  (cd entrypoint-on-workspace-commit
+    commit init
+    setup_target_to_match_main
+
+    git checkout -b A
+      commit A1
+      commit A2
+
+    create_workspace_commit_once A
+    # Place a tag on the workspace commit so it can be used as entrypoint
+    git tag my-tag HEAD
+  )
+
+  # A workspace where the local branch was deleted, leaving only the remote
+  # tracking branch. The workspace commit still has the old branch tip as parent.
+  # This tests whether a remote-only segment at the start of a stack is handled.
+  git init remote-only-stack-top
+  (cd remote-only-stack-top
+    commit init
+    setup_target_to_match_main
+
+    git checkout -b A
+      commit A1
+      commit A2
+
+    # Copy A to origin/A, then delete local A
+    setup_remote_tracking A A cp
+    create_workspace_commit_once A
+
+    # Delete the local branch (we're on gitbutler/workspace now)
+    git branch -D A
+  )
+
+  # A local branch B stacked on top of a remote-only branch origin/A.
+  # origin/A has commits on the first-parent path between B and main.
+  # This tests whether a remote-only segment trailing a local segment is handled.
+  git init remote-trailing-local-stack
+  (cd remote-trailing-local-stack
+    commit init
+    setup_target_to_match_main
+
+    git checkout -b soon-origin-A
+      commit A1
+      commit A2
+    setup_remote_tracking soon-origin-A A move
+
+    git checkout -b B
+      commit B1
+      commit B2
+
+    create_workspace_commit_once B
+  )
+
+  # A workspace where the only ref on the branch commits is origin/A (remote).
+  # The local branch never existed - only the remote was fetched.
+  # This tests whether a remote-only ref as the first stack segment is pruned.
+  git init remote-ref-as-stack-top
+  (cd remote-ref-as-stack-top
+    commit init
+    setup_target_to_match_main
+
+    # Create commits and move them directly to origin/A (no local branch ever)
+    git checkout -b temp-A
+      commit A1
+      commit A2
+    setup_remote_tracking temp-A A move
+    # temp-A is now gone, only origin/A exists
+
+    # Manually create workspace merging origin/A's commit
+    git checkout main
+    git checkout -b gitbutler/workspace
+    git merge --no-ff -m "GitButler Workspace Commit" origin/A
+  )
+
   git init integrated-above-target
   (cd integrated-above-target
      commit init
