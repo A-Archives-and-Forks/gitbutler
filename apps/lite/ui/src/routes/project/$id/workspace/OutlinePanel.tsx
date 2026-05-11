@@ -92,7 +92,7 @@ import { moveOperation, useRunOperationMutationOptions } from "#ui/operations/op
 import { isNonEmptyArray, NonEmptyArray } from "effect/Array";
 import { defaultOutlineSelection } from "#ui/projects/workspace/state.ts";
 import { ShortcutButton } from "#ui/ui/ShortcutButton.tsx";
-import { resolveDiffSpecs } from "#ui/operations/diff-specs.ts";
+import { useResolveDiffSpecs } from "#ui/operations/diff-specs.ts";
 import { rejectedChangesToastOptions } from "#ui/operations/rejectedChangesToastOptions.tsx";
 import { useCommand } from "#ui/commands/manager.ts";
 import { assert } from "#ui/assert.ts";
@@ -946,8 +946,6 @@ const Changes: FC<{
 		},
 	});
 
-	const queryClient = useQueryClient();
-
 	const { data: worktreeChanges } = useSuspenseQuery(changesInWorktreeQueryOptions(projectId));
 
 	const operand = changesSectionOperand;
@@ -978,14 +976,14 @@ const Changes: FC<{
 	const [branchId, setBranchId] = useState<string | null>(null);
 	const branch = branchComboboxItems.find((item) => item.id === branchId) ?? branchComboboxItems[0];
 
+	const changes = useResolveDiffSpecs({
+		source: changesSectionOperand,
+		projectId,
+	});
+
 	const commit = () => {
 		if (!branch) return;
 
-		const changes = resolveDiffSpecs({
-			source: changesSectionOperand,
-			queryClient,
-			projectId,
-		});
 		if (!changes) return;
 
 		commitCreate.mutate(

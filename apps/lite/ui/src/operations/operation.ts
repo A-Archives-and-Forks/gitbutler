@@ -1,5 +1,5 @@
 import { Toast } from "@base-ui/react";
-import { mutationOptions, QueryClient, useQueryClient } from "@tanstack/react-query";
+import { mutationOptions } from "@tanstack/react-query";
 import { Match } from "effect";
 import {
 	type CommitAmendParams,
@@ -14,12 +14,14 @@ import {
 	CommitUncommitParams,
 } from "#electron/ipc.ts";
 import { rejectedChangesToastOptions } from "#ui/operations/rejectedChangesToastOptions.tsx";
-import { CommitAbsorption, InsertSide, RelativeTo } from "@gitbutler/but-sdk";
+import { CommitAbsorption, DiffSpec, InsertSide, RelativeTo } from "@gitbutler/but-sdk";
 import { Operand, operandEquals, operandFileParent } from "#ui/operands.ts";
-import { resolveDiffSpecs } from "#ui/operations/diff-specs.ts";
+import { useResolveDiffSpecs } from "#ui/operations/diff-specs.ts";
 import { decodeRefName } from "#ui/api/ref-name.ts";
-import { projectActions } from "#ui/projects/state.ts";
+import { projectActions, selectProjectOperationModeState } from "#ui/projects/state.ts";
 import { useAppDispatch } from "#ui/store.ts";
+import { useAppSelector } from "#ui/store.ts";
+import { useParams } from "@tanstack/react-router";
 
 /** @public */
 export type CommitAmendOperation = Omit<CommitAmendParams, "dryRun" | "projectId" | "changes"> & {
@@ -179,7 +181,11 @@ export const operationLabel = (operation: Operation): string =>
 		}),
 	);
 
-const runOperation = async (projectId: string, operation: Operation, queryClient: QueryClient) =>
+const runOperation = async (
+	projectId: string,
+	operation: Operation,
+	changes: Array<DiffSpec> | null,
+) =>
 	Match.value(operation).pipe(
 		Match.tagsExhaustive({
 			Absorb: async (operation) => {
@@ -189,13 +195,7 @@ const runOperation = async (projectId: string, operation: Operation, queryClient
 				});
 			},
 			CommitAmend: (operation) => {
-				const changes = resolveDiffSpecs({
-					source: operation.source,
-					queryClient,
-					projectId,
-				});
 				if (!changes) return;
-
 				return window.lite.commitAmend({
 					projectId,
 					commitId: operation.commitId,
@@ -204,13 +204,7 @@ const runOperation = async (projectId: string, operation: Operation, queryClient
 				});
 			},
 			CommitMoveChangesBetween: (operation) => {
-				const changes = resolveDiffSpecs({
-					source: operation.source,
-					queryClient,
-					projectId,
-				});
 				if (!changes) return;
-
 				return window.lite.commitMoveChangesBetween({
 					projectId,
 					sourceCommitId: operation.sourceCommitId,
@@ -234,13 +228,7 @@ const runOperation = async (projectId: string, operation: Operation, queryClient
 					dryRun: false,
 				}),
 			CommitUncommitChanges: (operation) => {
-				const changes = resolveDiffSpecs({
-					source: operation.source,
-					queryClient,
-					projectId,
-				});
 				if (!changes) return;
-
 				return window.lite.commitUncommitChanges({
 					projectId,
 					commitId: operation.commitId,
@@ -250,13 +238,7 @@ const runOperation = async (projectId: string, operation: Operation, queryClient
 				});
 			},
 			CommitCreate: (operation) => {
-				const changes = resolveDiffSpecs({
-					source: operation.source,
-					queryClient,
-					projectId,
-				});
 				if (!changes) return;
-
 				return window.lite.commitCreate({
 					projectId,
 					relativeTo: operation.relativeTo,
@@ -267,11 +249,6 @@ const runOperation = async (projectId: string, operation: Operation, queryClient
 				});
 			},
 			CommitCreateFromCommittedChanges: async (operation) => {
-				const changes = resolveDiffSpecs({
-					source: operation.source,
-					queryClient,
-					projectId,
-				});
 				if (!changes) return;
 
 				// Ideally this would be an atomic backend operation.
@@ -317,13 +294,22 @@ const runOperation = async (projectId: string, operation: Operation, queryClient
 	);
 
 export const useRunOperationMutationOptions = () => {
+	const { id: projectId } = useParams({ from: "/project/$id/workspace" });
 	const dispatch = useAppDispatch();
 	const toastManager = Toast.useToastManager();
-	const queryClient = useQueryClient();
+
+	const operationMode = useAppSelector((state) =>
+		selectProjectOperationModeState(state, projectId),
+	);
+
+	const changes = useResolveDiffSpecs({
+		projectId,
+		source: operationMode?.source,
+	});
 
 	return mutationOptions({
 		mutationFn: ({ projectId, operation }: { projectId: string; operation: Operation }) =>
-			runOperation(projectId, operation, queryClient),
+			runOperation(projectId, operation, changes),
 		onSuccess: async (response, input, _ctx, { client }) => {
 			if (response) {
 				dispatch(
