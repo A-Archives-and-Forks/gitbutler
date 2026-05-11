@@ -223,7 +223,7 @@ const useNavigationIndex = (projectId: string) => {
 	return navigationIndex;
 };
 
-export const OutlinePanel: FC<{} & PanelProps> = ({ ...panelProps }) => (
+export const OutlinePanel: FC<PanelProps> = ({ ...panelProps }) => (
 	<Suspense
 		fallback={
 			<Panel {...panelProps} className={classes(panelProps.className, styles.panelPadding)}>
@@ -235,7 +235,7 @@ export const OutlinePanel: FC<{} & PanelProps> = ({ ...panelProps }) => (
 	</Suspense>
 );
 
-const OutlineTreePanel: FC<{} & PanelProps> = ({ ...panelProps }) => {
+const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 	const { id: projectId } = useParams({ from: "/project/$id/workspace" });
 	const dispatch = useAppDispatch();
 
