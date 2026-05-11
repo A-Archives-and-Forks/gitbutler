@@ -313,7 +313,9 @@ impl Graph {
     /// Produces a dot-version of the graph.
     pub fn dot_graph(&self) -> String {
         const HEX: usize = 7;
-        let entrypoint = self.entrypoint;
+        let entrypoint = self
+            .entrypoint
+            .map(|(segment, commit)| (segment, commit.index()));
         let max_goals = self.max_goals();
         let node_attrs = |_: &PetGraph, (sidx, s): (SegmentIndex, &Segment)| {
             let name = format!(

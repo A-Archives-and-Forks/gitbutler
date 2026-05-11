@@ -226,9 +226,19 @@ pub struct Graph {
     inner: init::PetGraph,
     /// From where the graph was created. This is useful if one wants to focus on a subset of the graph.
     ///
-    /// The [`CommitIndex`] is empty if the entry point is an empty segment, to indicate that the traversal
-    /// tip isn't contained in it.
-    entrypoint: Option<(SegmentIndex, Option<CommitIndex>)>,
+    /// This is `None` only for a freshly default-initialized graph, or while a graph is being assembled before
+    /// the first segment is inserted. Graphs returned by the traversal constructors are expected to have an
+    /// entrypoint, even for unborn refs; in that case the segment is present and the commit is
+    /// [`EntryPointCommit::Unborn`].
+    ///
+    /// The second value is the traversal tip if it can still be represented relative to that segment.
+    ///
+    /// Post-processing may move the entrypoint to an empty synthetic segment, for example a named workspace ref
+    /// without a workspace commit. The segment still marks the ref's place in the graph, but it has no local
+    /// commit slot that can hold the ref target. In that case the commit id is kept here so
+    /// [`Graph::redo_traversal_with_overlay()`] can keep using the original traversal tip if the ref can no
+    /// longer be resolved in the overlay/repository.
+    entrypoint: Option<(SegmentIndex, EntryPointCommit)>,
     /// The ref_name used when starting the graph traversal. It is set to help assure that the entrypoint stays
     /// on the correctly named segment, knowing that the post-process may alter segments quite substantially
     /// when crating independent and dependent branches.
@@ -246,6 +256,44 @@ pub struct Graph {
     /// They are useful to extract remote names from remote tracking refs like `refs/remotes/origin/master`,
     /// which may have slashes in them.
     pub symbolic_remote_names: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum EntryPointCommit {
+    /// The traversal tip is available in the entrypoint segment.
+    ///
+    /// This is a [`CommitIndex`] because it addresses a commit within a specific segment, not a global commit
+    /// position. A plain integer without the segment has no meaning after post-processing splits or moves
+    /// segments.
+    InSegment(CommitIndex),
+    /// The traversal tip is known, but not present in the entrypoint segment.
+    ///
+    /// This is an object id rather than a synthetic index because an empty entrypoint segment has no commit slot
+    /// to index into, nor is it reliably reachable by traversing the graph.
+    /// This happens when a workspace reference doesn't have an (unneeded) workspace merge commit,
+    /// and is connected to one or more named empty segments which themselves only point to the workspace base.
+    /// Then from Git's point of view, all involved refs point to the workspace base, but for use it's
+    /// already a graph, and one that isn't representable even with symbolic refs as the workspace ref segment
+    /// can easily point to multiple refs at the same time.
+    AtCommit(gix::ObjectId),
+    /// The traversal started from an unborn ref and has no tip commit.
+    Unborn,
+}
+
+impl EntryPointCommit {
+    pub(crate) fn index(self) -> Option<CommitIndex> {
+        match self {
+            EntryPointCommit::InSegment(index) => Some(index),
+            EntryPointCommit::AtCommit(_) | EntryPointCommit::Unborn => None,
+        }
+    }
+
+    pub(crate) fn object_id(self) -> Option<gix::ObjectId> {
+        match self {
+            EntryPointCommit::AtCommit(id) => Some(id),
+            EntryPointCommit::Unborn | EntryPointCommit::InSegment(_) => None,
+        }
+    }
 }
 
 /// A resolved entry point into the graph for easy access to the segment, commit,

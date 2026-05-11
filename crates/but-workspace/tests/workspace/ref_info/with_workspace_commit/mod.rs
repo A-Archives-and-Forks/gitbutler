@@ -802,6 +802,7 @@ fn two_dependent_branches_first_merged_no_ff_second_merged_on_remote_into_base_b
                         ],
                         commits_on_remote: [
                             Commit(059cc4f, "Merge branch \'B-on-A\' into new-origin-A\n"),
+                            Commit(de11c03, "change in B\n"),
                         ],
                         commits_outside: None,
                         metadata: Branch,
@@ -3846,7 +3847,7 @@ fn advanced_workspace_single_stack() -> anyhow::Result<()> {
     let opts = standard_options();
     let err = head_info(&repo, &meta, opts).unwrap_err();
     insta::assert_snapshot!(err.to_string(), @"
-    Found 5 commit(s) on top of the workspace commit.
+    Found 4 commit(s) on top of the workspace commit.
 
     Run the following command in your working directory to fix this while leaving your worktree unchanged.
     Worktree changes need to be re-committed manually for now.

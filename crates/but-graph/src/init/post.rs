@@ -11,7 +11,7 @@ use petgraph::{Direction, graph::NodeIndex, prelude::EdgeRef, visit::NodeRef};
 use tracing::instrument;
 
 use crate::{
-    Commit, CommitFlags, CommitIndex, Edge, Graph, SegmentIndex, SegmentMetadata,
+    Commit, CommitFlags, CommitIndex, Edge, EntryPointCommit, Graph, SegmentIndex, SegmentMetadata,
     init::{
         PetGraph, branch_segment_from_name_and_meta,
         overlay::{OverlayMetadata, OverlayRepo},
@@ -109,37 +109,17 @@ impl Graph {
         Ok(self)
     }
 
-    /// Rebuild outgoing edges so their creation order follows the source commit's
-    /// `parent_order`. Petgraph traverses edges in reverse creation order, and
-    /// several graph consumers reverse that order again to recover commit parent
-    /// order.
+    /// Rebuild outgoing edges so petgraph traversal follows the source commit's
+    /// `parent_order`. Petgraph traverses edges in reverse creation order, so
+    /// edges are re-added from last parent to first parent.
     fn rebuild_edges_in_parent_order(&mut self) {
         for sidx in self.segments().collect::<Vec<_>>() {
-            let mut outgoing_edges = self.inner.edges_directed(sidx, Direction::Outgoing);
-            let Some(first_edge) = outgoing_edges.next() else {
-                continue;
-            };
-            let mut previous_parent_order = first_edge.weight().parent_order;
-            let mut must_reorder = false;
-            for edge in outgoing_edges {
-                let parent_order = edge.weight().parent_order;
-                // `edges_directed()` yields newest edges first, so correctly inserted
-                // parent edges appear in descending `parent_order` here.
-                if previous_parent_order < parent_order {
-                    must_reorder = true;
-                    break;
-                }
-                previous_parent_order = parent_order;
-            }
-            if !must_reorder {
-                continue;
-            }
             let mut outgoing_edges: Vec<_> = self
                 .inner
                 .edges_directed(sidx, Direction::Outgoing)
                 .map(EdgeOwned::from)
                 .collect();
-            outgoing_edges.sort_by_key(|e| e.weight.parent_order);
+            outgoing_edges.sort_by_key(|e| std::cmp::Reverse(e.weight.parent_order));
 
             for edge in &outgoing_edges {
                 self.inner.remove_edge(edge.id);
@@ -158,7 +138,9 @@ impl Graph {
             *ep_commit = self
                 .inner
                 .node_weight(*segment)
-                .and_then(|s| s.commit_index_of(tip));
+                .and_then(|s| s.commit_index_of(tip))
+                .map(EntryPointCommit::InSegment)
+                .unwrap_or(EntryPointCommit::AtCommit(tip));
         }
     }
 
@@ -202,8 +184,7 @@ impl Graph {
             })
             .unwrap_or_default();
         if let Some(new_ep_sidx) = sidx_with_desired_name {
-            let assume_tip_is_not_available_in_segment_anymore = None;
-            self.entrypoint = Some((new_ep_sidx, assume_tip_is_not_available_in_segment_anymore));
+            self.entrypoint = Some((new_ep_sidx, EntryPointCommit::Unborn));
         } else if let Some((new_ep_sidx, ref_idx)) = sidx_with_first_commit_with_desired_name {
             let s = &mut self.inner[new_ep_sidx];
             let desired_ref_name = s
@@ -251,9 +232,9 @@ impl Graph {
                     );
                     self.inner.remove_edge(edge.id);
                 }
-                self.entrypoint = Some((entrypoint_sidx, None));
+                self.entrypoint = Some((entrypoint_sidx, EntryPointCommit::Unborn));
             } else {
-                self.entrypoint = Some((new_ep_sidx, Some(0)));
+                self.entrypoint = Some((new_ep_sidx, EntryPointCommit::InSegment(0)));
                 // It's really important to get the name, as the HEAD is pointing to this segment.
                 // So find the segment with the ambiguous ref we desire, and rewrite it to be non-ambiguous.
                 // The reason we wait till now is to not disturb the workspace upgrades, which act differently
@@ -381,8 +362,8 @@ impl Graph {
         let new_segment_commits = s.commits.drain(cidx_for_new_segment..).collect();
         let last_cidx_in_top_segment = s.last_commit_index();
         let edges_to_reconnect: Vec<_> = self
-            .edges_directed_in_order_of_creation(sidx, Direction::Outgoing)
-            .into_iter()
+            .inner
+            .edges_directed(sidx, Direction::Outgoing)
             .map(EdgeOwned::from)
             .collect();
         let mut new_segment = branch_segment_from_name_and_meta(
@@ -406,7 +387,7 @@ impl Graph {
             let last = s.commits.len() - 1;
             (Some(last), Some(s.commits[last].id))
         };
-        for edge in edges_to_reconnect {
+        for edge in edges_to_reconnect.into_iter().rev() {
             self.inner.add_edge(
                 new_segment_sidx,
                 edge.target,
@@ -875,8 +856,8 @@ impl Graph {
 
         // Redo workspace outgoing connections according to desired stack order.
         let mut edges_pointing_to_named_segment = self
-            .edges_directed_in_order_of_creation(ws_sidx, Direction::Outgoing)
-            .into_iter()
+            .inner
+            .edges_directed(ws_sidx, Direction::Outgoing)
             .map(|e| {
                 let rn = self[e.target()].ref_info.clone();
                 (e.id(), e.target(), rn)
@@ -904,7 +885,7 @@ impl Graph {
             })
         });
 
-        for (eid, target_sidx, _) in edges_pointing_to_named_segment {
+        for (eid, target_sidx, _) in edges_pointing_to_named_segment.into_iter().rev() {
             let weight = self
                 .inner
                 .remove_edge(eid)
@@ -1176,8 +1157,8 @@ impl Graph {
                 .filter(|((a, a_sidx), (b, b_sidx))| a.id == b.id && a_sidx == b_sidx)
             {
                 let outgoing: Vec<_> = self
-                    .edges_directed_in_order_of_creation(remote_sidx, Direction::Outgoing)
-                    .into_iter()
+                    .inner
+                    .edges_directed(remote_sidx, Direction::Outgoing)
                     .map(EdgeOwned::from)
                     .collect();
                 let remote_is_connected_to_local =
@@ -1425,7 +1406,7 @@ fn create_independent_segments<T: RefMetadata>(
                     && *ep_sidx == below_idx
                 {
                     *ep_sidx = new_segment_sidx;
-                    *ep_commit_idx = None;
+                    *ep_commit_idx = EntryPointCommit::Unborn;
                 }
             }
             Some(pos) => {

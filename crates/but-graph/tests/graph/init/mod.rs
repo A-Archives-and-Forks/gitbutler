@@ -38,7 +38,7 @@ fn unborn() -> anyhow::Result<()> {
         entrypoint: Some(
             (
                 NodeIndex(0),
-                None,
+                Unborn,
             ),
         ),
         entrypoint_ref: None,
@@ -143,7 +143,7 @@ fn detached() -> anyhow::Result<()> {
         entrypoint: Some(
             (
                 NodeIndex(0),
-                Some(
+                InSegment(
                     0,
                 ),
             ),

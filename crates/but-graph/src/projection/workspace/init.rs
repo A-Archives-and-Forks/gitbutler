@@ -349,6 +349,11 @@ impl Graph {
             target.compute_and_set_commits_ahead(self, lower_bound_segment_id);
         }
 
+        // Stack display order is the reverse of merge-parent order: the first
+        // parent is the integrated base, while workspace stacks are shown from
+        // the last workspace parent back toward the first.
+        // TODO(ST): this should probably be done at display time, right?
+        stacks.reverse();
         let mut ws = WorkspaceState {
             id,
             kind,
@@ -515,7 +520,7 @@ impl Graph {
         let mut edge = self
             .inner
             .edges_directed(start.id, Direction::Outgoing)
-            .last();
+            .next();
         let mut stopped_at = None;
         let mut seen = BTreeSet::new();
         while let Some(first_edge) = edge {
@@ -534,7 +539,7 @@ impl Graph {
                 edge = self
                     .inner
                     .edges_directed(next.id, Direction::Outgoing)
-                    .last();
+                    .next();
             }
         }
         (out, stopped_at)

@@ -8,15 +8,18 @@ use gix::{
     prelude::{ObjectIdExt, ReferenceExt},
     refs::Category,
 };
+use petgraph::Direction;
 use tracing::instrument;
 
-use crate::{CommitFlags, CommitIndex, Edge, Graph, Segment, SegmentIndex, SegmentMetadata};
+use crate::{
+    CommitFlags, CommitIndex, Edge, EntryPointCommit, Graph, Segment, SegmentIndex, SegmentMetadata,
+};
 
 mod walk;
 use walk::*;
 
 pub(crate) mod types;
-use types::{Goals, Instruction, Limit, Queue};
+use types::{EdgeOwned, Goals, Instruction, Limit, Queue};
 
 use crate::init::overlay::{OverlayMetadata, OverlayRepo};
 
@@ -463,7 +466,7 @@ impl Graph {
                     .zip(ref_name.as_ref())
                     .is_some_and(|(a, b)| a == b)
             {
-                graph.entrypoint = Some((ws_segment, None));
+                graph.entrypoint = Some((ws_segment, EntryPointCommit::AtCommit(tip)));
             }
             // As workspaces typically have integration branches which can help us to stop the traversal,
             // pick these up first.
@@ -840,15 +843,36 @@ impl Graph {
         let (tip, ref_name) = match entrypoint {
             Some(t) => t,
             None => {
-                let tip_sidx = self
+                let (entrypoint_sidx, commit) = self
                     .entrypoint
-                    .context("BUG: entrypoint must always be set")?
-                    .0;
-                let tip = self
-                    .tip_skip_empty(tip_sidx)
-                    .context("BUG: entrypoint must eventually point to a commit")?
-                    .id;
-                let ref_name = self[tip_sidx].ref_info.clone().map(|ri| ri.ref_name);
+                    .context("BUG: entrypoint must always be set")?;
+                let entrypoint_segment = self
+                    .inner
+                    .node_weight(entrypoint_sidx)
+                    .context("BUG: entrypoint segment must be present")?;
+                let ref_name = entrypoint_segment.ref_info.clone().map(|ri| ri.ref_name);
+                let tip = if ref_name.is_some() {
+                    match ref_name.as_ref() {
+                        Some(ref_name) => repo
+                            .try_find_reference(ref_name.as_ref())?
+                            .map(|mut reference| reference.peel_to_id().map(|id| id.detach()))
+                            .transpose()?,
+                        None => None,
+                    }
+                } else {
+                    None
+                };
+                let tip = tip
+                    .or_else(|| commit.object_id())
+                    .or_else(|| {
+                        commit
+                            .index()
+                            .and_then(|index| entrypoint_segment.commits.get(index))
+                            .map(|commit| commit.id)
+                    })
+                    .context(
+                        "BUG: entrypoint must either contain a commit index, remember the original commit id, or have a resolvable ref",
+                    )?;
                 (tip, ref_name)
             }
         };
@@ -932,7 +956,7 @@ impl Graph {
     ) {
         let src_commit = src_commit.into();
         let dst_commit = dst_commit.into();
-        self.inner.add_edge(
+        let new_edge_id = self.inner.add_edge(
             src,
             dst,
             Edge {
@@ -943,5 +967,41 @@ impl Graph {
                 parent_order,
             },
         );
+        self.rebuild_outgoing_edges_for_traversal_order(src, new_edge_id);
+    }
+
+    fn rebuild_outgoing_edges_for_traversal_order(
+        &mut self,
+        src: SegmentIndex,
+        new_edge_id: petgraph::stable_graph::EdgeIndex,
+    ) {
+        let mut new_edge = None;
+        let mut outgoing_edges = Vec::new();
+        for edge in self.inner.edges_directed(src, Direction::Outgoing) {
+            let edge = EdgeOwned::from(edge);
+            if edge.id == new_edge_id {
+                new_edge = Some(edge);
+            } else {
+                outgoing_edges.push(edge);
+            }
+        }
+
+        let Some(new_edge) = new_edge else {
+            return;
+        };
+        if outgoing_edges.is_empty() {
+            return;
+        }
+
+        let insert_at = outgoing_edges
+            .partition_point(|edge| edge.weight.parent_order <= new_edge.weight.parent_order);
+        outgoing_edges.insert(insert_at, new_edge);
+
+        for edge in &outgoing_edges {
+            self.inner.remove_edge(edge.id);
+        }
+        for edge in outgoing_edges.into_iter().rev() {
+            self.inner.add_edge(edge.source, edge.target, edge.weight);
+        }
     }
 }

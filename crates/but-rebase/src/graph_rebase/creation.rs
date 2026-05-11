@@ -197,11 +197,21 @@ impl<'ws, 'meta, M: RefMetadata> Editor<'ws, 'meta, M> {
                 continue;
             };
 
-            'inner: for edge in workspace
-                .graph
-                .edges_directed(*sidx, Direction::Outgoing)
-                .collect::<Vec<_>>()
-            {
+            let edges = {
+                let mut v = workspace
+                    .graph
+                    .edges_directed(*sidx, Direction::Outgoing)
+                    .collect::<Vec<_>>();
+                // TODO: the code below relies on edges being in reversed order,
+                //       but that changed now and they are in commit-graph order.
+                //       This is the minimal change to make this work,
+                //       even though a second step should be the cleanup of the
+                //       whole ordering business which also compensated for out-of-order
+                //       edges (which is also fixed).
+                v.reverse();
+                v
+            };
+            'inner: for edge in edges {
                 let Some(target) = segments.get(&edge.target()).and_then(|n| n.nodes.first())
                 else {
                     tracing::warn!(

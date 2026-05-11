@@ -13,8 +13,8 @@ use petgraph::{
 };
 
 use crate::{
-    Commit, CommitFlags, CommitIndex, Edge, EntryPoint, Graph, Segment, SegmentFlags, SegmentIndex,
-    SegmentRelation, StopCondition, init::PetGraph,
+    Commit, CommitFlags, CommitIndex, Edge, EntryPoint, EntryPointCommit, Graph, Segment,
+    SegmentFlags, SegmentIndex, SegmentRelation, StopCondition, init::PetGraph,
     projection::commit::is_managed_workspace_by_message,
 };
 
@@ -25,9 +25,14 @@ impl Graph {
     /// Note that as a side effect, the [entrypoint](Self::lookup_entrypoint()) will also be set if it's not
     /// set yet.
     pub fn insert_segment_set_entrypoint(&mut self, segment: Segment) -> SegmentIndex {
+        let entrypoint = segment
+            .commits
+            .first()
+            .map(|commit| EntryPointCommit::AtCommit(commit.id))
+            .unwrap_or(EntryPointCommit::Unborn);
         let index = self.insert_segment(segment);
         if self.entrypoint.is_none() {
-            self.entrypoint = Some((index, None))
+            self.entrypoint = Some((index, entrypoint))
         }
         index
     }
@@ -466,9 +471,10 @@ impl Graph {
     ///
     /// Note that this method only fails if the entrypoint wasn't set correctly due to a bug.
     pub fn lookup_entrypoint(&self) -> anyhow::Result<EntryPoint<'_>> {
-        let (segment_index, commit_index) = self
+        let (segment_index, commit) = self
             .entrypoint
             .context("BUG: must always set the entrypoint")?;
+        let commit_index = commit.index();
         let segment = &self.inner.node_weight(segment_index).with_context(|| {
             format!("BUG: entrypoint segment at {segment_index:?} wasn't present")
         })?;
@@ -520,27 +526,13 @@ impl Graph {
         &self,
         sidx: SegmentIndex,
     ) -> impl Iterator<Item = (Option<CommitIndex>, SegmentIndex)> {
-        self.edges_directed_in_order_of_creation(sidx, Direction::Outgoing)
-            .into_iter()
+        self.inner
+            .edges_directed(sidx, Direction::Outgoing)
             .filter_map(|edge| {
                 let dst = edge.weight().dst;
                 dst.is_none_or(|dst| dst == 0)
                     .then_some((edge.weight().src, edge.target()))
             })
-    }
-
-    /// Just like [petgraph::Graph::edges_directed()](petgraph::Graph::edges_directed()), but it returns the edges
-    /// in the order in which they were added, and *not* in reverse.
-    ///
-    /// Use this whenever you need to maintain a certain order of operation.
-    pub fn edges_directed_in_order_of_creation(
-        &self,
-        sidx: SegmentIndex,
-        direction: Direction,
-    ) -> Vec<EdgeReference<'_, Edge>> {
-        let mut edges: Vec<_> = self.inner.edges_directed(sidx, direction).collect();
-        edges.reverse();
-        edges
     }
 
     /// Return the condition under which traversal stopped at `sidx`,

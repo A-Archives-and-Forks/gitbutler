@@ -1183,7 +1183,7 @@ fn apply_two_ambiguous_stacks_with_target() -> anyhow::Result<()> {
 
 #[test]
 fn apply_with_conflicts_shows_exact_conflict_info() -> anyhow::Result<()> {
-    let (_tmp, graph, repo, mut meta, _description) =
+    let (_tmp, _graph, repo, mut meta, _description) =
         named_writable_scenario_with_description_and_graph(
             "various-heads-for-multi-line-merge-conflict",
             |_meta| {},
@@ -1212,9 +1212,19 @@ fn apply_with_conflicts_shows_exact_conflict_info() -> anyhow::Result<()> {
             .status()?
             .success()
     );
-    let mut ws = graph
-        .redo_traversal_with_overlay(&repo, &meta, Overlay::default())?
-        .into_workspace()?;
+    // The fixture helper created `graph` while `HEAD` still pointed to `conflict-hero`.
+    // Replaying that graph would correctly keep using `conflict-hero` as the traversal
+    // entrypoint, even though the test just checked out `main`. Build the graph from
+    // the current repository state so the workspace under test starts at `main`.
+    let mut ws = but_graph::Graph::from_head(
+        &repo,
+        &meta,
+        Options {
+            extra_target_commit_id: repo.rev_parse_single("main").ok().map(|id| id.detach()),
+            ..Options::limited()
+        },
+    )?
+    .into_workspace()?;
 
     for branch_to_apply in [
         "clean-A",
