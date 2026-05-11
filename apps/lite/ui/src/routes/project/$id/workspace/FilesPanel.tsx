@@ -54,13 +54,9 @@ import {
 	navigationIndexIncludes,
 } from "#ui/workspace/navigation-index.ts";
 import { useCommand } from "#ui/commands/manager.ts";
+import { assert } from "#ui/assert.ts";
 
 const NavigationIndexContext = createContext<NavigationIndex | null>(null);
-
-const assert = <T,>(t: T | null | undefined): T => {
-	if (t == null) throw new Error("Expected value to be non-null and defined");
-	return t;
-};
 
 const useNavigationIndex = (projectId: string, parent: Operand, files: Array<Operand>) => {
 	const dispatch = useAppDispatch();
