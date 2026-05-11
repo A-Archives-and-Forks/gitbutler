@@ -98,8 +98,7 @@ const Hunk: FC<{
 			: undefined;
 
 	const operand = hunkOperand({
-		parent: fileParent,
-		path: change.path,
+		parent: { parent: fileParent, path: change.path },
 		hunkHeader: hunk,
 		isResultOfBinaryToTextConversion,
 	});

@@ -52,7 +52,8 @@ export type FileOperand = {
 };
 
 /** @public */
-export type HunkOperand = FileOperand & {
+export type HunkOperand = {
+	parent: FileOperand;
 	hunkHeader: HunkHeader;
 	isResultOfBinaryToTextConversion: boolean;
 };
@@ -101,13 +102,11 @@ export const fileOperand = ({ parent, path }: FileOperand): Operand => ({
 /** @public */
 export const hunkOperand = ({
 	parent,
-	path,
 	hunkHeader,
 	isResultOfBinaryToTextConversion,
 }: HunkOperand): Operand => ({
 	_tag: "Hunk",
 	parent,
-	path,
 	hunkHeader,
 	isResultOfBinaryToTextConversion,
 });
@@ -127,13 +126,7 @@ export const operandIdentityKey = (operand: Operand): string =>
 			Commit: (x) => JSON.stringify(["Commit", x.stackId, x.commitId]),
 			BaseCommit: () => JSON.stringify(["BaseCommit"]),
 			Hunk: (x) =>
-				JSON.stringify([
-					"Hunk",
-					x.parent,
-					x.path,
-					x.hunkHeader,
-					x.isResultOfBinaryToTextConversion,
-				]),
+				JSON.stringify(["Hunk", x.parent, x.hunkHeader, x.isResultOfBinaryToTextConversion]),
 		}),
 	);
 
@@ -146,7 +139,7 @@ export const operandFileParent = (operand: Operand): FileParent | null =>
 		Match.tags({
 			File: ({ parent }) => parent,
 			ChangesSection: () => changesFileParent,
-			Hunk: ({ parent }) => parent,
+			Hunk: ({ parent }) => parent.parent,
 		}),
 		Match.orElse(() => null),
 	);
