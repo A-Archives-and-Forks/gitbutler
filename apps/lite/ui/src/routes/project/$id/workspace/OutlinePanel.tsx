@@ -3,7 +3,6 @@ import {
 	commitCreateMutationOptions,
 	commitDiscardMutationOptions,
 	commitInsertBlankMutationOptions,
-	commitMoveMutationOptions,
 	commitRewordMutationOptions,
 	unapplyStackMutationOptions,
 	updateBranchNameMutationOptions,
@@ -40,6 +39,7 @@ import {
 	selectProjectHighlightedCommitIds,
 	selectProjectOperationModeState,
 	selectProjectOutlineModeState,
+	selectProjectReplacedCommits,
 	selectProjectSelectionOutline,
 } from "#ui/projects/state.ts";
 import { OperationSourceC } from "#ui/routes/project/$id/workspace/OperationSourceC.tsx";
@@ -86,7 +86,7 @@ import { Panel, PanelProps } from "react-resizable-panels";
 import styles from "./OutlinePanel.module.css";
 import workspaceItemRowStyles from "./WorkspaceItemRow.module.css";
 import { WorkspaceItemRow, WorkspaceItemRowToolbar } from "./WorkspaceItemRow.tsx";
-import { moveOperation, useRunOperation } from "#ui/operations/operation.ts";
+import { moveOperation, useRunOperationMutationOptions } from "#ui/operations/operation.ts";
 import { isNonEmptyArray, NonEmptyArray } from "effect/Array";
 import { defaultOutlineSelection } from "#ui/projects/workspace/state.ts";
 import { ShortcutButton } from "#ui/ui/ShortcutButton.tsx";
@@ -150,12 +150,34 @@ const useNavigationIndex = (projectId: string) => {
 	const navigationIndexUnfiltered = buildNavigationIndex(sections(headInfo));
 
 	const selection = useAppSelector((state) => selectProjectSelectionOutline(state, projectId));
+	const replacedCommits = useAppSelector((state) => selectProjectReplacedCommits(state, projectId));
 
-	// Reset selection when it's no longer part of the workspace.
-	//
 	// React allows state updates on render, but not for external stores.
 	// https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
 	useEffect(() => {
+		//
+		// Update selection when the commit was replaced.
+		//
+		if (selection._tag === "Commit") {
+			const newCommitId = replacedCommits[selection.commitId];
+			if (newCommitId !== undefined && newCommitId !== selection.commitId) {
+				const newSelection = commitOperand({ ...selection, commitId: newCommitId });
+
+				if (navigationIndexIncludes(navigationIndexUnfiltered, newSelection)) {
+					dispatch(
+						projectActions.selectOutline({
+							projectId,
+							selection: newSelection,
+						}),
+					);
+					return;
+				}
+			}
+		}
+
+		//
+		// Reset selection when it's no longer part of the workspace.
+		//
 		if (!navigationIndexIncludes(navigationIndexUnfiltered, selection))
 			dispatch(
 				projectActions.selectOutline({
@@ -163,7 +185,7 @@ const useNavigationIndex = (projectId: string) => {
 					selection: defaultOutlineSelection,
 				}),
 			);
-	}, [navigationIndexUnfiltered, selection, projectId, dispatch]);
+	}, [navigationIndexUnfiltered, selection, projectId, dispatch, replacedCommits]);
 
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
@@ -452,10 +474,45 @@ const CommitRow: FC<
 		message: optimisticMessage,
 	};
 
-	const commitInsertBlank = useMutation(commitInsertBlankMutationOptions);
-	const commitDiscard = useMutation(commitDiscardMutationOptions);
-	const commitMove = useMutation(commitMoveMutationOptions);
-	const commitReword = useMutation(commitRewordMutationOptions);
+	const commitInsertBlank = useMutation({
+		...commitInsertBlankMutationOptions,
+		onSuccess: async (response, input, context, mutation) => {
+			dispatch(
+				projectActions.addReplacedCommits({
+					projectId: input.projectId,
+					replacedCommits: response.workspace.replacedCommits,
+				}),
+			);
+
+			await commitInsertBlankMutationOptions.onSuccess?.(response, input, context, mutation);
+		},
+	});
+	const commitDiscard = useMutation({
+		...commitDiscardMutationOptions,
+		onSuccess: async (response, input, context, mutation) => {
+			dispatch(
+				projectActions.addReplacedCommits({
+					projectId: input.projectId,
+					replacedCommits: response.workspace.replacedCommits,
+				}),
+			);
+
+			await commitDiscardMutationOptions.onSuccess?.(response, input, context, mutation);
+		},
+	});
+	const commitReword = useMutation({
+		...commitRewordMutationOptions,
+		onSuccess: async (response, input, context, mutation) => {
+			dispatch(
+				projectActions.addReplacedCommits({
+					projectId: input.projectId,
+					replacedCommits: response.workspace.replacedCommits,
+				}),
+			);
+
+			await commitRewordMutationOptions.onSuccess?.(response, input, context, mutation);
+		},
+	});
 
 	const insertBlankCommitAbove = () => {
 		commitInsertBlank.mutate({
@@ -483,7 +540,7 @@ const CommitRow: FC<
 		});
 	};
 
-	const runOperation = useRunOperation();
+	const runOperationMutation = useMutation(useRunOperationMutationOptions());
 
 	const moveCommit = (offset: -1 | 1) => {
 		const selectionIdx = navigationIndex.indexByKey.get(operandIdentityKey(operand));
@@ -499,7 +556,7 @@ const CommitRow: FC<
 		});
 		if (!operation) return;
 
-		runOperation(projectId, operation);
+		runOperationMutation.mutate({ projectId, operation });
 	};
 
 	const cutCommit = () => {
@@ -587,7 +644,7 @@ const CommitRow: FC<
 
 	useCommand(() => moveCommit(-1), {
 		enabled:
-			!commitMove.isPending &&
+			!runOperationMutation.isPending &&
 			isSelected &&
 			focusedPanel === "outline" &&
 			outlineMode._tag === "Default",
@@ -597,7 +654,7 @@ const CommitRow: FC<
 
 	useCommand(() => moveCommit(1), {
 		enabled:
-			!commitMove.isPending &&
+			!runOperationMutation.isPending &&
 			isSelected &&
 			focusedPanel === "outline" &&
 			outlineMode._tag === "Default",
@@ -1165,7 +1222,20 @@ const BranchRow: FC<
 	);
 	const [isRenamePending, startRenameTransition] = useTransition();
 
-	const updateBranchName = useMutation(updateBranchNameMutationOptions);
+	const updateBranchName = useMutation({
+		...updateBranchNameMutationOptions,
+		onSuccess: async (response, input, context, mutation) => {
+			await updateBranchNameMutationOptions.onSuccess?.(response, input, context, mutation);
+
+			const newSelection = branchOperand({
+				stackId,
+				// TODO: ideally the API would return the new ref?
+				branchRef: encodeRefName(`refs/heads/${input.newName}`),
+			});
+			dispatch(projectActions.selectOutline({ projectId, selection: newSelection }));
+			dispatch(projectActions.exitMode({ projectId }));
+		},
+	});
 
 	const startEditing = () => {
 		dispatch(projectActions.selectOutline({ projectId, selection: operand }));
@@ -1197,13 +1267,6 @@ const BranchRow: FC<
 				// error boundaries.
 				return;
 			}
-			const newItem = branchOperand({
-				stackId,
-				// TODO: ideally the API would return the new ref?
-				branchRef: encodeRefName(`refs/heads/${trimmed}`),
-			});
-			dispatch(projectActions.selectOutline({ projectId, selection: newItem }));
-			dispatch(projectActions.exitMode({ projectId }));
 		});
 	};
 

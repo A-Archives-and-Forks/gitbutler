@@ -4,7 +4,7 @@ import {
 	getOperation,
 	getOperations,
 	operationLabel,
-	useRunOperation,
+	useRunOperationMutationOptions,
 	type Operation,
 	type OperationsByType,
 } from "#ui/operations/operation.ts";
@@ -19,20 +19,21 @@ import { projectActions } from "#ui/projects/state.ts";
 import { operationModeToOperationType, OperationMode } from "#ui/outline/mode.ts";
 import { Match } from "effect";
 import { useCommand } from "#ui/commands/manager.ts";
+import { useMutation } from "@tanstack/react-query";
 
 const OperationModeControls: FC<{
 	projectId: string;
 	operation: Operation | null;
 }> = ({ projectId, operation }) => {
 	const dispatch = useAppDispatch();
-	const runOperation = useRunOperation();
+	const { mutate: runOperation } = useMutation(useRunOperationMutationOptions());
 
 	const confirm = () => {
 		dispatch(projectActions.exitMode({ projectId }));
 
 		if (!operation) return;
 
-		runOperation(projectId, operation);
+		runOperation({ projectId, operation });
 	};
 
 	const cancel = () => dispatch(projectActions.exitMode({ projectId }));
@@ -79,14 +80,14 @@ const CutOperationControls: FC<{
 	operations: OperationsByType;
 }> = ({ projectId, operations }) => {
 	const dispatch = useAppDispatch();
-	const runOperation = useRunOperation();
+	const { mutate: runOperation } = useMutation(useRunOperationMutationOptions());
 
 	const run = (operation: Operation | null) => {
 		dispatch(projectActions.exitMode({ projectId }));
 
 		if (!operation) return;
 
-		runOperation(projectId, operation);
+		runOperation({ projectId, operation });
 	};
 
 	const cancel = () => dispatch(projectActions.exitMode({ projectId }));

@@ -1,5 +1,5 @@
 import { Toast } from "@base-ui/react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { mutationOptions, QueryClient, useQueryClient } from "@tanstack/react-query";
 import { Match } from "effect";
 import {
 	type CommitAmendParams,
@@ -14,23 +14,12 @@ import {
 	CommitUncommitParams,
 } from "#electron/ipc.ts";
 import { rejectedChangesToastOptions } from "#ui/operations/rejectedChangesToastOptions.tsx";
-import {
-	commitAmendMutationOptions,
-	commitCreateMutationOptions,
-	commitInsertBlankMutationOptions,
-	commitMoveMutationOptions,
-	commitMoveChangesBetweenMutationOptions,
-	commitSquashMutationOptions,
-	commitUncommitChangesMutationOptions,
-	commitUncommitMutationOptions,
-	absorbMutationOptions,
-	moveBranchMutationOptions,
-	tearOffBranchMutationOptions,
-} from "#ui/api/mutations.ts";
 import { CommitAbsorption, InsertSide, RelativeTo } from "@gitbutler/but-sdk";
 import { Operand, operandEquals, operandFileParent } from "#ui/operands.ts";
 import { resolveDiffSpecs } from "#ui/operations/diff-specs.ts";
 import { decodeRefName } from "#ui/api/ref-name.ts";
+import { projectActions } from "#ui/projects/state.ts";
+import { useAppDispatch } from "#ui/store.ts";
 
 /** @public */
 export type CommitAmendOperation = Omit<CommitAmendParams, "dryRun" | "projectId" | "changes"> & {
@@ -190,198 +179,172 @@ export const operationLabel = (operation: Operation): string =>
 		}),
 	);
 
-export const useRunOperation = () => {
+const runOperation = async (projectId: string, operation: Operation, queryClient: QueryClient) =>
+	Match.value(operation).pipe(
+		Match.tagsExhaustive({
+			Absorb: async (operation) => {
+				await window.lite.absorb({
+					projectId,
+					absorptionPlan: operation.absorptionPlan,
+				});
+			},
+			CommitAmend: (operation) => {
+				const changes = resolveDiffSpecs({
+					source: operation.source,
+					queryClient,
+					projectId,
+				});
+				if (!changes) return;
+
+				return window.lite.commitAmend({
+					projectId,
+					commitId: operation.commitId,
+					changes,
+					dryRun: false,
+				});
+			},
+			CommitMoveChangesBetween: (operation) => {
+				const changes = resolveDiffSpecs({
+					source: operation.source,
+					queryClient,
+					projectId,
+				});
+				if (!changes) return;
+
+				return window.lite.commitMoveChangesBetween({
+					projectId,
+					sourceCommitId: operation.sourceCommitId,
+					destinationCommitId: operation.destinationCommitId,
+					changes,
+					dryRun: false,
+				});
+			},
+			CommitSquash: (operation) =>
+				window.lite.commitSquash({
+					projectId,
+					sourceCommitIds: operation.sourceCommitIds,
+					destinationCommitId: operation.destinationCommitId,
+					dryRun: false,
+				}),
+			CommitUncommit: (operation) =>
+				window.lite.commitUncommit({
+					projectId,
+					subjectCommitIds: operation.subjectCommitIds,
+					assignTo: operation.assignTo,
+					dryRun: false,
+				}),
+			CommitUncommitChanges: (operation) => {
+				const changes = resolveDiffSpecs({
+					source: operation.source,
+					queryClient,
+					projectId,
+				});
+				if (!changes) return;
+
+				return window.lite.commitUncommitChanges({
+					projectId,
+					commitId: operation.commitId,
+					assignTo: operation.assignTo,
+					changes,
+					dryRun: false,
+				});
+			},
+			CommitCreate: (operation) => {
+				const changes = resolveDiffSpecs({
+					source: operation.source,
+					queryClient,
+					projectId,
+				});
+				if (!changes) return;
+
+				return window.lite.commitCreate({
+					projectId,
+					relativeTo: operation.relativeTo,
+					side: operation.side,
+					changes,
+					message: operation.message,
+					dryRun: false,
+				});
+			},
+			CommitCreateFromCommittedChanges: async (operation) => {
+				const changes = resolveDiffSpecs({
+					source: operation.source,
+					queryClient,
+					projectId,
+				});
+				if (!changes) return;
+
+				// Ideally this would be an atomic backend operation.
+				const insertedCommit = await window.lite.commitInsertBlank({
+					projectId,
+					relativeTo: operation.relativeTo,
+					side: operation.side,
+					dryRun: false,
+				});
+
+				return window.lite.commitMoveChangesBetween({
+					projectId,
+					sourceCommitId:
+						insertedCommit.workspace.replacedCommits[operation.sourceCommitId] ??
+						operation.sourceCommitId,
+					destinationCommitId: insertedCommit.newCommit,
+					changes,
+					dryRun: false,
+				});
+			},
+			CommitMove: (operation) =>
+				window.lite.commitMove({
+					projectId,
+					subjectCommitIds: operation.subjectCommitIds,
+					relativeTo: operation.relativeTo,
+					side: operation.side,
+					dryRun: false,
+				}),
+			MoveBranch: (operation) =>
+				window.lite.moveBranch({
+					projectId,
+					subjectBranch: operation.subjectBranch,
+					targetBranch: operation.targetBranch,
+					dryRun: false,
+				}),
+			TearOffBranch: (operation) =>
+				window.lite.tearOffBranch({
+					projectId,
+					subjectBranch: operation.subjectBranch,
+					dryRun: false,
+				}),
+		}),
+	);
+
+export const useRunOperationMutationOptions = () => {
+	const dispatch = useAppDispatch();
 	const toastManager = Toast.useToastManager();
 	const queryClient = useQueryClient();
-	const commitAmend = useMutation({
-		...commitAmendMutationOptions,
-		onSuccess: async (response, input, context, mutation) => {
-			await commitAmendMutationOptions.onSuccess?.(response, input, context, mutation);
 
-			if (response.rejectedChanges.length > 0)
-				toastManager.add(
-					rejectedChangesToastOptions({
-						newCommit: response.newCommit,
-						rejectedChanges: response.rejectedChanges,
+	return mutationOptions({
+		mutationFn: ({ projectId, operation }: { projectId: string; operation: Operation }) =>
+			runOperation(projectId, operation, queryClient),
+		onSuccess: async (response, input, _ctx, { client }) => {
+			if (response) {
+				dispatch(
+					projectActions.addReplacedCommits({
+						projectId: input.projectId,
+						replacedCommits: response.workspace.replacedCommits,
 					}),
 				);
+
+				if ("rejectedChanges" in response && response.rejectedChanges.length > 0)
+					toastManager.add(
+						rejectedChangesToastOptions({
+							newCommit: response.newCommit,
+							rejectedChanges: response.rejectedChanges,
+						}),
+					);
+			}
+
+			await client.invalidateQueries();
 		},
 	});
-	const commitCreate = useMutation({
-		...commitCreateMutationOptions,
-		onSuccess: async (response, input, context, mutation) => {
-			await commitCreateMutationOptions.onSuccess?.(response, input, context, mutation);
-
-			if (response.rejectedChanges.length > 0)
-				toastManager.add(
-					rejectedChangesToastOptions({
-						newCommit: response.newCommit,
-						rejectedChanges: response.rejectedChanges,
-					}),
-				);
-		},
-	});
-	const commitInsertBlank = useMutation(commitInsertBlankMutationOptions);
-	const commitMove = useMutation(commitMoveMutationOptions);
-	const commitMoveChangesBetween = useMutation(commitMoveChangesBetweenMutationOptions);
-	const commitSquash = useMutation(commitSquashMutationOptions);
-	const commitUncommit = useMutation(commitUncommitMutationOptions);
-	const commitUncommitChanges = useMutation(commitUncommitChangesMutationOptions);
-	const moveBranch = useMutation(moveBranchMutationOptions);
-	const tearOffBranch = useMutation(tearOffBranchMutationOptions);
-	const absorb = useMutation({
-		...absorbMutationOptions,
-		onSuccess: async (response, input, context, mutation) => {
-			await absorbMutationOptions.onSuccess?.(response, input, context, mutation);
-
-			toastManager.add({ title: "Changes absorbed successfully" });
-		},
-	});
-
-	return (projectId: string, operation: Operation): void => {
-		Match.value(operation).pipe(
-			Match.tagsExhaustive({
-				Absorb: (operation) => {
-					absorb.mutate({
-						projectId,
-						absorptionPlan: operation.absorptionPlan,
-					});
-				},
-				CommitAmend: (operation) => {
-					const changes = resolveDiffSpecs({
-						source: operation.source,
-						queryClient,
-						projectId,
-					});
-					if (!changes) return;
-
-					commitAmend.mutate({
-						projectId,
-						commitId: operation.commitId,
-						changes,
-						dryRun: false,
-					});
-				},
-				CommitMoveChangesBetween: (operation) => {
-					const changes = resolveDiffSpecs({
-						source: operation.source,
-						queryClient,
-						projectId,
-					});
-					if (!changes) return;
-
-					commitMoveChangesBetween.mutate({
-						projectId,
-						sourceCommitId: operation.sourceCommitId,
-						destinationCommitId: operation.destinationCommitId,
-						changes,
-						dryRun: false,
-					});
-				},
-				CommitSquash: (operation) => {
-					commitSquash.mutate({
-						projectId,
-						sourceCommitIds: operation.sourceCommitIds,
-						destinationCommitId: operation.destinationCommitId,
-						dryRun: false,
-					});
-				},
-				CommitUncommit: (operation) => {
-					commitUncommit.mutate({
-						projectId,
-						subjectCommitIds: operation.subjectCommitIds,
-						assignTo: operation.assignTo,
-						dryRun: false,
-					});
-				},
-				CommitUncommitChanges: (operation) => {
-					const changes = resolveDiffSpecs({
-						source: operation.source,
-						queryClient,
-						projectId,
-					});
-					if (!changes) return;
-
-					commitUncommitChanges.mutate({
-						projectId,
-						commitId: operation.commitId,
-						assignTo: operation.assignTo,
-						changes,
-						dryRun: false,
-					});
-				},
-				CommitCreate: (operation) => {
-					const changes = resolveDiffSpecs({
-						source: operation.source,
-						queryClient,
-						projectId,
-					});
-					if (!changes) return;
-
-					commitCreate.mutate({
-						projectId,
-						relativeTo: operation.relativeTo,
-						side: operation.side,
-						changes,
-						message: operation.message,
-						dryRun: false,
-					});
-				},
-				CommitCreateFromCommittedChanges: (operation) => {
-					const changes = resolveDiffSpecs({
-						source: operation.source,
-						queryClient,
-						projectId,
-					});
-					if (!changes) return;
-
-					// Ideally this would be an atomic backend operation.
-					void (async () => {
-						const insertedCommit = await commitInsertBlank.mutateAsync({
-							projectId,
-							relativeTo: operation.relativeTo,
-							side: operation.side,
-							dryRun: false,
-						});
-
-						await commitMoveChangesBetween.mutateAsync({
-							projectId,
-							sourceCommitId:
-								insertedCommit.workspace.replacedCommits[operation.sourceCommitId] ??
-								operation.sourceCommitId,
-							destinationCommitId: insertedCommit.newCommit,
-							changes,
-							dryRun: false,
-						});
-					})();
-				},
-				CommitMove: (operation) => {
-					commitMove.mutate({
-						projectId,
-						subjectCommitIds: operation.subjectCommitIds,
-						relativeTo: operation.relativeTo,
-						side: operation.side,
-						dryRun: false,
-					});
-				},
-				MoveBranch: (operation) => {
-					moveBranch.mutate({
-						projectId,
-						subjectBranch: operation.subjectBranch,
-						targetBranch: operation.targetBranch,
-						dryRun: false,
-					});
-				},
-				TearOffBranch: (operation) => {
-					tearOffBranch.mutate({
-						projectId,
-						subjectBranch: operation.subjectBranch,
-						dryRun: false,
-					});
-				},
-			}),
-		);
-	};
 };
 
 /**

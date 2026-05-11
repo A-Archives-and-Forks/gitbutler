@@ -5,7 +5,7 @@ import { type BranchOperand, type CommitOperand, type Operand } from "#ui/operan
 import { type Panel } from "#ui/panels.ts";
 import * as panels from "#ui/panels/state.ts";
 import * as workspace from "#ui/projects/workspace/state.ts";
-import { OperationType } from "#ui/operations/operation.ts";
+import { type OperationType } from "#ui/operations/operation.ts";
 
 type Dialog =
 	| { _tag: "None" }
@@ -181,6 +181,13 @@ const projectSlice = createSlice({
 		closeDialog: (state, action: PayloadAction<{ projectId: string }>) => {
 			ensureProjectState(state, action.payload.projectId).dialog = { _tag: "None" };
 		},
+		addReplacedCommits: (
+			state,
+			action: PayloadAction<{ projectId: string; replacedCommits: Record<string, string> }>,
+		) => {
+			const { projectId, replacedCommits } = action.payload;
+			workspace.addReplacedCommits(ensureProjectState(state, projectId).workspace, replacedCommits);
+		},
 	},
 });
 
@@ -213,3 +220,6 @@ export const selectProjectOperationModeState = (state: RootState, projectId: str
 
 export const selectProjectHighlightedCommitIds = (state: RootState, projectId: string) =>
 	workspace.selectHighlightedCommitIds(selectProjectWorkspaceState(state, projectId));
+
+export const selectProjectReplacedCommits = (state: RootState, projectId: string) =>
+	workspace.selectReplacedCommits(selectProjectWorkspaceState(state, projectId));

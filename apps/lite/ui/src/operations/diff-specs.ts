@@ -60,8 +60,8 @@ const resolvedDiffSpecsFromOperand = ({
 				const changes = worktreeChanges.changes.map((change) => createDiffSpec(change, []));
 				return changes;
 			},
-			Hunk: ({ parent, path, hunkHeader }) => {
-				const changes = Match.value(parent).pipe(
+			Hunk: ({ parent, hunkHeader }) => {
+				const changes = Match.value(parent.parent).pipe(
 					Match.tagsExhaustive({
 						Changes: () => worktreeChanges?.changes,
 						Commit: ({ commitId }) => getCommitDetails(commitId)?.changes,
@@ -70,7 +70,7 @@ const resolvedDiffSpecsFromOperand = ({
 				);
 				if (!changes) return null;
 
-				const change = changes.find((candidate) => candidate.path === path);
+				const change = changes.find((candidate) => candidate.path === parent.path);
 				if (!change) return null;
 
 				return [createDiffSpec(change, [hunkHeader])];

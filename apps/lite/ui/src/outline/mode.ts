@@ -145,31 +145,31 @@ const hasAnyOperation = (source: Operand, target: Operand) => {
 	return !!operations.rub || !!operations.moveAbove || !!operations.moveBelow;
 };
 
-const operationModeHasOperation = ({
+export const operationModeHasOperation = ({
 	mode,
-	operand,
+	target,
 }: {
 	mode: OperationMode;
-	operand: Operand;
+	target: Operand;
 }): boolean =>
 	Match.value(mode).pipe(
 		Match.tagsExhaustive({
 			Absorb: ({ absorptionPlan }) =>
 				absorptionPlan.some(({ stackId, commitId }) =>
-					operandEquals(commitOperand({ stackId, commitId }), operand),
+					operandEquals(commitOperand({ stackId, commitId }), target),
 				),
-			DragAndDrop: ({ source }) => hasAnyOperation(source, operand),
-			Cut: ({ source }) => hasAnyOperation(source, operand),
+			DragAndDrop: ({ source }) => hasAnyOperation(source, target),
+			Cut: ({ source }) => hasAnyOperation(source, target),
 			Move: (mode) =>
 				!!getOperation({
 					source: mode.source,
-					target: operand,
+					target,
 					operationType: operationModeToOperationType(mode),
 				}),
 			Rub: (mode) =>
 				!!getOperation({
 					source: mode.source,
-					target: operand,
+					target,
 					operationType: operationModeToOperationType(mode),
 				}),
 		}),
@@ -190,11 +190,7 @@ export const filterNavigationIndexForOutlineMode = ({
 					navigationIndexUnfiltered,
 					(operand) =>
 						operandContains(operand, operationMode.source) ||
-						(operationMode._tag === "Absorb" &&
-							operationMode.absorptionPlan.some(({ stackId, commitId }) =>
-								operandEquals(commitOperand({ stackId, commitId }), operand),
-							)) ||
-						operationModeHasOperation({ mode: operationMode, operand }),
+						operationModeHasOperation({ mode: operationMode, target: operand }),
 				),
 			RenameBranch: (x) =>
 				filterNavigationIndex(navigationIndexUnfiltered, (operand) =>
