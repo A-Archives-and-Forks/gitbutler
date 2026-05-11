@@ -145,7 +145,7 @@ const hasAnyOperation = (source: Operand, target: Operand) => {
 	return !!operations.rub || !!operations.moveAbove || !!operations.moveBelow;
 };
 
-export const operationModeHasOperation = ({
+export const isOperationModeCandidateTarget = ({
 	mode,
 	target,
 }: {
@@ -190,7 +190,7 @@ export const filterNavigationIndexForOutlineMode = ({
 					navigationIndexUnfiltered,
 					(operand) =>
 						operandContains(operand, operationMode.source) ||
-						operationModeHasOperation({ mode: operationMode, target: operand }),
+						isOperationModeCandidateTarget({ mode: operationMode, target: operand }),
 				),
 			RenameBranch: (x) =>
 				filterNavigationIndex(navigationIndexUnfiltered, (operand) =>
