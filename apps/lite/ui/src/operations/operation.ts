@@ -185,10 +185,12 @@ const runOperation = async (
 	projectId: string,
 	operation: Operation,
 	changes: Array<DiffSpec> | null,
+	dryRun: boolean,
 ) =>
 	Match.value(operation).pipe(
 		Match.tagsExhaustive({
 			Absorb: async (operation) => {
+				if (dryRun) return;
 				await window.lite.absorb({
 					projectId,
 					absorptionPlan: operation.absorptionPlan,
@@ -200,7 +202,7 @@ const runOperation = async (
 					projectId,
 					commitId: operation.commitId,
 					changes,
-					dryRun: false,
+					dryRun,
 				});
 			},
 			CommitMoveChangesBetween: (operation) => {
@@ -210,7 +212,7 @@ const runOperation = async (
 					sourceCommitId: operation.sourceCommitId,
 					destinationCommitId: operation.destinationCommitId,
 					changes,
-					dryRun: false,
+					dryRun,
 				});
 			},
 			CommitSquash: (operation) =>
@@ -218,14 +220,14 @@ const runOperation = async (
 					projectId,
 					sourceCommitIds: operation.sourceCommitIds,
 					destinationCommitId: operation.destinationCommitId,
-					dryRun: false,
+					dryRun,
 				}),
 			CommitUncommit: (operation) =>
 				window.lite.commitUncommit({
 					projectId,
 					subjectCommitIds: operation.subjectCommitIds,
 					assignTo: operation.assignTo,
-					dryRun: false,
+					dryRun,
 				}),
 			CommitUncommitChanges: (operation) => {
 				if (!changes) return;
@@ -234,7 +236,7 @@ const runOperation = async (
 					commitId: operation.commitId,
 					assignTo: operation.assignTo,
 					changes,
-					dryRun: false,
+					dryRun,
 				});
 			},
 			CommitCreate: (operation) => {
@@ -245,18 +247,21 @@ const runOperation = async (
 					side: operation.side,
 					changes,
 					message: operation.message,
-					dryRun: false,
+					dryRun,
 				});
 			},
 			CommitCreateFromCommittedChanges: async (operation) => {
 				if (!changes) return;
 
-				// Ideally this would be an atomic backend operation.
+				// We can't dry run this as it's not an atomic operation. Ideally this
+				// would be an atomic backend operation.
+				if (dryRun) return;
+
 				const insertedCommit = await window.lite.commitInsertBlank({
 					projectId,
 					relativeTo: operation.relativeTo,
 					side: operation.side,
-					dryRun: false,
+					dryRun,
 				});
 
 				return window.lite.commitMoveChangesBetween({
@@ -266,7 +271,7 @@ const runOperation = async (
 						operation.sourceCommitId,
 					destinationCommitId: insertedCommit.newCommit,
 					changes,
-					dryRun: false,
+					dryRun,
 				});
 			},
 			CommitMove: (operation) =>
@@ -275,20 +280,20 @@ const runOperation = async (
 					subjectCommitIds: operation.subjectCommitIds,
 					relativeTo: operation.relativeTo,
 					side: operation.side,
-					dryRun: false,
+					dryRun,
 				}),
 			MoveBranch: (operation) =>
 				window.lite.moveBranch({
 					projectId,
 					subjectBranch: operation.subjectBranch,
 					targetBranch: operation.targetBranch,
-					dryRun: false,
+					dryRun,
 				}),
 			TearOffBranch: (operation) =>
 				window.lite.tearOffBranch({
 					projectId,
 					subjectBranch: operation.subjectBranch,
-					dryRun: false,
+					dryRun,
 				}),
 		}),
 	);
@@ -309,7 +314,7 @@ export const useRunOperationMutationOptions = () => {
 
 	return mutationOptions({
 		mutationFn: ({ projectId, operation }: { projectId: string; operation: Operation }) =>
-			runOperation(projectId, operation, changes),
+			runOperation(projectId, operation, changes, false),
 		onSuccess: async (response, input, _ctx, { client }) => {
 			if (response) {
 				dispatch(
