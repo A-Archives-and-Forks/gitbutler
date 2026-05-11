@@ -1,4 +1,4 @@
-import { commitOperand, operandEquals, type Operand } from "#ui/operands.ts";
+import { type Operand } from "#ui/operands.ts";
 import { parseDragData } from "./OperationSourceC.tsx";
 import styles from "./OperationTarget.module.css";
 import { OperationTooltip } from "./OperationTooltip.tsx";
@@ -19,6 +19,7 @@ import {
 import { mergeProps, useRender } from "@base-ui/react";
 import { Match, pipe } from "effect";
 import { FC, useEffect, useEffectEvent, useRef, useState } from "react";
+import { operationModeHasOperation } from "#ui/outline/mode.ts";
 
 type DropTargetParams = Parameters<typeof dropTargetForElements>[0];
 type GetDataArgs = Parameters<NonNullable<DropTargetParams["getData"]>>[0];
@@ -181,10 +182,7 @@ export const OperationTarget: FC<
 		Match.value(operationMode).pipe(
 			Match.tagsExhaustive({
 				DragAndDrop: ({ operationType }) => isActiveDropTarget && operationType === "rub",
-				Absorb: ({ absorptionPlan }) =>
-					absorptionPlan.some(({ stackId, commitId }) =>
-						operandEquals(commitOperand({ stackId, commitId }), target),
-					),
+				Absorb: () => operationModeHasOperation({ mode: operationMode, operand: target }),
 				Cut: () => isSelected,
 				Rub: () => isSelected,
 				Move: () => isSelected,

@@ -145,7 +145,7 @@ const hasAnyOperation = (source: Operand, target: Operand) => {
 	return !!operations.rub || !!operations.moveAbove || !!operations.moveBelow;
 };
 
-const operationModeHasOperation = ({
+export const operationModeHasOperation = ({
 	mode,
 	operand,
 }: {
