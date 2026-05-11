@@ -1254,12 +1254,12 @@ const BranchRow: FC<
 				// error boundaries.
 				return;
 			}
-			const newItem = branchOperand({
+			const newSelection = branchOperand({
 				stackId,
 				// TODO: ideally the API would return the new ref?
 				branchRef: encodeRefName(`refs/heads/${trimmed}`),
 			});
-			dispatch(projectActions.selectOutline({ projectId, selection: newItem }));
+			dispatch(projectActions.selectOutline({ projectId, selection: newSelection }));
 			dispatch(projectActions.exitMode({ projectId }));
 		});
 	};
