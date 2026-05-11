@@ -238,14 +238,7 @@ export const useRunOperation = () => {
 	const commitUncommitChanges = useMutation(commitUncommitChangesMutationOptions);
 	const moveBranch = useMutation(moveBranchMutationOptions);
 	const tearOffBranch = useMutation(tearOffBranchMutationOptions);
-	const absorb = useMutation({
-		...absorbMutationOptions,
-		onSuccess: async (response, input, context, mutation) => {
-			await absorbMutationOptions.onSuccess?.(response, input, context, mutation);
-
-			toastManager.add({ title: "Changes absorbed successfully" });
-		},
-	});
+	const absorb = useMutation(absorbMutationOptions);
 
 	return (projectId: string, operation: Operation): void => {
 		Match.value(operation).pipe(
