@@ -20,7 +20,7 @@
 	position: absolute;
 	height: var(--indicator-height);
 	inset-inline: 0;
-	background-color: var(--fill-gray-bg);
+	background-color: hotpink;
 	pointer-events: none;
 }
 
