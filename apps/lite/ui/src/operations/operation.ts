@@ -31,6 +31,8 @@ import { CommitAbsorption, InsertSide, RelativeTo } from "@gitbutler/but-sdk";
 import { Operand, operandEquals, operandFileParent } from "#ui/operands.ts";
 import { resolveDiffSpecs } from "#ui/operations/diff-specs.ts";
 import { decodeRefName } from "#ui/api/ref-name.ts";
+import { projectActions } from "#ui/projects/state.ts";
+import { useAppDispatch } from "#ui/store.ts";
 
 /** @public */
 export type CommitAmendOperation = Omit<CommitAmendParams, "dryRun" | "projectId" | "changes"> & {
@@ -191,11 +193,18 @@ export const operationLabel = (operation: Operation): string =>
 	);
 
 export const useRunOperation = () => {
+	const dispatch = useAppDispatch();
 	const toastManager = Toast.useToastManager();
 	const queryClient = useQueryClient();
 	const commitAmend = useMutation({
 		...commitAmendMutationOptions,
 		onSuccess: async (response, input, context, mutation) => {
+			dispatch(
+				projectActions.addReplacedCommits({
+					projectId: input.projectId,
+					replacedCommits: response.workspace.replacedCommits,
+				}),
+			);
 			await commitAmendMutationOptions.onSuccess?.(response, input, context, mutation);
 
 			if (response.rejectedChanges.length > 0)

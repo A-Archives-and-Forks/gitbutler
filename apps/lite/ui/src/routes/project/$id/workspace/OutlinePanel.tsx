@@ -40,6 +40,7 @@ import {
 	selectProjectHighlightedCommitIds,
 	selectProjectOperationModeState,
 	selectProjectOutlineModeState,
+	selectProjectReplacedCommits,
 	selectProjectSelectionOutline,
 } from "#ui/projects/state.ts";
 import { OperationSourceC } from "#ui/routes/project/$id/workspace/OperationSourceC.tsx";
@@ -150,12 +151,34 @@ const useNavigationIndex = (projectId: string) => {
 	const navigationIndexUnfiltered = buildNavigationIndex(sections(headInfo));
 
 	const selection = useAppSelector((state) => selectProjectSelectionOutline(state, projectId));
+	const replacedCommits = useAppSelector((state) => selectProjectReplacedCommits(state, projectId));
 
-	// Reset selection when it's no longer part of the workspace.
-	//
 	// React allows state updates on render, but not for external stores.
 	// https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
 	useEffect(() => {
+		//
+		// Update selection when the commit was replaced.
+		//
+		if (selection._tag === "Commit") {
+			const newCommitId = replacedCommits[selection.commitId];
+			if (newCommitId !== undefined && newCommitId !== selection.commitId) {
+				const newSelection = commitOperand({ ...selection, commitId: newCommitId });
+
+				if (navigationIndexIncludes(navigationIndexUnfiltered, newSelection)) {
+					dispatch(
+						projectActions.selectOutline({
+							projectId,
+							selection: newSelection,
+						}),
+					);
+					return;
+				}
+			}
+		}
+
+		//
+		// Reset selection when it's no longer part of the workspace.
+		//
 		if (!navigationIndexIncludes(navigationIndexUnfiltered, selection))
 			dispatch(
 				projectActions.selectOutline({
@@ -163,7 +186,7 @@ const useNavigationIndex = (projectId: string) => {
 					selection: defaultOutlineSelection,
 				}),
 			);
-	}, [navigationIndexUnfiltered, selection, projectId, dispatch]);
+	}, [navigationIndexUnfiltered, selection, projectId, dispatch, replacedCommits]);
 
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
@@ -452,10 +475,46 @@ const CommitRow: FC<
 		message: optimisticMessage,
 	};
 
-	const commitInsertBlank = useMutation(commitInsertBlankMutationOptions);
-	const commitDiscard = useMutation(commitDiscardMutationOptions);
+	const commitInsertBlank = useMutation({
+		...commitInsertBlankMutationOptions,
+		onSuccess: async (response, input, context, mutation) => {
+			dispatch(
+				projectActions.addReplacedCommits({
+					projectId: input.projectId,
+					replacedCommits: response.workspace.replacedCommits,
+				}),
+			);
+
+			await commitInsertBlankMutationOptions.onSuccess?.(response, input, context, mutation);
+		},
+	});
+	const commitDiscard = useMutation({
+		...commitDiscardMutationOptions,
+		onSuccess: async (response, input, context, mutation) => {
+			dispatch(
+				projectActions.addReplacedCommits({
+					projectId: input.projectId,
+					replacedCommits: response.workspace.replacedCommits,
+				}),
+			);
+
+			await commitDiscardMutationOptions.onSuccess?.(response, input, context, mutation);
+		},
+	});
 	const commitMove = useMutation(commitMoveMutationOptions);
-	const commitReword = useMutation(commitRewordMutationOptions);
+	const commitReword = useMutation({
+		...commitRewordMutationOptions,
+		onSuccess: async (response, input, context, mutation) => {
+			dispatch(
+				projectActions.addReplacedCommits({
+					projectId: input.projectId,
+					replacedCommits: response.workspace.replacedCommits,
+				}),
+			);
+
+			await commitRewordMutationOptions.onSuccess?.(response, input, context, mutation);
+		},
+	});
 
 	const insertBlankCommitAbove = () => {
 		commitInsertBlank.mutate({
@@ -525,18 +584,12 @@ const CommitRow: FC<
 		startCommitMessageTransition(async () => {
 			setOptimisticMessage(trimmed);
 			try {
-				const response = await commitReword.mutateAsync({
+				await commitReword.mutateAsync({
 					projectId,
 					commitId: commit.id,
 					message: trimmed,
 					dryRun: false,
 				});
-				dispatch(
-					projectActions.selectOutline({
-						projectId,
-						selection: commitOperand({ commitId: response.newCommit, stackId }),
-					}),
-				);
 			} catch {
 				// Use the global mutation error handler (shows toast) instead of React
 				// error boundaries.
