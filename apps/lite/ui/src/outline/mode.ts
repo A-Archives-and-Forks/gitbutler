@@ -190,10 +190,6 @@ export const filterNavigationIndexForOutlineMode = ({
 					navigationIndexUnfiltered,
 					(operand) =>
 						operandContains(operand, operationMode.source) ||
-						(operationMode._tag === "Absorb" &&
-							operationMode.absorptionPlan.some(({ stackId, commitId }) =>
-								operandEquals(commitOperand({ stackId, commitId }), operand),
-							)) ||
 						operationModeHasOperation({ mode: operationMode, operand }),
 				),
 			RenameBranch: (x) =>
