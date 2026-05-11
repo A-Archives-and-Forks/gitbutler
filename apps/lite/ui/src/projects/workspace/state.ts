@@ -1,4 +1,5 @@
 import { OperationType } from "#ui/operations/operation.ts";
+import { CommitAbsorption } from "@gitbutler/but-sdk";
 import { Match } from "effect";
 import {
 	branchOperand,
@@ -9,6 +10,7 @@ import {
 	type Operand,
 } from "#ui/operands.ts";
 import {
+	absorbOperationMode,
 	cutOperationMode,
 	defaultOutlineMode,
 	dragAndDropOperationMode,
@@ -58,6 +60,14 @@ export const enterRubMode = (state: WorkspaceState, source: Operand) => {
 
 export const enterCutMode = (state: WorkspaceState, source: Operand) => {
 	state.mode = operationOutlineMode(cutOperationMode({ source }));
+};
+
+export const enterAbsorbMode = (
+	state: WorkspaceState,
+	source: Operand,
+	absorptionPlan: Array<CommitAbsorption>,
+) => {
+	state.mode = operationOutlineMode(absorbOperationMode({ source, absorptionPlan }));
 };
 
 export const enterDragAndDropMode = (state: WorkspaceState, source: Operand) => {

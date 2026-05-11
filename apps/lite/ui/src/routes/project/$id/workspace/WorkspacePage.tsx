@@ -19,7 +19,6 @@ import {
 	selectProjectDialogState,
 	selectProjectPanelsState,
 } from "#ui/projects/state.ts";
-import { AbsorptionDialog } from "#ui/routes/project/$id/workspace/AbsorptionDialog.tsx";
 import { ShortcutsBarPortal, TopBarActionsPortal } from "#ui/portals.tsx";
 import { Keys } from "#ui/ui/Keys.tsx";
 import { ShortcutButton } from "#ui/ui/ShortcutButton.tsx";
@@ -487,15 +486,6 @@ const WorkspacePage: FC = () => {
 
 			{Match.value(dialog).pipe(
 				Match.tagsExhaustive({
-					Absorption: ({ target }) => (
-						<AbsorptionDialog
-							projectId={projectId}
-							target={target}
-							onOpenChange={(open) => {
-								if (!open) dispatch(projectActions.closeDialog({ projectId }));
-							}}
-						/>
-					),
 					None: () => null,
 					ApplyBranchPicker: () => (
 						<ApplyBranchPicker open onOpenChange={setApplyBranchPickerOpen} projectId={projectId} />

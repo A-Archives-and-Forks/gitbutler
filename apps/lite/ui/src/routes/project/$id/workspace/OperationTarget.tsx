@@ -1,4 +1,4 @@
-import { type Operand } from "#ui/operands.ts";
+import { commitOperand, operandEquals, type Operand } from "#ui/operands.ts";
 import { parseDragData } from "./OperationSourceC.tsx";
 import styles from "./OperationTarget.module.css";
 import { OperationTooltip } from "./OperationTooltip.tsx";
@@ -168,6 +168,7 @@ export const OperationTarget: FC<
 						isActiveDropTarget && (operationType === "moveAbove" || operationType === "moveBelow")
 							? operationType
 							: null,
+					Absorb: () => null,
 					Cut: () => null,
 					Rub: () => null,
 					Move: () => null,
@@ -180,6 +181,10 @@ export const OperationTarget: FC<
 		Match.value(operationMode).pipe(
 			Match.tagsExhaustive({
 				DragAndDrop: ({ operationType }) => isActiveDropTarget && operationType === "rub",
+				Absorb: ({ absorptionPlan }) =>
+					absorptionPlan.some(({ stackId, commitId }) =>
+						operandEquals(commitOperand({ stackId, commitId }), target),
+					),
 				Cut: () => isSelected,
 				Rub: () => isSelected,
 				Move: () => isSelected,
@@ -199,7 +204,7 @@ export const OperationTarget: FC<
 			<OperationTooltip
 				projectId={projectId}
 				target={target}
-				isActive={isMainTargetActive}
+				isActive={isSelected}
 				operationMode={operationMode}
 				render={targetEl}
 			/>

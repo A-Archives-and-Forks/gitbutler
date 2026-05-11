@@ -1,5 +1,6 @@
 import { classes } from "#ui/ui/classes.ts";
 import {
+	absorbOperation,
 	getOperation,
 	getOperations,
 	operationLabel,
@@ -181,6 +182,12 @@ export const OperationTooltip: FC<
 		isActive && !!operationMode
 			? Match.value(operationMode).pipe(
 					Match.tags({
+						Absorb: ({ absorptionPlan }) => (
+							<OperationModeControls
+								projectId={projectId}
+								operation={absorptionPlan.length > 0 ? absorbOperation({ absorptionPlan }) : null}
+							/>
+						),
 						DragAndDrop: ({ operationType }) => {
 							const operation = getOperation({
 								source: operationMode.source,
