@@ -5,11 +5,7 @@ import { type FC } from "react";
 import { type RefInfo } from "@gitbutler/but-sdk";
 import { Operand } from "#ui/operands.ts";
 import { formatHunkHeader } from "#ui/hunk.ts";
-
-const assert = <T,>(t: T | null | undefined): T => {
-	if (t == null) throw new Error("Expected value to be non-null and defined");
-	return t;
-};
+import { assert } from "#ui/assert.ts";
 
 export const OperationSourceLabel: FC<{
 	source: Operand;

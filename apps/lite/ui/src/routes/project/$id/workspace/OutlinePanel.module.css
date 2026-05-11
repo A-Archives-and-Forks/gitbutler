@@ -43,6 +43,7 @@
 	row-gap: var(--row-block-padding);
 	flex-grow: 1;
 	flex-direction: column;
+	min-width: 0;
 	padding-block: var(--row-block-padding);
 	line-height: var(--row-line-height);
 }

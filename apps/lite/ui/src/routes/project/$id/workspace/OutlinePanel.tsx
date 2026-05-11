@@ -73,9 +73,11 @@ import { Match } from "effect";
 
 import {
 	ComponentProps,
+	createContext,
 	FC,
 	Fragment,
 	Suspense,
+	use,
 	useEffect,
 	useOptimistic,
 	useRef,
@@ -93,6 +95,9 @@ import { ShortcutButton } from "#ui/ui/ShortcutButton.tsx";
 import { resolveDiffSpecs } from "#ui/operations/diff-specs.ts";
 import { rejectedChangesToastOptions } from "#ui/operations/rejectedChangesToastOptions.tsx";
 import { useCommand } from "#ui/commands/manager.ts";
+import { assert } from "#ui/assert.ts";
+
+const NavigationIndexContext = createContext<NavigationIndex | null>(null);
 
 const sections = (headInfo: RefInfo): NonEmptyArray<Section> => {
 	const changesSection: Section = {
@@ -158,21 +163,27 @@ const useNavigationIndex = (projectId: string) => {
 		//
 		// Update selection when the commit was replaced.
 		//
-		if (selection._tag === "Commit") {
-			const newCommitId = replacedCommits[selection.commitId];
-			if (newCommitId !== undefined && newCommitId !== selection.commitId) {
-				const newSelection = commitOperand({ ...selection, commitId: newCommitId });
+		const updatedSelection = Match.value(selection).pipe(
+			Match.withReturnType<Operand | null>(),
+			Match.tags({
+				Commit: (selection) => {
+					const newCommitId = replacedCommits[selection.commitId];
+					if (newCommitId === undefined || newCommitId === selection.commitId) return null;
 
-				if (navigationIndexIncludes(navigationIndexUnfiltered, newSelection)) {
-					dispatch(
-						projectActions.selectOutline({
-							projectId,
-							selection: newSelection,
-						}),
-					);
-					return;
-				}
-			}
+					return commitOperand({ ...selection, commitId: newCommitId });
+				},
+			}),
+			Match.orElse(() => null),
+		);
+
+		if (updatedSelection && navigationIndexIncludes(navigationIndexUnfiltered, updatedSelection)) {
+			dispatch(
+				projectActions.selectOutline({
+					projectId,
+					selection: updatedSelection,
+				}),
+			);
+			return;
 		}
 
 		//
@@ -212,7 +223,7 @@ const useNavigationIndex = (projectId: string) => {
 	return navigationIndex;
 };
 
-export const OutlinePanel: FC<{} & PanelProps> = ({ ...panelProps }) => (
+export const OutlinePanel: FC<PanelProps> = ({ ...panelProps }) => (
 	<Suspense
 		fallback={
 			<Panel {...panelProps} className={classes(panelProps.className, styles.panelPadding)}>
@@ -224,7 +235,7 @@ export const OutlinePanel: FC<{} & PanelProps> = ({ ...panelProps }) => (
 	</Suspense>
 );
 
-const OutlineTreePanel: FC<{} & PanelProps> = ({ ...panelProps }) => {
+const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 	const { id: projectId } = useParams({ from: "/project/$id/workspace" });
 	const dispatch = useAppDispatch();
 
@@ -250,44 +261,37 @@ const OutlineTreePanel: FC<{} & PanelProps> = ({ ...panelProps }) => {
 	});
 
 	return (
-		<Panel
-			{...panelProps}
-			tabIndex={0}
-			role="tree"
-			aria-activedescendant={treeItemId(selection)}
-			className={classes(panelProps.className, styles.panel)}
-		>
-			<div className={styles.panelPadding}>
-				<Changes projectId={projectId} navigationIndex={navigationIndex} />
-			</div>
+		<NavigationIndexContext value={navigationIndex}>
+			<Panel
+				{...panelProps}
+				tabIndex={0}
+				role="tree"
+				aria-activedescendant={treeItemId(selection)}
+				className={classes(panelProps.className, styles.panel)}
+			>
+				<div className={styles.panelPadding}>
+					<Changes projectId={projectId} />
+				</div>
 
-			<div className={styles.scroller}>
-				{headInfo.stacks.map((stack) => (
-					<StackC
-						key={stack.id}
-						projectId={projectId}
-						stack={stack}
-						navigationIndex={navigationIndex}
-					/>
-				))}
+				<div className={styles.scroller}>
+					{headInfo.stacks.map((stack) => (
+						<StackC key={stack.id} projectId={projectId} stack={stack} />
+					))}
 
-				<BaseCommit
-					projectId={projectId}
-					commitId={getCommonBaseCommitId(headInfo)}
-					navigationIndex={navigationIndex}
-				/>
-			</div>
+					<BaseCommit projectId={projectId} commitId={getCommonBaseCommitId(headInfo)} />
+				</div>
 
-			{Match.value(operationMode).pipe(
-				Match.when(null, () => null),
-				Match.tag("DragAndDrop", () => null),
-				Match.orElse(({ source }) => (
-					<div className={styles.operationModePreview}>
-						<OperationSourceLabel headInfo={headInfo} source={source} />
-					</div>
-				)),
-			)}
-		</Panel>
+				{Match.value(operationMode).pipe(
+					Match.when(null, () => null),
+					Match.tag("DragAndDrop", () => null),
+					Match.orElse(({ source }) => (
+						<div className={styles.operationModePreview}>
+							<OperationSourceLabel headInfo={headInfo} source={source} />
+						</div>
+					)),
+				)}
+			</Panel>
+		</NavigationIndexContext>
 	);
 };
 
@@ -305,10 +309,10 @@ const ItemRow: FC<
 	{
 		projectId: string;
 		operand: Operand;
-		navigationIndex: NavigationIndex;
 	} & Omit<ComponentProps<typeof WorkspaceItemRow>, "inert" | "isSelected" | "onSelect">
-> = ({ projectId, operand, navigationIndex, ...props }) => {
+> = ({ projectId, operand, ...props }) => {
 	const dispatch = useAppDispatch();
+	const navigationIndex = assert(use(NavigationIndexContext));
 	const isSelected = useIsSelected({ projectId, operand });
 	const selectItem = () => {
 		dispatch(projectActions.selectOutline({ projectId, selection: operand }));
@@ -444,9 +448,9 @@ const CommitRow: FC<
 		commit: Commit;
 		projectId: string;
 		stackId: string;
-		navigationIndex: NavigationIndex;
 	} & ComponentProps<"div">
-> = ({ commit, projectId, stackId, navigationIndex, ...restProps }) => {
+> = ({ commit, projectId, stackId, ...restProps }) => {
+	const navigationIndex = assert(use(NavigationIndexContext));
 	const isHighlighted = useAppSelector((state) =>
 		selectProjectHighlightedCommitIds(state, projectId).includes(commit.id),
 	);
@@ -721,7 +725,6 @@ const CommitRow: FC<
 			{...restProps}
 			projectId={projectId}
 			operand={operand}
-			navigationIndex={navigationIndex}
 			className={classes(
 				restProps.className,
 				isHighlighted && workspaceItemRowStyles.itemRowHighlighted,
@@ -774,8 +777,7 @@ const CommitC: FC<{
 	commit: Commit;
 	projectId: string;
 	stackId: string;
-	navigationIndex: NavigationIndex;
-}> = ({ commit, projectId, stackId, navigationIndex }) => {
+}> = ({ commit, projectId, stackId }) => {
 	const operand = commitOperand({ stackId, commitId: commit.id });
 
 	return (
@@ -785,22 +787,16 @@ const CommitC: FC<{
 			label={commitTitle(commit.message)}
 			render={<OperandC projectId={projectId} operand={operand} />}
 		>
-			<CommitRow
-				commit={commit}
-				projectId={projectId}
-				stackId={stackId}
-				navigationIndex={navigationIndex}
-			/>
+			<CommitRow commit={commit} projectId={projectId} stackId={stackId} />
 		</TreeItem>
 	);
 };
 
 const ChangesSectionRow: FC<{
 	changes: Array<TreeChange>;
-	navigationIndex: NavigationIndex;
 
 	projectId: string;
-}> = ({ changes, navigationIndex, projectId }) => {
+}> = ({ changes, projectId }) => {
 	const operand = changesSectionOperand;
 	const isSelected = useIsSelected({ projectId, operand });
 	const focusedPanel = useFocusedProjectPanel(projectId);
@@ -839,7 +835,7 @@ const ChangesSectionRow: FC<{
 	const menuItems: Array<NativeMenuItem> = [absorbContextMenuItem];
 
 	return (
-		<ItemRow projectId={projectId} operand={operand} navigationIndex={navigationIndex}>
+		<ItemRow projectId={projectId} operand={operand}>
 			<div
 				className={classes(
 					workspaceItemRowStyles.itemRowLabel,
@@ -872,8 +868,7 @@ const ChangesSectionRow: FC<{
 const BaseCommit: FC<{
 	projectId: string;
 	commitId?: string;
-	navigationIndex: NavigationIndex;
-}> = ({ projectId, commitId, navigationIndex }) => {
+}> = ({ projectId, commitId }) => {
 	const operand = baseCommitOperand;
 
 	return (
@@ -886,9 +881,7 @@ const BaseCommit: FC<{
 					<OperandC
 						projectId={projectId}
 						operand={operand}
-						render={
-							<ItemRow projectId={projectId} operand={operand} navigationIndex={navigationIndex} />
-						}
+						render={<ItemRow projectId={projectId} operand={operand} />}
 					/>
 				}
 			>
@@ -935,9 +928,7 @@ const CommitBranchComboboxPopup: FC = () => (
 
 const Changes: FC<{
 	projectId: string;
-
-	navigationIndex: NavigationIndex;
-}> = ({ projectId, navigationIndex }) => {
+}> = ({ projectId }) => {
 	const toastManager = Toast.useToastManager();
 
 	const commitCreate = useMutation({
@@ -1086,11 +1077,7 @@ const Changes: FC<{
 			className={classes(workspaceItemRowStyles.section, styles.changesSection)}
 			render={<OperandC projectId={projectId} operand={operand} />}
 		>
-			<ChangesSectionRow
-				changes={worktreeChanges.changes}
-				navigationIndex={navigationIndex}
-				projectId={projectId}
-			/>
+			<ChangesSectionRow changes={worktreeChanges.changes} projectId={projectId} />
 
 			<textarea
 				ref={commitTextareaRef}
@@ -1203,9 +1190,8 @@ const BranchRow: FC<
 		branchName: string;
 		branchRef: Array<number>;
 		stackId: string;
-		navigationIndex: NavigationIndex;
 	} & ComponentProps<"div">
-> = ({ projectId, branchName, branchRef, stackId, navigationIndex, ...restProps }) => {
+> = ({ projectId, branchName, branchRef, stackId, ...restProps }) => {
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 	const dispatch = useAppDispatch();
 	const branchOperandV: BranchOperand = {
@@ -1285,12 +1271,7 @@ const BranchRow: FC<
 	const menuItems: Array<NativeMenuItem> = [startEditingContextMenuItem];
 
 	return (
-		<ItemRow
-			{...restProps}
-			projectId={projectId}
-			operand={operand}
-			navigationIndex={navigationIndex}
-		>
+		<ItemRow {...restProps} projectId={projectId} operand={operand}>
 			{isRenaming ? (
 				<InlineRenameBranch
 					branchName={optimisticBranchName}
@@ -1346,11 +1327,10 @@ const BranchRow: FC<
 
 const StackRow: FC<
 	{
-		navigationIndex: NavigationIndex;
 		projectId: string;
 		stackId: string;
 	} & ComponentProps<"div">
-> = ({ navigationIndex, projectId, stackId, ...restProps }) => {
+> = ({ projectId, stackId, ...restProps }) => {
 	const operand = stackOperand({ stackId });
 	const isSelected = useIsSelected({ projectId, operand });
 	const focusedPanel = useFocusedProjectPanel(projectId);
@@ -1384,12 +1364,7 @@ const StackRow: FC<
 	];
 
 	return (
-		<ItemRow
-			{...restProps}
-			projectId={projectId}
-			operand={operand}
-			navigationIndex={navigationIndex}
-		>
+		<ItemRow {...restProps} projectId={projectId} operand={operand}>
 			<div
 				className={classes(
 					workspaceItemRowStyles.itemRowLabel,
@@ -1424,12 +1399,11 @@ const StackRow: FC<
 };
 
 const BranchSegment: FC<{
-	navigationIndex: NavigationIndex;
 	projectId: string;
 	segment: Segment;
 	refName: BranchReference;
 	stackId: string;
-}> = ({ navigationIndex, projectId, segment, refName, stackId }) => {
+}> = ({ projectId, segment, refName, stackId }) => {
 	const operand = branchOperand({ stackId, branchRef: refName.fullNameBytes });
 
 	return (
@@ -1449,7 +1423,6 @@ const BranchSegment: FC<{
 						branchName={refName.displayName}
 						branchRef={refName.fullNameBytes}
 						stackId={stackId}
-						navigationIndex={navigationIndex}
 					/>
 				}
 			/>
@@ -1459,13 +1432,7 @@ const BranchSegment: FC<{
 			) : (
 				<div role="group">
 					{segment.commits.map((commit) => (
-						<CommitC
-							key={commit.id}
-							commit={commit}
-							projectId={projectId}
-							stackId={stackId}
-							navigationIndex={navigationIndex}
-						/>
+						<CommitC key={commit.id} commit={commit} projectId={projectId} stackId={stackId} />
 					))}
 				</div>
 			)}
@@ -1474,20 +1441,13 @@ const BranchSegment: FC<{
 };
 
 const BranchlessSegment: FC<{
-	navigationIndex: NavigationIndex;
 	projectId: string;
 	segment: Segment;
 	stackId: string;
-}> = ({ navigationIndex, projectId, segment, stackId }) => (
+}> = ({ projectId, segment, stackId }) => (
 	<div className={classes(workspaceItemRowStyles.section, styles.segment)}>
 		{segment.commits.map((commit) => (
-			<CommitC
-				key={commit.id}
-				commit={commit}
-				projectId={projectId}
-				stackId={stackId}
-				navigationIndex={navigationIndex}
-			/>
+			<CommitC key={commit.id} commit={commit} projectId={projectId} stackId={stackId} />
 		))}
 	</div>
 );
@@ -1495,8 +1455,7 @@ const BranchlessSegment: FC<{
 const StackC: FC<{
 	projectId: string;
 	stack: Stack;
-	navigationIndex: NavigationIndex;
-}> = ({ projectId, stack, navigationIndex }) => {
+}> = ({ projectId, stack }) => {
 	// From Caleb:
 	// > There shouldn't be a way within GitButler to end up with a stack without a
 	//   StackId. Users can disrupt our matching against our metadata by playing
@@ -1517,14 +1476,13 @@ const StackC: FC<{
 			className={classes(styles.stack, workspaceItemRowStyles.section)}
 			render={<OperandC projectId={projectId} operand={operand} />}
 		>
-			<StackRow projectId={projectId} stackId={stackId} navigationIndex={navigationIndex} />
+			<StackRow projectId={projectId} stackId={stackId} />
 
 			<div role="group" className={styles.segments}>
 				{stack.segments.map((segment) =>
 					segment.refName ? (
 						<BranchSegment
 							key={JSON.stringify(segment.refName.fullNameBytes)}
-							navigationIndex={navigationIndex}
 							projectId={projectId}
 							segment={segment}
 							refName={segment.refName}
@@ -1536,7 +1494,6 @@ const StackC: FC<{
 						isNonEmptyArray(segment.commits) && (
 							<BranchlessSegment
 								key={segment.commits[0].id}
-								navigationIndex={navigationIndex}
 								projectId={projectId}
 								segment={segment}
 								stackId={stackId}
