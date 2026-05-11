@@ -1222,7 +1222,20 @@ const BranchRow: FC<
 	);
 	const [isRenamePending, startRenameTransition] = useTransition();
 
-	const updateBranchName = useMutation(updateBranchNameMutationOptions);
+	const updateBranchName = useMutation({
+		...updateBranchNameMutationOptions,
+		onSuccess: async (response, input, context, mutation) => {
+			await updateBranchNameMutationOptions.onSuccess?.(response, input, context, mutation);
+
+			const newSelection = branchOperand({
+				stackId,
+				// TODO: ideally the API would return the new ref?
+				branchRef: encodeRefName(`refs/heads/${input.newName}`),
+			});
+			dispatch(projectActions.selectOutline({ projectId, selection: newSelection }));
+			dispatch(projectActions.exitMode({ projectId }));
+		},
+	});
 
 	const startEditing = () => {
 		dispatch(projectActions.selectOutline({ projectId, selection: operand }));
@@ -1254,13 +1267,6 @@ const BranchRow: FC<
 				// error boundaries.
 				return;
 			}
-			const newSelection = branchOperand({
-				stackId,
-				// TODO: ideally the API would return the new ref?
-				branchRef: encodeRefName(`refs/heads/${trimmed}`),
-			});
-			dispatch(projectActions.selectOutline({ projectId, selection: newSelection }));
-			dispatch(projectActions.exitMode({ projectId }));
 		});
 	};
 
