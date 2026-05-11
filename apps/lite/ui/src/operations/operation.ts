@@ -166,8 +166,8 @@ export const operationLabel = (operation: Operation): string =>
 				),
 			CommitMove: ({ side }) =>
 				Match.value(side).pipe(
-					Match.when("above", () => "Move commit above"),
-					Match.when("below", () => "Move commit below"),
+					Match.when("above", () => "Move above"),
+					Match.when("below", () => "Move below"),
 					Match.exhaustive,
 				),
 			CommitMoveChangesBetween: () => "Amend",
