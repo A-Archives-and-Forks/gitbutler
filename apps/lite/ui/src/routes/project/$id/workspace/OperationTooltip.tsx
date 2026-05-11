@@ -1,7 +1,6 @@
 import { classes } from "#ui/ui/classes.ts";
 import {
 	absorbOperation,
-	getOperation,
 	getOperations,
 	operationLabel,
 	useRunOperationMutationOptions,
@@ -16,7 +15,7 @@ import styles from "./OperationTooltip.module.css";
 import { Operand, operandEquals } from "#ui/operands.ts";
 import { useAppDispatch } from "#ui/store.ts";
 import { projectActions } from "#ui/projects/state.ts";
-import { operationModeToOperationType, OperationMode } from "#ui/outline/mode.ts";
+import { OperationMode, getBinaryOperation } from "#ui/outline/mode.ts";
 import { Match } from "effect";
 import { useCommand } from "#ui/commands/manager.ts";
 import { useMutation } from "@tanstack/react-query";
@@ -189,11 +188,10 @@ export const OperationTooltip: FC<
 								operation={absorptionPlan.length > 0 ? absorbOperation({ absorptionPlan }) : null}
 							/>
 						),
-						DragAndDrop: ({ operationType }) => {
-							const operation = getOperation({
-								source: operationMode.source,
+						DragAndDrop: () => {
+							const operation = getBinaryOperation({
+								mode: operationMode,
 								target,
-								operationType,
 							});
 							if (!operation) return null;
 
@@ -210,10 +208,9 @@ export const OperationTooltip: FC<
 						),
 					}),
 					Match.orElse(() => {
-						const operation = getOperation({
-							source: operationMode.source,
+						const operation = getBinaryOperation({
+							mode: operationMode,
 							target,
-							operationType: operationModeToOperationType(operationMode),
 						});
 						return (
 							<>
