@@ -163,21 +163,27 @@ const useNavigationIndex = (projectId: string) => {
 		//
 		// Update selection when the commit was replaced.
 		//
-		if (selection._tag === "Commit") {
-			const newCommitId = replacedCommits[selection.commitId];
-			if (newCommitId !== undefined && newCommitId !== selection.commitId) {
-				const newSelection = commitOperand({ ...selection, commitId: newCommitId });
+		const updatedSelection = Match.value(selection).pipe(
+			Match.withReturnType<Operand | null>(),
+			Match.tags({
+				Commit: (selection) => {
+					const newCommitId = replacedCommits[selection.commitId];
+					if (newCommitId === undefined || newCommitId === selection.commitId) return null;
 
-				if (navigationIndexIncludes(navigationIndexUnfiltered, newSelection)) {
-					dispatch(
-						projectActions.selectOutline({
-							projectId,
-							selection: newSelection,
-						}),
-					);
-					return;
-				}
-			}
+					return commitOperand({ ...selection, commitId: newCommitId });
+				},
+			}),
+			Match.orElse(() => null),
+		);
+
+		if (updatedSelection && navigationIndexIncludes(navigationIndexUnfiltered, updatedSelection)) {
+			dispatch(
+				projectActions.selectOutline({
+					projectId,
+					selection: updatedSelection,
+				}),
+			);
+			return;
 		}
 
 		//
