@@ -132,10 +132,8 @@ const CommitFilesTreePanel: FC<{ projectId: string; commit: CommitOperand } & Pa
 		}),
 	);
 
-	const navigationIndex = useNavigationIndex(projectId, parent, files);
-
 	return (
-		<FilesTreePanel {...panelProps} navigationIndex={navigationIndex}>
+		<FilesTreePanel {...panelProps} parent={parent} files={files}>
 			{(() => {
 				if (conflictedPaths.length === 0 && data.changes.length === 0)
 					return <div className={workspaceItemRowStyles.itemRowEmpty}>No file changes.</div>;
@@ -187,14 +185,12 @@ const ChangesFilesTreePanel: FC<
 		fileOperand({ parent: changesFileParent, path: change.path }),
 	);
 
-	const navigationIndex = useNavigationIndex(projectId, parent, files);
-
 	const hunkDependencyDiffsByPath = getHunkDependencyDiffsByPath(
 		worktreeChanges.dependencies?.diffs ?? [],
 	);
 
 	return (
-		<FilesTreePanel {...panelProps} navigationIndex={navigationIndex}>
+		<FilesTreePanel {...panelProps} parent={parent} files={files}>
 			{worktreeChanges.changes.length === 0 ? (
 				<div className={workspaceItemRowStyles.itemRowEmpty}>No changes.</div>
 			) : (
@@ -241,10 +237,8 @@ const BranchFilesTreePanel: FC<
 		}),
 	);
 
-	const navigationIndex = useNavigationIndex(projectId, parent, files);
-
 	return (
-		<FilesTreePanel {...panelProps} navigationIndex={navigationIndex}>
+		<FilesTreePanel {...panelProps} parent={parent} files={files}>
 			{branchDiff.changes.length === 0 ? (
 				<div className={workspaceItemRowStyles.itemRowEmpty}>No changes.</div>
 			) : (
@@ -296,17 +290,16 @@ export const FilesPanel: FC<{} & PanelProps> = ({ ...panelProps }) => {
 	);
 };
 
-const FilesTreePanel: FC<{ navigationIndex: NavigationIndex } & PanelProps> = ({
+const FilesTreePanel: FC<{ parent: Operand; files: Array<Operand> } & PanelProps> = ({
 	className,
 	children,
-	navigationIndex,
+	parent,
+	files,
 	...panelProps
 }) => {
 	const { id: projectId } = useParams({ from: "/project/$id/workspace" });
 
-	const outlineSelection = useAppSelector((state) =>
-		selectProjectSelectionOutline(state, projectId),
-	);
+	const navigationIndex = useNavigationIndex(projectId, parent, files);
 	const selection = useAppSelector((state) => selectProjectSelectionFiles(state, projectId));
 
 	return (
@@ -320,13 +313,13 @@ const FilesTreePanel: FC<{ navigationIndex: NavigationIndex } & PanelProps> = ({
 			>
 				<TreeItem
 					projectId={projectId}
-					operand={outlineSelection}
+					operand={parent}
 					label="All changes"
 					expanded
 					className={workspaceItemRowStyles.section}
-					render={<OperationSourceC projectId={projectId} source={outlineSelection} />}
+					render={<OperationSourceC projectId={projectId} source={parent} />}
 				>
-					<ItemRow projectId={projectId} operand={outlineSelection}>
+					<ItemRow projectId={projectId} operand={parent}>
 						<div
 							className={classes(
 								workspaceItemRowStyles.itemRowLabel,
