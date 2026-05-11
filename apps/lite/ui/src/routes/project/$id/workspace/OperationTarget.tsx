@@ -190,6 +190,18 @@ export const OperationTarget: FC<
 			}),
 		);
 
+	const isMainTargetTooltipActive =
+		!!operationMode &&
+		Match.value(operationMode).pipe(
+			Match.tagsExhaustive({
+				DragAndDrop: () => isMainTargetActive,
+				Absorb: () => isSelected,
+				Cut: () => isSelected,
+				Rub: () => isSelected,
+				Move: () => isSelected,
+			}),
+		);
+
 	const targetEl = useRender({
 		render,
 		ref: dropRef,
@@ -203,7 +215,7 @@ export const OperationTarget: FC<
 			<OperationTooltip
 				projectId={projectId}
 				target={target}
-				isActive={isSelected}
+				isActive={isMainTargetTooltipActive}
 				operationMode={operationMode}
 				render={targetEl}
 			/>
