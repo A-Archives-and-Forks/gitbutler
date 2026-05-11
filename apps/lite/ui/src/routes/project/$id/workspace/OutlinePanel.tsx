@@ -643,13 +643,21 @@ const CommitRow: FC<
 	});
 
 	useCommand(() => moveCommit(-1), {
-		enabled: isSelected && focusedPanel === "outline" && outlineMode._tag === "Default",
+		enabled:
+			!runOperationMutation.isPending &&
+			isSelected &&
+			focusedPanel === "outline" &&
+			outlineMode._tag === "Default",
 		group: "Commit",
 		hotkeys: [{ hotkey: "Alt+ArrowUp" }],
 	});
 
 	useCommand(() => moveCommit(1), {
-		enabled: isSelected && focusedPanel === "outline" && outlineMode._tag === "Default",
+		enabled:
+			!runOperationMutation.isPending &&
+			isSelected &&
+			focusedPanel === "outline" &&
+			outlineMode._tag === "Default",
 		group: "Commit",
 		hotkeys: [{ hotkey: "Alt+ArrowDown" }],
 	});
