@@ -20,8 +20,8 @@ import {
 	selectProjectPanelsState,
 } from "#ui/projects/state.ts";
 import { ShortcutsBarPortal, TopBarActionsPortal } from "#ui/portals.tsx";
-import { Keys } from "#ui/ui/Keys.tsx";
-import { ShortcutButton } from "#ui/ui/ShortcutButton.tsx";
+import { Keys } from "#ui/components/Keys.tsx";
+import { ShortcutButton } from "#ui/components/ShortcutButton.tsx";
 import { useAppDispatch, useAppSelector } from "#ui/store.ts";
 import { isInputElement } from "#ui/commands/hotkeys.ts";
 import { BranchListing, Segment, Stack } from "@gitbutler/but-sdk";
@@ -333,7 +333,9 @@ const ShortcutsBar: FC = () => {
 			enabled !== false && shortcutsBar !== undefined && hotkeys !== undefined
 				? hotkeys.flatMap((hk) =>
 						// TODO: Render sequences too.
-						"sequence" in hk || isInputIgnoredHotkey({ activeElement, hotkeyOpts: hk })
+						"sequence" in hk ||
+						hk.enabled === false ||
+						isInputIgnoredHotkey({ activeElement, hotkeyOpts: hk })
 							? []
 							: {
 									label: shortcutsBar.label,
