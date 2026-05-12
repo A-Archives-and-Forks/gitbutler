@@ -198,17 +198,7 @@ export class AmendCommitWithChangeDzHandler implements DropzoneHandler {
 				const rejectionResult = toRejectedChangesResult(this.projectId, outcome);
 
 				if (this.runHooks) {
-					try {
-						await this.hooksService.runPostCommitHooks(this.projectId);
-					} catch (err) {
-						if (err instanceof HookFailedError) {
-							if (!rejectionResult) return { type: "ok" };
-						} else if (!rejectionResult) {
-							return { type: "error", title: "Git hook failed", error: err };
-						} else {
-							console.error("Post-commit hook failed (rejected changes take priority):", err);
-						}
-					}
+					await this.hooksService.runPostCommitHooks(this.projectId);
 				}
 
 				return rejectionResult;
@@ -444,17 +434,7 @@ export class AmendCommitWithHunkDzHandler implements DropzoneHandler {
 			const rejectionResult = toRejectedChangesResult(projectId, outcome);
 
 			if (runHooks) {
-				try {
-					await this.hooksService.runPostCommitHooks(projectId);
-				} catch (err) {
-					if (err instanceof HookFailedError) {
-						if (!rejectionResult) return { type: "ok" };
-					} else if (!rejectionResult) {
-						return { type: "error", title: "Git hook failed", error: err };
-					} else {
-						console.error("Post-commit hook failed (rejected changes take priority):", err);
-					}
-				}
+				await this.hooksService.runPostCommitHooks(projectId);
 			}
 
 			return rejectionResult;

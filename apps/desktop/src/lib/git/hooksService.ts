@@ -48,14 +48,14 @@ export class HooksService {
 			if (result?.status === "failure") {
 				chipToasts.removeChipToast(loadingToastId);
 				showWarning("Post-commit hook failed", formatError(result.error));
-				throw new HookFailedError();
+				return;
 			}
 
 			chipToasts.removeChipToast(loadingToastId);
 			chipToasts.success("Post-commit hooks succeeded");
 		} catch (e: unknown) {
 			chipToasts.removeChipToast(loadingToastId);
-			throw e;
+			console.error("Post-commit hook error:", e);
 		}
 	}
 }
