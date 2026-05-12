@@ -14,7 +14,7 @@ import {
 	CommitUncommitParams,
 } from "#electron/ipc.ts";
 import { rejectedChangesToastOptions } from "#ui/operations/rejectedChangesToastOptions.tsx";
-import { CommitAbsorption, DiffSpec, InsertSide, RelativeTo } from "@gitbutler/but-sdk";
+import { DiffSpec, InsertSide, RelativeTo } from "@gitbutler/but-sdk";
 import { Operand, operandEquals, operandFileParent } from "#ui/operands.ts";
 import { resolveDiffSpecs, useResolveDiffSpecs } from "#ui/operations/diff-specs.ts";
 import { decodeRefName } from "#ui/api/ref-name.ts";
@@ -58,13 +58,8 @@ export type CommitUncommitChangesOperation = Omit<
 export type MoveBranchOperation = Omit<MoveBranchParams, "dryRun" | "projectId">;
 /** @public */
 export type TearOffBranchOperation = Omit<TearOffBranchParams, "dryRun" | "projectId">;
-/** @public */
-export type AbsorbOperation = {
-	absorptionPlan: Array<CommitAbsorption>;
-};
 
 export type Operation =
-	| ({ _tag: "Absorb" } & AbsorbOperation)
 	| ({ _tag: "CommitAmend" } & CommitAmendOperation)
 	| ({ _tag: "CommitCreate" } & CommitCreateOperation)
 	| ({ _tag: "CommitCreateFromCommittedChanges" } & CommitCreateFromCommittedChangesOperation)
@@ -75,12 +70,6 @@ export type Operation =
 	| ({ _tag: "CommitUncommitChanges" } & CommitUncommitChangesOperation)
 	| ({ _tag: "MoveBranch" } & MoveBranchOperation)
 	| ({ _tag: "TearOffBranch" } & TearOffBranchOperation);
-
-/** @public */
-export const absorbOperation = (operation: AbsorbOperation): Operation => ({
-	_tag: "Absorb",
-	...operation,
-});
 
 /** @public */
 export const commitAmendOperation = (operation: CommitAmendOperation): Operation => ({
@@ -151,7 +140,6 @@ export const tearOffBranchOperation = (operation: TearOffBranchOperation): Opera
 export const operationLabel = (operation: Operation): string =>
 	Match.value(operation).pipe(
 		Match.tagsExhaustive({
-			Absorb: () => "Absorb",
 			CommitAmend: () => "Amend",
 			CommitCreate: ({ side }) =>
 				Match.value(side).pipe(
@@ -193,13 +181,6 @@ const runOperation = async ({
 }) =>
 	Match.value(operation).pipe(
 		Match.tagsExhaustive({
-			Absorb: async (operation) => {
-				if (dryRun) return;
-				await window.lite.absorb({
-					projectId,
-					absorptionPlan: operation.absorptionPlan,
-				});
-			},
 			CommitAmend: async (operation) => {
 				const changes = await resolveChanges(operation.source);
 				if (!changes) return null;
