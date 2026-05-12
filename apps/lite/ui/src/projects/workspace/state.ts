@@ -5,6 +5,7 @@ import {
 	branchOperand,
 	changesSectionOperand,
 	commitOperand,
+	operandEquals,
 	type BranchOperand,
 	type CommitOperand,
 	type Operand,
@@ -67,19 +68,29 @@ export const enterAbsorbMode = (
 };
 
 export const enterDragAndDropMode = (state: WorkspaceState, source: Operand) => {
-	state.mode = operationOutlineMode(dragAndDropOperationMode({ source, operationType: null }));
+	state.mode = operationOutlineMode(
+		dragAndDropOperationMode({ source, target: null, operationType: null }),
+	);
 };
 
 export const updateDragAndDropMode = (
 	state: WorkspaceState,
+	target: Operand | null,
 	operationType: OperationType | null,
 ) => {
 	Match.value(state.mode).pipe(
 		Match.when({ _tag: "Operation", value: { _tag: "DragAndDrop" } }, (mode) => {
-			if (mode.value.operationType === operationType) return;
+			if (
+				mode.value.operationType === operationType &&
+				((mode.value.target === null && target === null) ||
+					(mode.value.target !== null &&
+						target !== null &&
+						operandEquals(mode.value.target, target)))
+			)
+				return;
 
 			state.mode = operationOutlineMode(
-				dragAndDropOperationMode({ source: mode.value.source, operationType }),
+				dragAndDropOperationMode({ source: mode.value.source, target, operationType }),
 			);
 		}),
 		Match.orElse(() => {}),
