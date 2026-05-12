@@ -208,13 +208,7 @@ fn create_snapshot(
     use gitbutler_oplog::entry::Trailer;
 
     // Create trailers with file names
-    let trailers: Vec<Trailer> = file_names
-        .iter()
-        .map(|name| Trailer {
-            key: "file".to_string(),
-            value: name.clone(),
-        })
-        .collect();
+    let trailers = file_names.iter().cloned().map(Trailer::File);
 
     let details = SnapshotDetails::new(operation).with_trailers(trailers);
     let _snapshot = ctx.create_snapshot(details, perm).ok();

@@ -135,14 +135,10 @@ pub fn unapply_stack(
         .context("Unapplying a stack requires open workspace mode")?;
     let stack = ctx.virtual_branches().get_stack_in_workspace(stack_id)?;
 
-    let trailers: Vec<Trailer> = stack
+    let trailers = stack
         .heads
         .iter()
-        .map(|head| Trailer {
-            key: "branch".to_string(),
-            value: head.name.to_string(),
-        })
-        .collect();
+        .map(|head| Trailer::Branch(head.name.clone()));
 
     let details = SnapshotDetails::new(OperationKind::UnapplyBranch).with_trailers(trailers);
     let _snapshot = ctx.create_snapshot(details, perm).ok();

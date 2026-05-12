@@ -814,8 +814,8 @@ fn restore_snapshot(
         .to_str()
         .ok()
         .and_then(|msg| SnapshotDetails::from_str(msg).ok())
-        .map(|d| d.operation.title().to_owned())
-        .unwrap_or_default();
+        .map(|d| d.operation)
+        .unwrap_or(OperationKind::Unknown);
 
     // create new snapshot
     let before_restore_snapshot_tree_id = before_restore_snapshot_result?;
@@ -830,20 +830,11 @@ fn restore_snapshot(
         operation,
         title: operation.as_persisted_str().to_owned(),
         body: None,
-        trailers: vec![
-            Trailer {
-                key: "restored_from".to_string(),
-                value: snapshot_commit_id.to_string(),
-            },
-            Trailer {
-                key: "restored_operation".to_string(),
-                value: restored_operation,
-            },
-            Trailer {
-                key: "restored_date".to_string(),
-                value: restored_date_ms.to_string(),
-            },
-        ],
+        trailers: Vec::from([
+            Trailer::RestoredFrom(snapshot_commit_id),
+            Trailer::RestoredOperation(restored_operation),
+            Trailer::RestoredDate(restored_date_ms),
+        ]),
     };
     let repo = ctx.repo.get()?;
     let target = ctx.persisted_default_target()?.sha;

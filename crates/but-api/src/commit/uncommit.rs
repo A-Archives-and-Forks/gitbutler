@@ -80,15 +80,7 @@ pub fn commit_uncommit_with_perm(
 ) -> anyhow::Result<UncommitResult> {
     let details = SnapshotDetails::new(OperationKind::UndoCommit)
         .with_count(subject_commit_ids.len())
-        .with_trailers(
-            subject_commit_ids
-                .iter()
-                .map(|id| Trailer {
-                    key: "sha".to_string(),
-                    value: id.to_string(),
-                })
-                .collect(),
-        );
+        .with_trailers(subject_commit_ids.iter().copied().map(Trailer::Sha));
     let maybe_oplog_entry = but_oplog::UnmaterializedOplogSnapshot::from_details_with_perm(
         ctx,
         details,

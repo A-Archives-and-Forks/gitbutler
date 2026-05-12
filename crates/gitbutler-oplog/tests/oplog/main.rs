@@ -6,7 +6,7 @@ mod trailer {
 
     #[test]
     fn display() {
-        let trailer = Trailer {
+        let trailer = Trailer::Other {
             key: "foo".to_string(),
             value: "bar".to_string(),
         };
@@ -17,8 +17,13 @@ mod trailer {
     fn from_str() {
         let s = "foo: bar";
         let trailer = Trailer::from_str(s).unwrap();
-        assert_eq!(trailer.key, "foo");
-        assert_eq!(trailer.value, "bar");
+        assert_eq!(
+            trailer,
+            Trailer::Other {
+                key: "foo".to_owned(),
+                value: "bar".to_owned()
+            }
+        );
     }
 
     #[test]
@@ -37,25 +42,25 @@ mod version {
     #[test]
     fn from_trailer() {
         let s = "Version: 3";
-        let trailer = Trailer::from_str(s).unwrap();
-        let version = Version::from_str(&trailer.value).unwrap();
+        let Trailer::Version(version) = Trailer::from_str(s).unwrap() else {
+            panic!();
+        };
         assert_eq!(version, Version::default());
     }
 
     #[test]
     fn non_default() {
         let s = "Version: 1";
-        let trailer = Trailer::from_str(s).unwrap();
-        let version = Version::from_str(&trailer.value).unwrap();
-        assert_eq!(version, Version::from_str("1").unwrap());
+        let Trailer::Version(version) = Trailer::from_str(s).unwrap() else {
+            panic!();
+        };
+        assert_eq!(version, Version(1));
     }
 
     #[test]
     fn invalid() {
         let s = "Version: -1";
-        let trailer = Trailer::from_str(s).unwrap();
-        let version = Version::from_str(&trailer.value);
-        assert!(version.is_err());
+        assert!(Trailer::from_str(s).is_err());
     }
 }
 
@@ -67,8 +72,9 @@ mod operation_kind {
     #[test]
     fn from_trailer() {
         let s = "Operation: CreateCommit";
-        let trailer = Trailer::from_str(s).unwrap();
-        let operation = OperationKind::parse_persisted_str(&trailer.value).unwrap();
+        let Trailer::Operation(operation) = Trailer::from_str(s).unwrap() else {
+            panic!();
+        };
         assert_eq!(operation, OperationKind::CreateCommit);
     }
 
@@ -85,7 +91,7 @@ mod operation_kind {
         );
         assert_eq!(
             details.trailers,
-            vec![Trailer {
+            vec![Trailer::Other {
                 key: "Foo".to_string(),
                 value: "Bar".to_string(),
             }]
@@ -123,7 +129,7 @@ mod snapshot_details {
         );
         assert_eq!(
             details.trailers,
-            vec![Trailer {
+            vec![Trailer::Other {
                 key: "Foo".to_string(),
                 value: "Bar".to_string(),
             }]
@@ -133,7 +139,7 @@ mod snapshot_details {
 
     #[test]
     fn new_with_newline_in_trailer() {
-        let snapshot_details = new_details(Trailer {
+        let snapshot_details = new_details(Trailer::Other {
             key: "Message".to_string(),
             value: "Header\n\nBody".to_string(),
         });
@@ -148,13 +154,16 @@ mod snapshot_details {
     #[test]
     fn new_with_space_in_trailer_key() {
         for value in ["trailing-space ", " leading-space"] {
-            let trailer = Trailer {
+            let trailer = Trailer::Other {
                 key: value.to_string(),
                 value: "anything".to_string(),
             };
             let mut snapshot_details = new_details(trailer);
-            let trailer = &mut snapshot_details.trailers[0];
-            trailer.key = trailer.key.trim().to_string();
+            if let Trailer::Other { key, .. } = &mut snapshot_details.trailers[0] {
+                *key = key.trim().to_string();
+            } else {
+                panic!()
+            }
 
             let serialized = snapshot_details.to_string();
             let deserialized = SnapshotDetails::from_str(&serialized).unwrap();

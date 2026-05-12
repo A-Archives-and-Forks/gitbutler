@@ -159,10 +159,8 @@ pub fn apply_with_perm(
     // NOTE: since this is optional by nature, the same would be true if snapshotting/undo would be disabled via `ctx` app settings, for instance.
     let maybe_oplog_entry = but_oplog::UnmaterializedOplogSnapshot::from_details_with_perm(
         ctx,
-        SnapshotDetails::new(OperationKind::CreateBranch).with_trailers(vec![Trailer {
-            key: "name".into(),
-            value: existing_branch.to_string(),
-        }]),
+        SnapshotDetails::new(OperationKind::CreateBranch)
+            .with_trailers([Trailer::Name(existing_branch.to_string())]),
         perm.read_permission(),
         DryRun::No,
     );
