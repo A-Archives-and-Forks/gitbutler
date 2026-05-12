@@ -628,7 +628,7 @@ const CommitRow: FC<
 	};
 
 	const amendCommit = () => {
-		dispatch(projectActions.enterRubMode({ projectId, source: changesSectionOperand }));
+		dispatch(projectActions.enterCutMode({ projectId, source: changesSectionOperand }));
 		focusPanel("outline");
 	};
 

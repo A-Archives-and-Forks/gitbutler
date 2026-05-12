@@ -59,10 +59,6 @@ export const enterMoveMode = (state: WorkspaceState, source: Operand) => {
 	);
 };
 
-export const enterRubMode = (state: WorkspaceState, source: Operand) => {
-	state.mode = operationOutlineMode(cutOperationMode({ source, operationType: "rub" }));
-};
-
 export const enterCutMode = (state: WorkspaceState, source: Operand) => {
 	state.mode = operationOutlineMode(cutOperationMode({ source, operationType: "rub" }));
 };

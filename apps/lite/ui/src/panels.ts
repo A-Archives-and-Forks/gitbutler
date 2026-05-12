@@ -147,11 +147,6 @@ export const useNavigationIndexHotkeys = ({
 		focusPanel("outline");
 	};
 
-	const enterRubMode = () => {
-		dispatch(projectActions.enterRubMode({ projectId, source: selection }));
-		focusPanel("outline");
-	};
-
 	const enterCutMode = () => {
 		dispatch(projectActions.enterCutMode({ projectId, source: selection }));
 		focusPanel("outline");
@@ -175,15 +170,7 @@ export const useNavigationIndexHotkeys = ({
 		enabled: focusedPanel === panel && outlineMode._tag === "Default",
 		commandPalette: { label: "Cut" },
 		shortcutsBar: { label: "Cut" },
-		hotkeys: [{ hotkey: "Mod+X", ignoreInputs: true }],
-	});
-
-	useCommand(enterRubMode, {
-		group,
-		enabled: focusedPanel === panel && outlineMode._tag === "Default",
-		commandPalette: { label: "Rub" },
-		shortcutsBar: { label: "Rub" },
-		hotkeys: [{ hotkey: "R" }],
+		hotkeys: [{ hotkey: "Mod+X", ignoreInputs: true }, { hotkey: "R" }],
 	});
 
 	useCommand(enterCommitMode, {

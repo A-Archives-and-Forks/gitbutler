@@ -78,11 +78,6 @@ const projectSlice = createSlice({
 			const projectState = ensureProjectState(state, projectId);
 			workspace.startRenameBranch(projectState.workspace, branch);
 		},
-		enterRubMode: (state, action: PayloadAction<{ projectId: string; source: Operand }>) => {
-			const { projectId, source } = action.payload;
-			const projectState = ensureProjectState(state, projectId);
-			workspace.enterRubMode(projectState.workspace, source);
-		},
 		enterCutMode: (state, action: PayloadAction<{ projectId: string; source: Operand }>) => {
 			const { projectId, source } = action.payload;
 			const projectState = ensureProjectState(state, projectId);
