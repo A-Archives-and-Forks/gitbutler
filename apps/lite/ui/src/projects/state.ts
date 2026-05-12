@@ -117,12 +117,13 @@ const projectSlice = createSlice({
 			state,
 			action: PayloadAction<{
 				projectId: string;
+				target: Operand | null;
 				operationType: OperationType | null;
 			}>,
 		) => {
-			const { projectId, operationType } = action.payload;
+			const { projectId, target, operationType } = action.payload;
 			const projectState = ensureProjectState(state, projectId);
-			workspace.updateDragAndDropMode(projectState.workspace, operationType);
+			workspace.updateDragAndDropMode(projectState.workspace, target, operationType);
 		},
 		updateCutMode: (
 			state,

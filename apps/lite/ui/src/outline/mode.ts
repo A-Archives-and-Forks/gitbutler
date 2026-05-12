@@ -20,7 +20,11 @@ export type AbsorbOperationMode = {
 /** @public */
 export type CutOperationMode = { source: Operand; operationType: OperationType };
 /** @public */
-export type DragAndDropOperationMode = { source: Operand; operationType: OperationType | null };
+export type DragAndDropOperationMode = {
+	source: Operand;
+	target: Operand | null;
+	operationType: OperationType | null;
+};
 export type OperationMode =
 	| ({ _tag: "Absorb" } & AbsorbOperationMode)
 	| ({ _tag: "Cut" } & CutOperationMode)
@@ -46,10 +50,12 @@ export const cutOperationMode = ({ source, operationType }: CutOperationMode): O
 /** @public */
 export const dragAndDropOperationMode = ({
 	source,
+	target,
 	operationType,
 }: DragAndDropOperationMode): OperationMode => ({
 	_tag: "DragAndDrop",
 	source,
+	target,
 	operationType,
 });
 

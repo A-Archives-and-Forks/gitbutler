@@ -262,9 +262,17 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 		selectProjectOperationModeState(state, projectId),
 	);
 
-	const dryRunOperation = operationMode
-		? (getBinaryOperation({ mode: operationMode, target: selection }) ?? undefined)
-		: undefined;
+	const dryRunTarget = operationMode
+		? Match.value(operationMode).pipe(
+				Match.withReturnType<Operand | null>(),
+				Match.tags({ DragAndDrop: ({ target }) => target }),
+				Match.orElse(() => selection),
+			)
+		: null;
+	const dryRunOperation =
+		operationMode && dryRunTarget
+			? (getBinaryOperation({ mode: operationMode, target: dryRunTarget }) ?? undefined)
+			: undefined;
 
 	// TODO: debounce?
 	const dryRunOperationQuery = useDryRunOperation({ projectId, operation: dryRunOperation });

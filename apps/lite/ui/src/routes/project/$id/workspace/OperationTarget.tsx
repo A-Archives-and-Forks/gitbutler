@@ -115,12 +115,20 @@ const useOperationDropTarget = ({ target, projectId }: { target: Operand; projec
 				dispatch(
 					projectActions.updateDragAndDropMode({
 						projectId,
+						target: dropData?.target ?? null,
 						operationType: dropData?.operationType ?? null,
 					}),
 				);
 			},
 			onDragLeave: () => {
 				setIsActiveDropTarget(false);
+				dispatch(
+					projectActions.updateDragAndDropMode({
+						projectId,
+						target: null,
+						operationType: null,
+					}),
+				);
 			},
 			onDrop: (args) => {
 				setIsActiveDropTarget(false);
