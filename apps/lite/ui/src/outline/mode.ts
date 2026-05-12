@@ -126,12 +126,15 @@ export const isValidOutlineModeForSelection = ({
 		}),
 	);
 
-export const getBinaryOperation = ({ mode, target }: { mode: OperationMode; target: Operand }) =>
-	getOperation({
+export const getBinaryOperation = ({ mode, target }: { mode: OperationMode; target: Operand }) => {
+	const operationType = operationModeToOperationType(mode);
+	if (operationType === null) return null;
+	return getOperation({
 		source: mode.source,
 		target,
-		operationType: operationModeToOperationType(mode),
+		operationType,
 	});
+};
 
 const hasAnyOperation = (source: Operand, target: Operand) => {
 	const operations = getOperations(source, target);
