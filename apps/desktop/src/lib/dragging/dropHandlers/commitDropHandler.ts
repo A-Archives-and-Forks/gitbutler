@@ -6,7 +6,7 @@ import {
 	type ChangeDropData,
 } from "$lib/dragging/draggables";
 import { parseError } from "$lib/error/parser";
-import { HOOKS_SERVICE } from "$lib/git/hooksService";
+import { HookFailedError, HOOKS_SERVICE } from "$lib/git/hooksService";
 import { toCommitMovePlacement } from "$lib/stacks/commitMovePlacement";
 import { STACK_SERVICE } from "$lib/stacks/stackService.svelte";
 import { UI_STATE, withStackBusy, type UiState } from "$lib/state/uiState.svelte";
@@ -178,6 +178,7 @@ export class AmendCommitWithChangeDzHandler implements DropzoneHandler {
 					try {
 						await this.hooksService.runPreCommitHooks(this.projectId, worktreeChanges);
 					} catch (err) {
+						if (err instanceof HookFailedError) return { type: "ok" };
 						return { type: "error", title: "Git hook failed", error: err };
 					}
 				}
@@ -200,10 +201,13 @@ export class AmendCommitWithChangeDzHandler implements DropzoneHandler {
 					try {
 						await this.hooksService.runPostCommitHooks(this.projectId);
 					} catch (err) {
-						if (!rejectionResult) {
+						if (err instanceof HookFailedError) {
+							if (!rejectionResult) return { type: "ok" };
+						} else if (!rejectionResult) {
 							return { type: "error", title: "Git hook failed", error: err };
+						} else {
+							console.error("Post-commit hook failed (rejected changes take priority):", err);
 						}
-						console.error("Post-commit hook failed (rejected changes take priority):", err);
 					}
 				}
 
@@ -425,6 +429,7 @@ export class AmendCommitWithHunkDzHandler implements DropzoneHandler {
 				try {
 					await this.hooksService.runPreCommitHooks(projectId, worktreeChanges);
 				} catch (err) {
+					if (err instanceof HookFailedError) return { type: "ok" };
 					return { type: "error", title: "Git hook failed", error: err };
 				}
 			}
@@ -442,10 +447,13 @@ export class AmendCommitWithHunkDzHandler implements DropzoneHandler {
 				try {
 					await this.hooksService.runPostCommitHooks(projectId);
 				} catch (err) {
-					if (!rejectionResult) {
+					if (err instanceof HookFailedError) {
+						if (!rejectionResult) return { type: "ok" };
+					} else if (!rejectionResult) {
 						return { type: "error", title: "Git hook failed", error: err };
+					} else {
+						console.error("Post-commit hook failed (rejected changes take priority):", err);
 					}
-					console.error("Post-commit hook failed (rejected changes take priority):", err);
 				}
 			}
 
