@@ -117,24 +117,24 @@ pub(crate) fn show_oplog(
             };
 
             let operation_colored = match operation_type {
-                OperationKind::CreateCommit => t.success.paint(operation_type.as_str()),
+                OperationKind::CreateCommit => t.success.paint(operation_type.kind_str()),
                 OperationKind::UpdateCommitMessage | OperationKind::AmendCommit => {
-                    t.attention.paint(operation_type.as_str())
+                    t.attention.paint(operation_type.kind_str())
                 }
                 OperationKind::UndoCommit
                 | OperationKind::RestoreFromSnapshot
                 | OperationKind::RestoreFromSnapshotViaUndo
                 | OperationKind::RestoreFromSnapshotViaRedo => {
-                    t.error.paint(operation_type.as_str())
+                    t.error.paint(operation_type.kind_str())
                 }
                 OperationKind::DiscardChanges | OperationKind::Discard => {
-                    t.error.paint(operation_type.as_str())
+                    t.error.paint(operation_type.kind_str())
                 }
-                OperationKind::CreateBranch => t.local_branch.paint(operation_type.as_str()),
+                OperationKind::CreateBranch => t.local_branch.paint(operation_type.kind_str()),
                 OperationKind::MoveCommit
                 | OperationKind::ReorderCommit
-                | OperationKind::MoveHunk => t.info.paint(operation_type.as_str()),
-                OperationKind::OnDemandSnapshot => t.hint.paint(operation_type.as_str()),
+                | OperationKind::MoveHunk => t.info.paint(operation_type.kind_str()),
+                OperationKind::OnDemandSnapshot => t.hint.paint(operation_type.kind_str()),
                 OperationKind::StashIntoBranch
                 | OperationKind::SetBaseBranch
                 | OperationKind::MergeUpstream
@@ -171,7 +171,7 @@ pub(crate) fn show_oplog(
                 | OperationKind::AutoHandleChangesAfter
                 | OperationKind::SplitBranch
                 | OperationKind::CleanWorkspace
-                | OperationKind::Unknown => t.default.paint(operation_type.as_str()),
+                | OperationKind::Unknown => t.default.paint(operation_type.kind_str()),
             };
 
             writeln!(

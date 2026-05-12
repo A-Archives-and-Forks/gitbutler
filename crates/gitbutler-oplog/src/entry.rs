@@ -187,7 +187,7 @@ pub enum OperationKind {
 }
 
 impl OperationKind {
-    pub fn as_str(self) -> &'static str {
+    pub fn kind_str(self) -> &'static str {
         match self {
             OperationKind::CreateCommit => "COMMIT",
             OperationKind::CreateBranch => "BRANCH",
