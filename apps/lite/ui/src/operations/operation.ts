@@ -22,7 +22,6 @@ import { projectActions, selectProjectOperationModeState } from "#ui/projects/st
 import { useAppDispatch } from "#ui/store.ts";
 import { useAppSelector } from "#ui/store.ts";
 import { useParams } from "@tanstack/react-router";
-import { Hash } from "effect";
 
 /** @public */
 export type CommitAmendOperation = Omit<CommitAmendParams, "dryRun" | "projectId" | "changes"> & {
@@ -321,8 +320,7 @@ export const useDryRunOperation = ({
 	});
 
 	return useQuery({
-		// We hash because the object may contain large data due to path bytes.
-		queryKey: ["dryRun", Hash.string(JSON.stringify({ projectId, operation, changes }))],
+		queryKey: ["dryRun", projectId, operation, changes],
 		queryFn: () => {
 			if (!operation) return null;
 			return runOperation({ projectId, operation, changes, dryRun: true });
