@@ -134,16 +134,6 @@ const hasAnyOperation = (source: Operand, target: Operand) => {
 	return !!operations.rub || !!operations.moveAbove || !!operations.moveBelow;
 };
 
-const outlineModeSource = (mode: OutlineMode): Operand | null =>
-	Match.value(mode).pipe(
-		Match.withReturnType<Operand | null>(),
-		Match.tags({
-			Absorb: ({ source }) => source,
-			Transfer: ({ value: mode }) => mode.source,
-		}),
-		Match.orElse(() => null),
-	);
-
 export const isOutlineModeCandidateTarget = ({
 	mode,
 	target,
@@ -173,21 +163,19 @@ export const filterNavigationIndexForOutlineMode = ({
 		Match.tagsExhaustive({
 			Default: () => navigationIndexUnfiltered,
 			Absorb: (activeMode) =>
-				filterNavigationIndex(navigationIndexUnfiltered, (operand) => {
-					const source = outlineModeSource(activeMode);
-					return (
-						(source !== null && operandContains(operand, source)) ||
-						isOutlineModeCandidateTarget({ mode: activeMode, target: operand })
-					);
-				}),
+				filterNavigationIndex(
+					navigationIndexUnfiltered,
+					(operand) =>
+						operandContains(operand, activeMode.source) ||
+						isOutlineModeCandidateTarget({ mode: activeMode, target: operand }),
+				),
 			Transfer: (activeMode) =>
-				filterNavigationIndex(navigationIndexUnfiltered, (operand) => {
-					const source = outlineModeSource(activeMode);
-					return (
-						(source !== null && operandContains(operand, source)) ||
-						isOutlineModeCandidateTarget({ mode: activeMode, target: operand })
-					);
-				}),
+				filterNavigationIndex(
+					navigationIndexUnfiltered,
+					(operand) =>
+						operandContains(operand, activeMode.value.source) ||
+						isOutlineModeCandidateTarget({ mode: activeMode, target: operand }),
+				),
 			RenameBranch: (x) =>
 				filterNavigationIndex(navigationIndexUnfiltered, (operand) =>
 					operandEquals(operand, branchOperand(x.operand)),
