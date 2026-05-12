@@ -203,9 +203,7 @@ mod tests {
             recent_commits: vec![],
             last_fetched_ms: None,
             conflicted: false,
-            diverged: false,
-            diverged_ahead: vec![],
-            diverged_behind: vec![],
+            target_sha_ahead_of_ref: false,
             short_name: "main".to_string(),
         }
     }

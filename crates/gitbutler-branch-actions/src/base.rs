@@ -49,19 +49,7 @@ pub struct BaseBranch {
     pub recent_commits: Vec<RemoteCommit>,
     pub last_fetched_ms: Option<u128>,
     pub conflicted: bool,
-    pub diverged: bool,
-    #[serde(with = "but_serde::object_id_vec")]
-    #[cfg_attr(
-        feature = "export-schema",
-        schemars(schema_with = "but_schemars::object_id_vec")
-    )]
-    pub diverged_ahead: Vec<gix::ObjectId>,
-    #[serde(with = "but_serde::object_id_vec")]
-    #[cfg_attr(
-        feature = "export-schema",
-        schemars(schema_with = "but_schemars::object_id_vec")
-    )]
-    pub diverged_behind: Vec<gix::ObjectId>,
+    pub target_sha_ahead_of_ref: bool,
     pub short_name: String,
 }
 #[cfg(feature = "export-schema")]
@@ -356,23 +344,18 @@ fn set_exclude_decoration(ctx: &Context) -> Result<()> {
 
 pub(crate) fn target_to_base_branch(ctx: &Context, target: &Target) -> Result<BaseBranch> {
     let repo = &*ctx.repo.get()?;
-    let target_commit_id = repo
+    let target_ref_commit = repo
         .find_reference(&target.branch.to_string())?
         .peel_to_commit()?
         .id;
-    let cache = repo.commit_graph_if_enabled()?;
-    let mut graph = repo.revision_graph(cache.as_ref());
-    let merge_base = repo
-        .merge_base_with_graph(target.sha, target_commit_id, &mut graph)?
-        .detach();
 
-    let diverged_ahead = first_parent_commit_ids_until(repo, target.sha, merge_base)
+    // The old integrate_upstream function cares about whether the target sha
+    // is ahead of the target ref.
+    //
+    // The old function provided some options for how to resolve this.
+    let target_sha_not_ref = first_parent_commit_ids_until(repo, target.sha, target_ref_commit)
         .context("failed to get fork point")?;
-    let diverged_behind = first_parent_commit_ids_until(repo, target_commit_id, merge_base)
-        .context("failed to get fork point")?;
-
-    // if there are commits ahead of the base branch consider it diverged
-    let diverged = !diverged_ahead.is_empty();
+    let target_sha_ahead_of_ref = !target_sha_not_ref.is_empty();
 
     // Compute the lowest merge base across all workspace stacks and the target.
     // Read the workspace ref directly rather than HEAD, since HEAD may not point
@@ -389,7 +372,7 @@ pub(crate) fn target_to_base_branch(ctx: &Context, target: &Target) -> Result<Ba
             Some(target.sha)
         } else {
             let base = repo
-                .merge_base_octopus([heads.as_slice(), &[target_commit_id]].concat())
+                .merge_base_octopus([heads.as_slice(), &[target_ref_commit]].concat())
                 .context("failed to compute octopus merge-base for workspace stacks")?;
             Some(base.object()?.id().detach())
         }
@@ -397,7 +380,7 @@ pub(crate) fn target_to_base_branch(ctx: &Context, target: &Target) -> Result<Ba
 
     // Commits on the target branch between its tip and the lowest merge base.
     let upstream_commit_ids = lowest_merge_base
-        .map(|lb| first_parent_commit_ids_until(repo, target_commit_id, lb))
+        .map(|lb| first_parent_commit_ids_until(repo, target_ref_commit, lb))
         .transpose()
         .context("failed to get upstream commits")?
         .unwrap_or_default();
@@ -456,7 +439,7 @@ pub(crate) fn target_to_base_branch(ctx: &Context, target: &Target) -> Result<Ba
         push_remote_name,
         push_remote_url,
         base_sha: target.sha,
-        current_sha: target_commit_id,
+        current_sha: target_ref_commit,
         behind,
         upstream_commits,
         recent_commits,
@@ -467,9 +450,7 @@ pub(crate) fn target_to_base_branch(ctx: &Context, target: &Target) -> Result<Ba
             .map(FetchResult::timestamp)
             .map(|t| t.duration_since(time::UNIX_EPOCH).unwrap().as_millis()),
         conflicted,
-        diverged,
-        diverged_ahead,
-        diverged_behind,
+        target_sha_ahead_of_ref,
         short_name,
     };
     Ok(base)
