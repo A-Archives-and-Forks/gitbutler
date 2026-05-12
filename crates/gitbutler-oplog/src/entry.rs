@@ -238,8 +238,8 @@ impl OperationKind {
             | OperationKind::EnterEditMode
             | OperationKind::SyncWorkspace
             | OperationKind::AutoHandleChangesBefore
-            | OperationKind::AutoHandleChangesAfter
-            | OperationKind::Unknown => "OTHER",
+            | OperationKind::AutoHandleChangesAfter => "OTHER",
+            OperationKind::Unknown => "UNKNOWN",
         }
     }
 }
