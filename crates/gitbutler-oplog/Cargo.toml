@@ -25,6 +25,7 @@ anyhow.workspace = true
 git2.workspace = true
 serde.workspace = true
 itertools.workspace = true
+strum = { version = "0.27", features = ["derive"] }
 tracing.workspace = true
 gix = { workspace = true, features = ["dirwalk", "credentials", "parallel"] }
 toml.workspace = true

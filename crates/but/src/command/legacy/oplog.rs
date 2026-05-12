@@ -89,7 +89,7 @@ pub(crate) fn show_oplog(
                         .as_ref()
                         .filter(|b| !b.is_empty())
                         .cloned()
-                        .unwrap_or_else(|| details.title.clone()),
+                        .unwrap_or_else(|| details.operation.title().to_owned()),
                     OperationKind::Discard => {
                         let file_names = details
                             .trailers
@@ -98,9 +98,9 @@ pub(crate) fn show_oplog(
                             .map(|t| &*t.value)
                             .collect::<Vec<_>>();
                         if !file_names.is_empty() {
-                            format!("{} ({})", details.title, file_names.join(", "))
+                            format!("{} ({})", details.operation.title(), file_names.join(", "))
                         } else {
-                            details.title.clone()
+                            details.operation.title().to_owned()
                         }
                     }
                     OperationKind::CreateCommit
@@ -151,7 +151,7 @@ pub(crate) fn show_oplog(
                     | OperationKind::AutoHandleChangesAfter
                     | OperationKind::SplitBranch
                     | OperationKind::CleanWorkspace
-                    | OperationKind::Unknown => details.title.clone(),
+                    | OperationKind::Unknown => details.operation.title().to_owned(),
                 };
 
                 let display_title = out.truncate_if_unpaged(&display_title, 80);

@@ -49,7 +49,7 @@ impl SnapshotDetails {
         SnapshotDetails {
             version: Default::default(),
             operation,
-            title: operation.to_string(),
+            title: operation.as_persisted_str().to_string(),
             body: None,
             trailers: vec![],
         }
@@ -95,7 +95,7 @@ impl FromStr for SnapshotDetails {
             .iter()
             .find(|t| t.key == OPERATION_TRAILER_KEY)
             .ok_or(anyhow!("No operation found on snapshot commit message"))?;
-        let operation = OperationKind::parse_persisted(&operation_trailer.value)
+        let operation = OperationKind::parse_persisted_str(&operation_trailer.value)
             .unwrap_or(OperationKind::Unknown);
 
         // remove the version and operation attributes from the trailers since they have dedicated fields
@@ -118,7 +118,11 @@ impl Display for SnapshotDetails {
             writeln!(f, "{body}\n")?;
         }
         writeln!(f, "{VERSION_TRAILER_KEY}: {}", self.version)?;
-        writeln!(f, "{OPERATION_TRAILER_KEY}: {}", self.operation)?;
+        writeln!(
+            f,
+            "{OPERATION_TRAILER_KEY}: {}",
+            self.operation.as_persisted_str()
+        )?;
         for line in &self.trailers {
             writeln!(f, "{line}")?;
         }
@@ -126,7 +130,7 @@ impl Display for SnapshotDetails {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize, strum::EnumIter)]
 pub enum OperationKind {
     CreateCommit,
     CreateBranch,
@@ -244,7 +248,118 @@ impl OperationKind {
         }
     }
 
-    pub fn parse_persisted(s: &str) -> Option<Self> {
+    pub fn title(self) -> &'static str {
+        match self {
+            OperationKind::CreateCommit => "Created commit",
+            OperationKind::CreateBranch => "Created branch",
+            OperationKind::StashIntoBranch => "Stashed into branch",
+            OperationKind::SetBaseBranch => "Set base branch",
+            OperationKind::MergeUpstream => "Merged upstream",
+            OperationKind::UpdateWorkspaceBase => "Updated workspace base",
+            OperationKind::MoveHunk => "Moved hunk",
+            OperationKind::UpdateBranchName => "Renamed branch",
+            OperationKind::UpdateBranchNotes => "Updated branch notes",
+            OperationKind::ReorderBranches => "Reordered branches",
+            OperationKind::UpdateBranchRemoteName => "Updated branch remote",
+            OperationKind::GenericBranchUpdate => "Updated branch",
+            OperationKind::DeleteBranch => "Deleted branch",
+            OperationKind::ApplyBranch => "Applied branch",
+            OperationKind::DiscardLines => "Discarded lines",
+            OperationKind::DiscardHunk => "Discarded hunk",
+            OperationKind::DiscardFile => "Discarded file",
+            OperationKind::DiscardChanges | OperationKind::Discard => "Discarded changes",
+            OperationKind::AmendCommit => "Amended commit",
+            OperationKind::Absorb => "Absorbed changes",
+            OperationKind::AutoCommit => "Auto-committed changes",
+            OperationKind::UndoCommit => "Undid commit",
+            OperationKind::DiscardCommit => "Discarded commit",
+            OperationKind::UnapplyBranch => "Unapplied branch",
+            OperationKind::CherryPick => "Cherry-picked commit",
+            OperationKind::SquashCommit => "Squashed commit",
+            OperationKind::UpdateCommitMessage => "Updated commit message",
+            OperationKind::MoveCommit => "Moved commit",
+            OperationKind::MoveBranch => "Moved branch",
+            OperationKind::TearOffBranch => "Unstacked branch",
+            OperationKind::RestoreFromSnapshotViaUndo
+            | OperationKind::RestoreFromSnapshotViaRedo
+            | OperationKind::RestoreFromSnapshot => "Restored from snapshot",
+            OperationKind::ReorderCommit => "Reordered commit",
+            OperationKind::InsertBlankCommit => "Inserted blank commit",
+            OperationKind::MoveCommitFile => "Moved file",
+            OperationKind::FileChanges => "Updated file changes",
+            OperationKind::EnterEditMode => "Entered edit mode",
+            OperationKind::SyncWorkspace => "Synced workspace",
+            OperationKind::CreateDependentBranch => "Created branch",
+            OperationKind::RemoveDependentBranch => "Removed branch",
+            OperationKind::UpdateDependentBranchName => "Updated branch name",
+            OperationKind::UpdateDependentBranchDescription => "Updated branch description",
+            OperationKind::UpdateDependentBranchPrNumber => "Updated branch pull request number",
+            OperationKind::AutoHandleChangesBefore => "Handled changes before action",
+            OperationKind::AutoHandleChangesAfter => "Handled changes after action",
+            OperationKind::SplitBranch => "Split branch",
+            OperationKind::CleanWorkspace => "Cleaned workspace",
+            OperationKind::OnDemandSnapshot => "Created snapshot",
+            OperationKind::Unknown => "Unknown operation",
+        }
+    }
+
+    pub fn as_persisted_str(self) -> &'static str {
+        match self {
+            OperationKind::CreateCommit => "CreateCommit",
+            OperationKind::CreateBranch => "CreateBranch",
+            OperationKind::StashIntoBranch => "StashIntoBranch",
+            OperationKind::SetBaseBranch => "SetBaseBranch",
+            OperationKind::MergeUpstream => "MergeUpstream",
+            OperationKind::UpdateWorkspaceBase => "UpdateWorkspaceBase",
+            OperationKind::MoveHunk => "MoveHunk",
+            OperationKind::UpdateBranchName => "UpdateBranchName",
+            OperationKind::UpdateBranchNotes => "UpdateBranchNotes",
+            OperationKind::ReorderBranches => "ReorderBranches",
+            OperationKind::UpdateBranchRemoteName => "UpdateBranchRemoteName",
+            OperationKind::GenericBranchUpdate => "GenericBranchUpdate",
+            OperationKind::DeleteBranch => "DeleteBranch",
+            OperationKind::ApplyBranch => "ApplyBranch",
+            OperationKind::DiscardLines => "DiscardLines",
+            OperationKind::DiscardHunk => "DiscardHunk",
+            OperationKind::DiscardFile => "DiscardFile",
+            OperationKind::DiscardChanges => "DiscardChanges",
+            OperationKind::Discard => "Discard",
+            OperationKind::AmendCommit => "AmendCommit",
+            OperationKind::Absorb => "Absorb",
+            OperationKind::AutoCommit => "AutoCommit",
+            OperationKind::UndoCommit => "UndoCommit",
+            OperationKind::DiscardCommit => "DiscardCommit",
+            OperationKind::UnapplyBranch => "UnapplyBranch",
+            OperationKind::CherryPick => "CherryPick",
+            OperationKind::SquashCommit => "SquashCommit",
+            OperationKind::UpdateCommitMessage => "UpdateCommitMessage",
+            OperationKind::MoveCommit => "MoveCommit",
+            OperationKind::MoveBranch => "MoveBranch",
+            OperationKind::TearOffBranch => "TearOffBranch",
+            OperationKind::RestoreFromSnapshotViaUndo => "RestoreFromSnapshotViaUndo",
+            OperationKind::RestoreFromSnapshotViaRedo => "RestoreFromSnapshotViaRedo",
+            OperationKind::RestoreFromSnapshot => "RestoreFromSnapshot",
+            OperationKind::ReorderCommit => "ReorderCommit",
+            OperationKind::InsertBlankCommit => "InsertBlankCommit",
+            OperationKind::MoveCommitFile => "MoveCommitFile",
+            OperationKind::FileChanges => "FileChanges",
+            OperationKind::EnterEditMode => "EnterEditMode",
+            OperationKind::SyncWorkspace => "SyncWorkspace",
+            OperationKind::CreateDependentBranch => "CreateDependentBranch",
+            OperationKind::RemoveDependentBranch => "RemoveDependentBranch",
+            OperationKind::UpdateDependentBranchName => "UpdateDependentBranchName",
+            OperationKind::UpdateDependentBranchDescription => "UpdateDependentBranchDescription",
+            OperationKind::UpdateDependentBranchPrNumber => "UpdateDependentBranchPrNumber",
+            OperationKind::AutoHandleChangesBefore => "AutoHandleChangesBefore",
+            OperationKind::AutoHandleChangesAfter => "AutoHandleChangesAfter",
+            OperationKind::SplitBranch => "SplitBranch",
+            OperationKind::CleanWorkspace => "CleanWorkspace",
+            OperationKind::OnDemandSnapshot => "OnDemandSnapshot",
+            OperationKind::Unknown => "Unknown",
+        }
+    }
+
+    pub fn parse_persisted_str(s: &str) -> Option<Self> {
         Some(match s {
             "CreateCommit" => Self::CreateCommit,
             "CreateBranch" => Self::CreateBranch,
@@ -302,12 +417,6 @@ impl OperationKind {
     }
 }
 
-impl fmt::Display for OperationKind {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        Debug::fmt(self, f)
-    }
-}
-
 #[derive(Debug, PartialEq, Clone, Copy, Serialize)]
 pub struct Version(pub u32);
 
@@ -361,5 +470,20 @@ impl FromStr for Trailer {
             key: parts[0].trim().to_string(),
             value: unescaped_value,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use strum::IntoEnumIterator;
+
+    use super::OperationKind;
+
+    #[test]
+    fn parsing_operation_kinds() {
+        for kind in OperationKind::iter() {
+            let s = kind.as_persisted_str();
+            assert_eq!(kind, OperationKind::parse_persisted_str(s).unwrap());
+        }
     }
 }

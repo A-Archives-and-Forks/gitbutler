@@ -186,7 +186,7 @@ Created new independent branch 'feature-x'
         .stdout_eq(str![[r#"
 Operations History
 ──────────────────────────────────────────────────
-[SHORTHASH] 2000-01-02 00:00:00 [COMMIT] CreateCommit
+[SHORTHASH] 2000-01-02 00:00:00 [COMMIT] Created commit
 
 "#]]);
     Ok(())
