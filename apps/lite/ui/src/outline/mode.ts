@@ -99,17 +99,6 @@ export const getOperationMode = (mode: OutlineMode): OperationMode | null =>
 		Match.orElse(() => null),
 	);
 
-const operationModeToOperationType = (operationMode: OperationMode): OperationType | null =>
-	Match.value(operationMode).pipe(
-		Match.withReturnType<OperationType | null>(),
-		Match.tags({
-			Absorb: () => null,
-			Cut: ({ operationType }) => operationType,
-			DragAndDrop: ({ operationType }) => operationType,
-		}),
-		Match.exhaustive,
-	);
-
 export const isValidOutlineModeForSelection = ({
 	mode,
 	selection,
@@ -127,7 +116,15 @@ export const isValidOutlineModeForSelection = ({
 	);
 
 export const getBinaryOperation = ({ mode, target }: { mode: OperationMode; target: Operand }) => {
-	const operationType = operationModeToOperationType(mode);
+	const operationType = Match.value(mode).pipe(
+		Match.withReturnType<OperationType | null>(),
+		Match.tags({
+			Absorb: () => null,
+			Cut: ({ operationType }) => operationType,
+			DragAndDrop: ({ operationType }) => operationType,
+		}),
+		Match.exhaustive,
+	);
 	if (operationType === null) return null;
 	return getOperation({
 		source: mode.source,
