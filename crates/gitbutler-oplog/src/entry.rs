@@ -126,7 +126,7 @@ impl Display for SnapshotDetails {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize, strum::EnumIter)]
 pub enum OperationKind {
     CreateCommit,
     CreateBranch,
@@ -361,5 +361,20 @@ impl FromStr for Trailer {
             key: parts[0].trim().to_string(),
             value: unescaped_value,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use strum::IntoEnumIterator;
+
+    use super::OperationKind;
+
+    #[test]
+    fn parsing_operation_kinds() {
+        for kind in OperationKind::iter() {
+            let s = kind.as_persisted_str();
+            assert_eq!(kind, OperationKind::parse_persisted_str(s).unwrap());
+        }
     }
 }
