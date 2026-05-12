@@ -424,7 +424,7 @@ export class StackService {
 					title: "Git push failed",
 					message: `Your branch cannot be pushed due to ${reason}.\n\nPlease check our [documentation](https://docs.gitbutler.com/troubleshooting/fetch-push)\non fetching and pushing for ways to resolve the problem.`,
 					error: message,
-					style: "danger",
+					style: "warning",
 				});
 			},
 			throwSilentError: true,

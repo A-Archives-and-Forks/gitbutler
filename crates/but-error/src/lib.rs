@@ -109,6 +109,26 @@
 //! By default, `thiserror` instances have no context.
 use std::{borrow::Cow, fmt::Debug};
 
+/// Like [`anyhow::bail!`], but tags the error with [`Code::PreconditionFailed`].
+///
+/// Use this when the operation is rejected because the current state doesn't
+/// allow it — not because something broke.
+///
+/// ```rust
+/// # use anyhow::Result;
+/// fn example() -> Result<()> {
+///     but_error::bail_precondition!("branch is already checked out: {}", "main");
+/// }
+/// ```
+#[macro_export]
+macro_rules! bail_precondition {
+    ($($arg:tt)*) => {
+        return Err(::anyhow::anyhow!(
+            $crate::Context::new(format!($($arg)*)).with_code($crate::Code::PreconditionFailed)
+        ))
+    };
+}
+
 /// A unique code that consumers of the API may rely on to identify errors.
 ///
 /// ### Important
@@ -148,6 +168,10 @@ pub enum Code {
     /// "Not Found -" — kept here so the wire-level `Code` enum is the
     /// single source of truth for codes the desktop app may surface.
     GitHubTokenExpired,
+    /// The operation was rejected because the current state doesn't allow it.
+    /// Not a bug — the user's request simply can't be fulfilled right now.
+    /// The frontend should present this as a warning rather than an error.
+    PreconditionFailed,
 }
 
 #[cfg(feature = "export-schema")]

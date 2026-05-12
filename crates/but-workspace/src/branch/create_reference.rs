@@ -117,6 +117,7 @@ pub(super) mod function {
             WorkspaceStack, WorkspaceStackBranch,
         },
     };
+    use but_error::bail_precondition;
     use gix::refs::transaction::PreviousValue;
 
     use crate::branch::create_reference::{Anchor, Position};
@@ -332,10 +333,10 @@ pub(super) mod function {
                 && !workspace.refname_is_segment(ref_name)
                 && workspace.ref_name() != Some(ref_name)
             {
-                bail!(
+                bail_precondition!(
                     "Reference '{}' already exists and is outside the workspace",
                     ref_name.shorten()
-                )
+                );
             }
             bail!(
                 "Branch '{}' cannot be created: the target commit ({}) already \

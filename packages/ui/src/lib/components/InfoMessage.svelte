@@ -110,7 +110,11 @@
 		</div>
 
 		{#if error}
-			<code class="info-message__error-block scrollbar">
+			<code
+				class="info-message__code-block scrollbar"
+				class:warn={style === "warning"}
+				class:error={style === "danger"}
+			>
 				{error}
 			</code>
 		{/if}
@@ -236,25 +240,34 @@
 	}
 
 	/* ERROR BLOCK */
-	.info-message__error-block {
+	.info-message__code-block {
 		max-height: 350px;
 		padding: 10px;
 		overflow: auto;
 		border-radius: var(--radius-s);
-		background-color: var(--bg-danger);
-		color: var(--text-danger);
 		font-size: 12px;
 		white-space: pre-wrap;
 		overflow-wrap: break-word;
 		user-select: text;
 
-		/* selection */
-		&::selection {
-			background-color: color-mix(in srgb, var(--fill-danger-bg) 20%, transparent);
-		}
-		/* empty */
 		&:empty {
 			display: none;
+		}
+
+		&.warn {
+			background-color: var(--bg-warn);
+			color: var(--text-warn);
+			&::selection {
+				background-color: color-mix(in srgb, var(--fill-warn-bg) 20%, transparent);
+			}
+		}
+
+		&.error {
+			background-color: var(--bg-danger);
+			color: var(--text-danger);
+			&::selection {
+				background-color: color-mix(in srgb, var(--fill-danger-bg) 20%, transparent);
+			}
 		}
 	}
 
