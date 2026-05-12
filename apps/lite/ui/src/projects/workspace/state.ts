@@ -50,17 +50,12 @@ export const createInitialState = (): WorkspaceState => ({
 
 export const initialState: WorkspaceState = createInitialState();
 
-export const enterMoveMode = (state: WorkspaceState, source: Operand) => {
-	state.mode = operationOutlineMode(
-		cutOperationMode({
-			source,
-			operationType: "moveAbove",
-		}),
-	);
-};
-
-export const enterCutMode = (state: WorkspaceState, source: Operand) => {
-	state.mode = operationOutlineMode(cutOperationMode({ source, operationType: "rub" }));
+export const enterCutMode = (
+	state: WorkspaceState,
+	source: Operand,
+	operationType: OperationType,
+) => {
+	state.mode = operationOutlineMode(cutOperationMode({ source, operationType }));
 };
 
 export const enterAbsorbMode = (

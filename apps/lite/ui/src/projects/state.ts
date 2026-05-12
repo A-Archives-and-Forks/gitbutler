@@ -78,10 +78,17 @@ const projectSlice = createSlice({
 			const projectState = ensureProjectState(state, projectId);
 			workspace.startRenameBranch(projectState.workspace, branch);
 		},
-		enterCutMode: (state, action: PayloadAction<{ projectId: string; source: Operand }>) => {
-			const { projectId, source } = action.payload;
+		enterCutMode: (
+			state,
+			action: PayloadAction<{
+				projectId: string;
+				source: Operand;
+				operationType: OperationType;
+			}>,
+		) => {
+			const { projectId, source, operationType } = action.payload;
 			const projectState = ensureProjectState(state, projectId);
-			workspace.enterCutMode(projectState.workspace, source);
+			workspace.enterCutMode(projectState.workspace, source, operationType);
 		},
 		enterAbsorbMode: (
 			state,
@@ -94,11 +101,6 @@ const projectSlice = createSlice({
 			const { projectId, source, absorptionPlan } = action.payload;
 			const projectState = ensureProjectState(state, projectId);
 			workspace.enterAbsorbMode(projectState.workspace, source, absorptionPlan);
-		},
-		enterMoveMode: (state, action: PayloadAction<{ projectId: string; source: Operand }>) => {
-			const { projectId, source } = action.payload;
-			const projectState = ensureProjectState(state, projectId);
-			workspace.enterMoveMode(projectState.workspace, source);
 		},
 		enterDragAndDropMode: (
 			state,
