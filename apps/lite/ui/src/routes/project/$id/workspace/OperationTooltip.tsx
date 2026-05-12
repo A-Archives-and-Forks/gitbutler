@@ -1,10 +1,8 @@
 import { classes } from "#ui/ui/classes.ts";
 import {
-	absorbOperation,
 	getOperations,
 	operationLabel,
 	useRunOperationMutationOptions,
-	type Operation,
 	type OperationType,
 	type OperationsByType,
 } from "#ui/operations/operation.ts";
@@ -18,30 +16,37 @@ import styles from "./OperationTooltip.module.css";
 import { Operand, operandEquals } from "#ui/operands.ts";
 import { useAppDispatch } from "#ui/store.ts";
 import { projectActions } from "#ui/projects/state.ts";
-import { OperationMode, getTransferOperation } from "#ui/outline/mode.ts";
+import { getTransferOperation, type OutlineMode } from "#ui/outline/mode.ts";
 import { Match } from "effect";
 import { useCommand } from "#ui/commands/manager.ts";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { type CommitAbsorption } from "@gitbutler/but-sdk";
 
-const OperationModeControls: FC<{
+const AbsorbControls: FC<{
 	projectId: string;
-	operation: Operation | null;
-}> = ({ projectId, operation }) => {
+	absorptionPlan: Array<CommitAbsorption>;
+}> = ({ projectId, absorptionPlan }) => {
 	const dispatch = useAppDispatch();
-	const { mutate: runOperation } = useMutation(useRunOperationMutationOptions());
+	const queryClient = useQueryClient();
+	const { mutate: absorb } = useMutation({
+		mutationFn: () => window.lite.absorb({ projectId, absorptionPlan }),
+		onSuccess: async () => {
+			await queryClient.invalidateQueries();
+		},
+	});
 
 	const confirm = () => {
 		dispatch(projectActions.exitMode({ projectId }));
 
-		if (!operation) return;
+		if (absorptionPlan.length === 0) return;
 
-		runOperation(operation);
+		absorb();
 	};
 
 	const cancel = () => dispatch(projectActions.exitMode({ projectId }));
 
 	const confirmCommand = useCommand(confirm, {
-		enabled: !!operation,
+		enabled: absorptionPlan.length > 0,
 		group: "Operation mode",
 		commandPalette: { label: "Confirm" },
 		shortcutsBar: { label: "Confirm" },
@@ -57,13 +62,13 @@ const OperationModeControls: FC<{
 
 	return (
 		<>
-			{operation && (
+			{absorptionPlan.length > 0 && (
 				<ShortcutButton
 					className={uiStyles.button}
 					hotkeys={confirmCommand.hotkeys}
 					onClick={confirmCommand.commandFn}
 				>
-					{operationLabel(operation)}
+					Absorb
 				</ShortcutButton>
 			)}
 			<ShortcutButton
@@ -199,53 +204,48 @@ export const OperationTooltip: FC<
 	{
 		projectId: string;
 		target: Operand;
-		operationMode: OperationMode | null;
+		outlineMode: OutlineMode;
 		isActive: boolean;
 	} & useRender.ComponentProps<"div">
-> = ({ projectId, target, operationMode, isActive, render, ...props }) => {
-	const tooltip =
-		isActive && !!operationMode
-			? Match.value(operationMode).pipe(
-					Match.tagsExhaustive({
-						Absorb: ({ absorptionPlan }) => (
-							<OperationModeControls
-								projectId={projectId}
-								operation={absorptionPlan.length > 0 ? absorbOperation({ absorptionPlan }) : null}
-							/>
-						),
-						Transfer: ({ value: mode }) =>
-							Match.value(mode).pipe(
-								Match.tagsExhaustive({
-									Pointer: (mode) => {
-										const operation = getTransferOperation({ mode, target });
-										if (!operation) return null;
+> = ({ projectId, target, outlineMode, isActive, render, ...props }) => {
+	const tooltip = isActive
+		? Match.value(outlineMode).pipe(
+				Match.tags({
+					Absorb: ({ absorptionPlan }) => (
+						<AbsorbControls projectId={projectId} absorptionPlan={absorptionPlan} />
+					),
+					Transfer: ({ value: mode }) =>
+						Match.value(mode).pipe(
+							Match.tagsExhaustive({
+								Pointer: (mode) => {
+									const operation = getTransferOperation({ mode, target });
+									if (!operation) return null;
 
-										return <>{operationLabel(operation)}</>;
-									},
-									Keyboard: (mode) => (
-										<>
-											{operandEquals(mode.source, target) && <>Select a target</>}
-											<TransferOperationControls
-												projectId={projectId}
-												operations={getOperations(mode.source, target)}
-												operationType={mode.operationType}
-											/>
-										</>
-									),
-								}),
-							),
-					}),
-				)
-			: null;
+									return <>{operationLabel(operation)}</>;
+								},
+								Keyboard: (mode) => (
+									<>
+										{operandEquals(mode.source, target) && <>Select a target</>}
+										<TransferOperationControls
+											projectId={projectId}
+											operations={getOperations(mode.source, target)}
+											operationType={mode.operationType}
+										/>
+									</>
+								),
+							}),
+						),
+				}),
+				Match.orElse(() => null),
+			)
+		: null;
 
 	const trigger = useRender({ render, props });
 
-	const isPointerTransfer =
-		!!operationMode &&
-		Match.value(operationMode).pipe(
-			Match.when({ _tag: "Transfer", value: { _tag: "Pointer" } }, () => true),
-			Match.orElse(() => false),
-		);
+	const isPointerTransfer = Match.value(outlineMode).pipe(
+		Match.when({ _tag: "Transfer", value: { _tag: "Pointer" } }, () => true),
+		Match.orElse(() => false),
+	);
 
 	return (
 		<Tooltip.Root

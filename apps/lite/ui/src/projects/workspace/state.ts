@@ -11,16 +11,14 @@ import {
 	type Operand,
 } from "#ui/operands.ts";
 import {
-	absorbOperationMode,
+	absorbOutlineMode,
 	defaultOutlineMode,
-	getOperationMode,
 	isValidOutlineModeForSelection,
 	keyboardTransferOperationMode,
-	operationOutlineMode,
 	pointerTransferOperationMode,
 	renameBranchOutlineMode,
 	rewordCommitOutlineMode,
-	transferOperationMode,
+	transferOutlineMode,
 	type OutlineMode,
 	type TransferOperationMode,
 } from "#ui/outline/mode.ts";
@@ -54,7 +52,7 @@ export const createInitialState = (): WorkspaceState => ({
 export const initialState: WorkspaceState = createInitialState();
 
 export const enterTransferMode = (state: WorkspaceState, mode: TransferOperationMode) => {
-	state.mode = operationOutlineMode(transferOperationMode(mode));
+	state.mode = transferOutlineMode(mode);
 };
 
 export const enterAbsorbMode = (
@@ -62,7 +60,7 @@ export const enterAbsorbMode = (
 	source: Operand,
 	absorptionPlan: Array<CommitAbsorption>,
 ) => {
-	state.mode = operationOutlineMode(absorbOperationMode({ source, absorptionPlan }));
+	state.mode = absorbOutlineMode({ source, absorptionPlan });
 };
 
 export const updatePointerTransfer = (
@@ -71,24 +69,19 @@ export const updatePointerTransfer = (
 	operationType: OperationType | null,
 ) => {
 	Match.value(state.mode).pipe(
-		Match.when(
-			{ _tag: "Operation", value: { _tag: "Transfer", value: { _tag: "Pointer" } } },
-			(mode) => {
-				if (target !== null && !operandEquals(state.selection.outline, target))
-					selectOutline(state, target);
+		Match.when({ _tag: "Transfer", value: { _tag: "Pointer" } }, (mode) => {
+			if (target !== null && !operandEquals(state.selection.outline, target))
+				selectOutline(state, target);
 
-				if (mode.value.value.operationType === operationType) return;
+			if (mode.value.operationType === operationType) return;
 
-				state.mode = operationOutlineMode(
-					transferOperationMode(
-						pointerTransferOperationMode({
-							source: mode.value.value.source,
-							operationType,
-						}),
-					),
-				);
-			},
-		),
+			state.mode = transferOutlineMode(
+				pointerTransferOperationMode({
+					source: mode.value.source,
+					operationType,
+				}),
+			);
+		}),
 		Match.orElse(() => {}),
 	);
 };
@@ -98,19 +91,14 @@ export const updateTransferOperationType = (
 	operationType: OperationType,
 ) => {
 	Match.value(state.mode).pipe(
-		Match.when(
-			{ _tag: "Operation", value: { _tag: "Transfer", value: { _tag: "Keyboard" } } },
-			(mode) => {
-				state.mode = operationOutlineMode(
-					transferOperationMode(
-						keyboardTransferOperationMode({
-							source: mode.value.value.source,
-							operationType,
-						}),
-					),
-				);
-			},
-		),
+		Match.when({ _tag: "Transfer", value: { _tag: "Keyboard" } }, (mode) => {
+			state.mode = transferOutlineMode(
+				keyboardTransferOperationMode({
+					source: mode.value.source,
+					operationType,
+				}),
+			);
+		}),
 		Match.orElse(() => {}),
 	);
 };
@@ -158,8 +146,6 @@ export const selectSelectionOutlineState = (state: WorkspaceState): Operand =>
 export const selectSelectionFilesState = (state: WorkspaceState): Operand => state.selection.files;
 
 export const selectMode = (state: WorkspaceState): OutlineMode => state.mode;
-
-export const selectOperationMode = (state: WorkspaceState) => getOperationMode(state.mode);
 
 export const selectHighlightedCommitIds = (state: WorkspaceState): Array<string> =>
 	state.highlightedCommitIds;
