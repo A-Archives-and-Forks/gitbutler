@@ -16,11 +16,9 @@ import {
 	dragAndDropOperationMode,
 	getOperationMode,
 	isValidOutlineModeForSelection,
-	moveOperationMode,
 	operationOutlineMode,
 	renameBranchOutlineMode,
 	rewordCommitOutlineMode,
-	rubOperationMode,
 	type OutlineMode,
 } from "#ui/outline/mode.ts";
 
@@ -52,16 +50,12 @@ export const createInitialState = (): WorkspaceState => ({
 
 export const initialState: WorkspaceState = createInitialState();
 
-export const enterMoveMode = (state: WorkspaceState, source: Operand) => {
-	state.mode = operationOutlineMode(moveOperationMode({ source }));
-};
-
-export const enterRubMode = (state: WorkspaceState, source: Operand) => {
-	state.mode = operationOutlineMode(rubOperationMode({ source }));
-};
-
-export const enterCutMode = (state: WorkspaceState, source: Operand) => {
-	state.mode = operationOutlineMode(cutOperationMode({ source }));
+export const enterCutMode = (
+	state: WorkspaceState,
+	source: Operand,
+	operationType: OperationType,
+) => {
+	state.mode = operationOutlineMode(cutOperationMode({ source, operationType }));
 };
 
 export const enterAbsorbMode = (
@@ -84,6 +78,17 @@ export const updateDragAndDropMode = (
 		Match.when({ _tag: "Operation", value: { _tag: "DragAndDrop" } }, (mode) => {
 			state.mode = operationOutlineMode(
 				dragAndDropOperationMode({ source: mode.value.source, operationType }),
+			);
+		}),
+		Match.orElse(() => {}),
+	);
+};
+
+export const updateCutMode = (state: WorkspaceState, operationType: OperationType) => {
+	Match.value(state.mode).pipe(
+		Match.when({ _tag: "Operation", value: { _tag: "Cut" } }, (mode) => {
+			state.mode = operationOutlineMode(
+				cutOperationMode({ source: mode.value.source, operationType }),
 			);
 		}),
 		Match.orElse(() => {}),

@@ -166,14 +166,15 @@ export const OperationTarget: FC<
 	const insertTargetOperationType = operationMode
 		? Match.value(operationMode).pipe(
 				Match.tagsExhaustive({
+					Absorb: () => null,
 					DragAndDrop: ({ operationType }) =>
 						isActiveDropTarget && (operationType === "moveAbove" || operationType === "moveBelow")
 							? operationType
 							: null,
-					Absorb: () => null,
-					Cut: () => null,
-					Rub: () => null,
-					Move: () => null,
+					Cut: ({ operationType }) =>
+						isSelected && (operationType === "moveAbove" || operationType === "moveBelow")
+							? operationType
+							: null,
 				}),
 			)
 		: null;
@@ -182,11 +183,9 @@ export const OperationTarget: FC<
 		!!operationMode &&
 		Match.value(operationMode).pipe(
 			Match.tagsExhaustive({
-				DragAndDrop: ({ operationType }) => isActiveDropTarget && operationType === "rub",
 				Absorb: () => isOperationModeCandidateTarget({ mode: operationMode, target }),
-				Cut: () => isSelected,
-				Rub: () => isSelected,
-				Move: () => isSelected,
+				DragAndDrop: ({ operationType }) => isActiveDropTarget && operationType === "rub",
+				Cut: ({ operationType }) => isSelected && operationType === "rub",
 			}),
 		);
 
@@ -194,11 +193,9 @@ export const OperationTarget: FC<
 		!!operationMode &&
 		Match.value(operationMode).pipe(
 			Match.tagsExhaustive({
-				DragAndDrop: () => isMainTargetActive,
 				Absorb: () => isSelected,
-				Cut: () => isSelected,
-				Rub: () => isSelected,
-				Move: () => isSelected,
+				DragAndDrop: () => isMainTargetActive,
+				Cut: () => isMainTargetActive,
 			}),
 		);
 

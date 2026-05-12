@@ -320,6 +320,7 @@ export const useDryRunOperation = ({
 	});
 
 	return useQuery({
+		enabled: !!operation,
 		queryKey: ["dryRun", projectId, operation, changes],
 		queryFn: () => {
 			if (!operation) return null;

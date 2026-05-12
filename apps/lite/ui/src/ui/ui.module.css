@@ -3,7 +3,6 @@
 	padding-block: var(--row-block-padding);
 	border: var(--button-border);
 	border-radius: 8px;
-	background-color: transparent;
 
 	&:not(:disabled):hover {
 		background-color: var(--button-ghost-hover-bg);

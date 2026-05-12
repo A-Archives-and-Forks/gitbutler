@@ -18,18 +18,12 @@ export type AbsorbOperationMode = {
 	absorptionPlan: Array<CommitAbsorption>;
 };
 /** @public */
-export type RubOperationMode = { source: Operand };
-/** @public */
-export type CutOperationMode = { source: Operand };
-/** @public */
-export type MoveOperationMode = { source: Operand };
+export type CutOperationMode = { source: Operand; operationType: OperationType };
 /** @public */
 export type DragAndDropOperationMode = { source: Operand; operationType: OperationType | null };
 export type OperationMode =
 	| ({ _tag: "Absorb" } & AbsorbOperationMode)
-	| ({ _tag: "Rub" } & RubOperationMode)
 	| ({ _tag: "Cut" } & CutOperationMode)
-	| ({ _tag: "Move" } & MoveOperationMode)
 	| ({ _tag: "DragAndDrop" } & DragAndDropOperationMode);
 
 /** @public */
@@ -43,21 +37,10 @@ export const absorbOperationMode = ({
 });
 
 /** @public */
-export const rubOperationMode = ({ source }: RubOperationMode): OperationMode => ({
-	_tag: "Rub",
-	source,
-});
-
-/** @public */
-export const cutOperationMode = ({ source }: CutOperationMode): OperationMode => ({
+export const cutOperationMode = ({ source, operationType }: CutOperationMode): OperationMode => ({
 	_tag: "Cut",
 	source,
-});
-
-/** @public */
-export const moveOperationMode = ({ source }: MoveOperationMode): OperationMode => ({
-	_tag: "Move",
-	source,
+	operationType,
 });
 
 /** @public */
@@ -115,10 +98,7 @@ const operationModeToOperationType = (operationMode: OperationMode): OperationTy
 		Match.withReturnType<OperationType | null>(),
 		Match.tags({
 			Absorb: () => null,
-			Rub: () => "rub",
-			Cut: () => null,
-			// We should have the ability to move either above or below.
-			Move: ({ source }) => (source._tag === "Branch" ? "moveAbove" : "moveBelow"),
+			Cut: ({ operationType }) => operationType,
 			DragAndDrop: ({ operationType }) => operationType,
 		}),
 		Match.exhaustive,
@@ -167,18 +147,6 @@ export const isOperationModeCandidateTarget = ({
 				),
 			DragAndDrop: ({ source }) => hasAnyOperation(source, target),
 			Cut: ({ source }) => hasAnyOperation(source, target),
-			Move: (mode) =>
-				!!getOperation({
-					source: mode.source,
-					target,
-					operationType: operationModeToOperationType(mode),
-				}),
-			Rub: (mode) =>
-				!!getOperation({
-					source: mode.source,
-					target,
-					operationType: operationModeToOperationType(mode),
-				}),
 		}),
 	);
 

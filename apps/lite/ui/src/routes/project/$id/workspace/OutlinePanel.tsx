@@ -591,7 +591,7 @@ const CommitRow: FC<
 	};
 
 	const cutCommit = () => {
-		dispatch(projectActions.enterCutMode({ projectId, source: operand }));
+		dispatch(projectActions.enterCutMode({ projectId, source: operand, operationType: "rub" }));
 	};
 
 	const startEditing = () => {
@@ -628,7 +628,13 @@ const CommitRow: FC<
 	};
 
 	const amendCommit = () => {
-		dispatch(projectActions.enterRubMode({ projectId, source: changesSectionOperand }));
+		dispatch(
+			projectActions.enterCutMode({
+				projectId,
+				source: changesSectionOperand,
+				operationType: "rub",
+			}),
+		);
 		focusPanel("outline");
 	};
 
