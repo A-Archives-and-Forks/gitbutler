@@ -19,7 +19,7 @@ import {
 import { mergeProps, useRender } from "@base-ui/react";
 import { Match, pipe } from "effect";
 import { FC, useEffect, useEffectEvent, useRef, useState } from "react";
-import { operationModeHasOperation } from "#ui/outline/mode.ts";
+import { isOperationModeCandidateTarget } from "#ui/outline/mode.ts";
 import { useMutation } from "@tanstack/react-query";
 
 type DropTargetParams = Parameters<typeof dropTargetForElements>[0];
@@ -143,7 +143,7 @@ const useOperationDropTarget = ({ target, projectId }: { target: Operand; projec
 				});
 				if (!operation) return;
 
-				runOperation({ projectId, operation });
+				runOperation(operation);
 			},
 		});
 	}, [dispatch, projectId, runOperation]);
@@ -183,7 +183,7 @@ export const OperationTarget: FC<
 		Match.value(operationMode).pipe(
 			Match.tagsExhaustive({
 				DragAndDrop: ({ operationType }) => isActiveDropTarget && operationType === "rub",
-				Absorb: () => operationModeHasOperation({ mode: operationMode, target }),
+				Absorb: () => isOperationModeCandidateTarget({ mode: operationMode, target }),
 				Cut: () => isSelected,
 				Rub: () => isSelected,
 				Move: () => isSelected,

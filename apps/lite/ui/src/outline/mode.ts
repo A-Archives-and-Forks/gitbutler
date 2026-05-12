@@ -110,7 +110,7 @@ export const getOperationMode = (mode: OutlineMode): OperationMode | null =>
 		Match.orElse(() => null),
 	);
 
-export const operationModeToOperationType = (operationMode: OperationMode): OperationType | null =>
+const operationModeToOperationType = (operationMode: OperationMode): OperationType | null =>
 	Match.value(operationMode).pipe(
 		Match.withReturnType<OperationType | null>(),
 		Match.tags({
@@ -140,12 +140,19 @@ export const isValidOutlineModeForSelection = ({
 		}),
 	);
 
+export const getBinaryOperation = ({ mode, target }: { mode: OperationMode; target: Operand }) =>
+	getOperation({
+		source: mode.source,
+		target,
+		operationType: operationModeToOperationType(mode),
+	});
+
 const hasAnyOperation = (source: Operand, target: Operand) => {
 	const operations = getOperations(source, target);
 	return !!operations.rub || !!operations.moveAbove || !!operations.moveBelow;
 };
 
-export const operationModeHasOperation = ({
+export const isOperationModeCandidateTarget = ({
 	mode,
 	target,
 }: {
@@ -190,7 +197,7 @@ export const filterNavigationIndexForOutlineMode = ({
 					navigationIndexUnfiltered,
 					(operand) =>
 						operandContains(operand, operationMode.source) ||
-						operationModeHasOperation({ mode: operationMode, target: operand }),
+						isOperationModeCandidateTarget({ mode: operationMode, target: operand }),
 				),
 			RenameBranch: (x) =>
 				filterNavigationIndex(navigationIndexUnfiltered, (operand) =>

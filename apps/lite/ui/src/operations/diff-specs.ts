@@ -2,8 +2,8 @@ import {
 	changesInWorktreeQueryOptions,
 	commitDetailsWithLineStatsQueryOptions,
 } from "#ui/api/queries.ts";
-import { Operand } from "#ui/operands.ts";
-import { QueryClient } from "@tanstack/react-query";
+import { FileParent, Operand, operandFileParent } from "#ui/operands.ts";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import {
 	CommitDetails,
 	DiffSpec,
@@ -24,11 +24,11 @@ const createDiffSpec = (change: TreeChange, hunkHeaders: Array<HunkHeader>): Dif
 const resolvedDiffSpecsFromOperand = ({
 	operand,
 	worktreeChanges,
-	getCommitDetails,
+	commitDetails,
 }: {
 	operand: Operand;
 	worktreeChanges: WorktreeChanges | undefined;
-	getCommitDetails: (commitId: string) => CommitDetails | undefined;
+	commitDetails: CommitDetails | undefined;
 }) =>
 	Match.value(operand).pipe(
 		Match.withReturnType<Array<DiffSpec> | null>(),
@@ -43,10 +43,8 @@ const resolvedDiffSpecsFromOperand = ({
 
 							return [createDiffSpec(change, [])];
 						},
-						Commit: ({ commitId }) => {
-							const change = getCommitDetails(commitId)?.changes.find(
-								(candidate) => candidate.path === path,
-							);
+						Commit: () => {
+							const change = commitDetails?.changes.find((candidate) => candidate.path === path);
 							if (!change) return null;
 
 							return [createDiffSpec(change, [])];
@@ -64,7 +62,7 @@ const resolvedDiffSpecsFromOperand = ({
 				const changes = Match.value(parent.parent).pipe(
 					Match.tagsExhaustive({
 						Changes: () => worktreeChanges?.changes,
-						Commit: ({ commitId }) => getCommitDetails(commitId)?.changes,
+						Commit: () => commitDetails?.changes,
 						Branch: () => null,
 					}),
 				);
@@ -79,20 +77,39 @@ const resolvedDiffSpecsFromOperand = ({
 		Match.orElse(() => null),
 	);
 
-export const resolveDiffSpecs = ({
+const commitIdFromParent = (parent: FileParent) =>
+	Match.value(parent).pipe(
+		Match.withReturnType<string | null>(),
+		Match.tagsExhaustive({
+			Changes: () => null,
+			Commit: ({ commitId }) => commitId,
+			Branch: () => null,
+		}),
+	);
+
+export const useResolveDiffSpecs = ({
 	source,
-	queryClient,
 	projectId,
 }: {
-	source: Operand;
-	queryClient: QueryClient;
+	source?: Operand;
 	projectId: string;
-}) =>
-	resolvedDiffSpecsFromOperand({
-		operand: source,
-		worktreeChanges: queryClient.getQueryData(changesInWorktreeQueryOptions(projectId).queryKey),
-		getCommitDetails: (commitId) =>
-			queryClient.getQueryData(
-				commitDetailsWithLineStatsQueryOptions({ projectId, commitId }).queryKey,
-			),
+}) => {
+	const { data: worktreeChanges } = useQuery(changesInWorktreeQueryOptions(projectId));
+
+	const fileParent = source ? operandFileParent(source) : null;
+	const commitId = fileParent ? commitIdFromParent(fileParent) : null;
+	const conditionalQueries = useQueries({
+		queries: (commitId !== null ? [commitId] : []).map((commitId) =>
+			commitDetailsWithLineStatsQueryOptions({ projectId, commitId }),
+		),
 	});
+	const commitDetails = conditionalQueries[0]?.data;
+
+	if (!source) return null;
+
+	return resolvedDiffSpecsFromOperand({
+		operand: source,
+		worktreeChanges,
+		commitDetails,
+	});
+};
