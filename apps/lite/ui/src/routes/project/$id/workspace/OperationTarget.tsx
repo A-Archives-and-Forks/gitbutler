@@ -171,7 +171,10 @@ export const OperationTarget: FC<
 							? operationType
 							: null,
 					Absorb: () => null,
-					Cut: () => null,
+					Cut: ({ operationType }) =>
+						isSelected && (operationType === "moveAbove" || operationType === "moveBelow")
+							? operationType
+							: null,
 				}),
 			)
 		: null;
@@ -182,7 +185,7 @@ export const OperationTarget: FC<
 			Match.tagsExhaustive({
 				DragAndDrop: ({ operationType }) => isActiveDropTarget && operationType === "rub",
 				Absorb: () => isOperationModeCandidateTarget({ mode: operationMode, target }),
-				Cut: () => isSelected,
+				Cut: ({ operationType }) => isSelected && operationType === "rub",
 			}),
 		);
 
@@ -192,7 +195,7 @@ export const OperationTarget: FC<
 			Match.tagsExhaustive({
 				DragAndDrop: () => isMainTargetActive,
 				Absorb: () => isSelected,
-				Cut: () => isSelected,
+				Cut: () => isMainTargetActive,
 			}),
 		);
 
