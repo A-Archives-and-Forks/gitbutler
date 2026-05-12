@@ -2632,10 +2632,9 @@ impl App {
                 .into_iter()
                 .chain([Span::raw(" "), Span::raw(time).style(self.theme.time)])
                 .chain(target_snapshot.details.iter().flat_map(|details| {
-                    let op_type = details.operation.kind_str();
                     [
                         Span::raw(" "),
-                        Span::raw(op_type).style(self.theme.attention),
+                        Span::raw(details.operation.title()).style(self.theme.attention),
                     ]
                 }))
                 .chain([Span::raw("?")]),
