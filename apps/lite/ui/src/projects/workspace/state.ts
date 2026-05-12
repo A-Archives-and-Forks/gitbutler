@@ -16,11 +16,9 @@ import {
 	dragAndDropOperationMode,
 	getOperationMode,
 	isValidOutlineModeForSelection,
-	moveOperationMode,
 	operationOutlineMode,
 	renameBranchOutlineMode,
 	rewordCommitOutlineMode,
-	rubOperationMode,
 	type OutlineMode,
 } from "#ui/outline/mode.ts";
 
@@ -53,11 +51,16 @@ export const createInitialState = (): WorkspaceState => ({
 export const initialState: WorkspaceState = createInitialState();
 
 export const enterMoveMode = (state: WorkspaceState, source: Operand) => {
-	state.mode = operationOutlineMode(moveOperationMode({ source }));
+	state.mode = operationOutlineMode(
+		cutOperationMode({
+			source,
+			operationType: source._tag === "Branch" ? "moveAbove" : "moveBelow",
+		}),
+	);
 };
 
 export const enterRubMode = (state: WorkspaceState, source: Operand) => {
-	state.mode = operationOutlineMode(rubOperationMode({ source }));
+	state.mode = operationOutlineMode(cutOperationMode({ source, operationType: "rub" }));
 };
 
 export const enterCutMode = (state: WorkspaceState, source: Operand) => {

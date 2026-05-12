@@ -172,8 +172,6 @@ export const OperationTarget: FC<
 							: null,
 					Absorb: () => null,
 					Cut: () => null,
-					Rub: () => null,
-					Move: () => null,
 				}),
 			)
 		: null;
@@ -185,8 +183,6 @@ export const OperationTarget: FC<
 				DragAndDrop: ({ operationType }) => isActiveDropTarget && operationType === "rub",
 				Absorb: () => isOperationModeCandidateTarget({ mode: operationMode, target }),
 				Cut: () => isSelected,
-				Rub: () => isSelected,
-				Move: () => isSelected,
 			}),
 		);
 
@@ -197,8 +193,6 @@ export const OperationTarget: FC<
 				DragAndDrop: () => isMainTargetActive,
 				Absorb: () => isSelected,
 				Cut: () => isSelected,
-				Rub: () => isSelected,
-				Move: () => isSelected,
 			}),
 		);
 

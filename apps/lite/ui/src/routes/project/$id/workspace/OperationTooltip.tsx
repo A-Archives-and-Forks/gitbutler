@@ -206,7 +206,7 @@ export const OperationTooltip: FC<
 	const tooltip =
 		isActive && !!operationMode
 			? Match.value(operationMode).pipe(
-					Match.tags({
+					Match.tagsExhaustive({
 						Absorb: ({ absorptionPlan }) => (
 							<OperationModeControls
 								projectId={projectId}
@@ -232,18 +232,6 @@ export const OperationTooltip: FC<
 								/>
 							</>
 						),
-					}),
-					Match.orElse(() => {
-						const operation = getBinaryOperation({
-							mode: operationMode,
-							target,
-						});
-						return (
-							<>
-								{operandEquals(operationMode.source, target) && <>Select a target</>}
-								<OperationModeControls projectId={projectId} operation={operation} />
-							</>
-						);
 					}),
 				)
 			: null;
