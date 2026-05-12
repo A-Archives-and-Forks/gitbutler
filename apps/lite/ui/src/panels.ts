@@ -1,6 +1,7 @@
 import { CommandGroup } from "#ui/commands/groups.ts";
 import { useActiveElement } from "#ui/focus.ts";
 import { type OperationType } from "#ui/operations/operation.ts";
+import { keyboardTransferOperationMode } from "#ui/outline/mode.ts";
 import { changesSectionOperand, type Operand } from "#ui/operands.ts";
 import {
 	projectActions,
@@ -143,12 +144,20 @@ export const useNavigationIndexHotkeys = ({
 
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
-	const enterCutMode = (source: Operand, operationType: OperationType) => {
-		dispatch(projectActions.enterCutMode({ projectId, source, operationType }));
+	const enterTransferMode = (source: Operand, operationType: OperationType) => {
+		dispatch(
+			projectActions.enterTransferMode({
+				projectId,
+				mode: keyboardTransferOperationMode({
+					source,
+					operationType,
+				}),
+			}),
+		);
 		focusPanel("outline");
 	};
 
-	useCommand(() => enterCutMode(selection, "moveAbove"), {
+	useCommand(() => enterTransferMode(selection, "moveAbove"), {
 		group,
 		enabled: focusedPanel === panel && outlineMode._tag === "Default",
 		commandPalette: { label: "Move" },
@@ -156,7 +165,7 @@ export const useNavigationIndexHotkeys = ({
 		hotkeys: [{ hotkey: "M" }],
 	});
 
-	useCommand(() => enterCutMode(selection, "rub"), {
+	useCommand(() => enterTransferMode(selection, "rub"), {
 		group,
 		enabled: focusedPanel === panel && outlineMode._tag === "Default",
 		commandPalette: { label: "Cut" },
@@ -164,7 +173,7 @@ export const useNavigationIndexHotkeys = ({
 		hotkeys: [{ hotkey: "Mod+X", ignoreInputs: true }, { hotkey: "R" }],
 	});
 
-	useCommand(() => enterCutMode(changesSectionOperand, "moveAbove"), {
+	useCommand(() => enterTransferMode(changesSectionOperand, "moveAbove"), {
 		group,
 		enabled: focusedPanel === panel && outlineMode._tag === "Default",
 		commandPalette: { label: "Commit" },

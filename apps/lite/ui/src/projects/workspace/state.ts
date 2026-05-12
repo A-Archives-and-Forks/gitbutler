@@ -12,15 +12,17 @@ import {
 } from "#ui/operands.ts";
 import {
 	absorbOperationMode,
-	cutOperationMode,
 	defaultOutlineMode,
-	dragAndDropOperationMode,
 	getOperationMode,
 	isValidOutlineModeForSelection,
+	keyboardTransferOperationMode,
 	operationOutlineMode,
+	pointerTransferOperationMode,
 	renameBranchOutlineMode,
 	rewordCommitOutlineMode,
+	transferOperationMode,
 	type OutlineMode,
+	type TransferOperationMode,
 } from "#ui/outline/mode.ts";
 
 type SelectionState = {
@@ -51,12 +53,8 @@ export const createInitialState = (): WorkspaceState => ({
 
 export const initialState: WorkspaceState = createInitialState();
 
-export const enterCutMode = (
-	state: WorkspaceState,
-	source: Operand,
-	operationType: OperationType,
-) => {
-	state.mode = operationOutlineMode(cutOperationMode({ source, operationType }));
+export const enterTransferMode = (state: WorkspaceState, mode: TransferOperationMode) => {
+	state.mode = operationOutlineMode(transferOperationMode(mode));
 };
 
 export const enterAbsorbMode = (
@@ -67,43 +65,52 @@ export const enterAbsorbMode = (
 	state.mode = operationOutlineMode(absorbOperationMode({ source, absorptionPlan }));
 };
 
-export const enterDragAndDropMode = (state: WorkspaceState, source: Operand) => {
-	state.mode = operationOutlineMode(
-		dragAndDropOperationMode({ source, target: null, operationType: null }),
-	);
-};
-
-export const updateDragAndDropMode = (
+export const updatePointerTransfer = (
 	state: WorkspaceState,
 	target: Operand | null,
 	operationType: OperationType | null,
 ) => {
 	Match.value(state.mode).pipe(
-		Match.when({ _tag: "Operation", value: { _tag: "DragAndDrop" } }, (mode) => {
-			if (
-				mode.value.operationType === operationType &&
-				((mode.value.target === null && target === null) ||
-					(mode.value.target !== null &&
-						target !== null &&
-						operandEquals(mode.value.target, target)))
-			)
-				return;
+		Match.when(
+			{ _tag: "Operation", value: { _tag: "Transfer", value: { _tag: "Pointer" } } },
+			(mode) => {
+				if (target !== null && !operandEquals(state.selection.outline, target))
+					selectOutline(state, target);
 
-			state.mode = operationOutlineMode(
-				dragAndDropOperationMode({ source: mode.value.source, target, operationType }),
-			);
-		}),
+				if (mode.value.value.operationType === operationType) return;
+
+				state.mode = operationOutlineMode(
+					transferOperationMode(
+						pointerTransferOperationMode({
+							source: mode.value.value.source,
+							operationType,
+						}),
+					),
+				);
+			},
+		),
 		Match.orElse(() => {}),
 	);
 };
 
-export const updateCutMode = (state: WorkspaceState, operationType: OperationType) => {
+export const updateTransferOperationType = (
+	state: WorkspaceState,
+	operationType: OperationType,
+) => {
 	Match.value(state.mode).pipe(
-		Match.when({ _tag: "Operation", value: { _tag: "Cut" } }, (mode) => {
-			state.mode = operationOutlineMode(
-				cutOperationMode({ source: mode.value.source, operationType }),
-			);
-		}),
+		Match.when(
+			{ _tag: "Operation", value: { _tag: "Transfer", value: { _tag: "Keyboard" } } },
+			(mode) => {
+				state.mode = operationOutlineMode(
+					transferOperationMode(
+						keyboardTransferOperationMode({
+							source: mode.value.value.source,
+							operationType,
+						}),
+					),
+				);
+			},
+		),
 		Match.orElse(() => {}),
 	);
 };
@@ -153,17 +160,6 @@ export const selectSelectionFilesState = (state: WorkspaceState): Operand => sta
 export const selectMode = (state: WorkspaceState): OutlineMode => state.mode;
 
 export const selectOperationMode = (state: WorkspaceState) => getOperationMode(state.mode);
-
-export const selectOperationModeTarget = (state: WorkspaceState): Operand | null => {
-	const operationMode = selectOperationMode(state);
-	if (!operationMode) return null;
-
-	return Match.value(operationMode).pipe(
-		Match.withReturnType<Operand | null>(),
-		Match.tags({ DragAndDrop: ({ target }) => target }),
-		Match.orElse(() => selectSelectionOutlineState(state)),
-	);
-};
 
 export const selectHighlightedCommitIds = (state: WorkspaceState): Array<string> =>
 	state.highlightedCommitIds;

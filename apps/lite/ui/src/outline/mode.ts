@@ -17,18 +17,47 @@ export type AbsorbOperationMode = {
 	source: Operand;
 	absorptionPlan: Array<CommitAbsorption>;
 };
+
 /** @public */
-export type CutOperationMode = { source: Operand; operationType: OperationType };
-/** @public */
-export type DragAndDropOperationMode = {
+export type KeyboardTransferOperationMode = {
 	source: Operand;
-	target: Operand | null;
+	operationType: OperationType;
+};
+
+/** @public */
+export type PointerTransferOperationMode = {
+	source: Operand;
 	operationType: OperationType | null;
 };
+
+/** @public */
+export type TransferOperationMode =
+	| ({ _tag: "Keyboard" } & KeyboardTransferOperationMode)
+	| ({ _tag: "Pointer" } & PointerTransferOperationMode);
+
+/** @public */
+export const keyboardTransferOperationMode = ({
+	source,
+	operationType,
+}: KeyboardTransferOperationMode): TransferOperationMode => ({
+	_tag: "Keyboard",
+	source,
+	operationType,
+});
+
+/** @public */
+export const pointerTransferOperationMode = ({
+	source,
+	operationType,
+}: PointerTransferOperationMode): TransferOperationMode => ({
+	_tag: "Pointer",
+	source,
+	operationType,
+});
+
 export type OperationMode =
 	| ({ _tag: "Absorb" } & AbsorbOperationMode)
-	| ({ _tag: "Cut" } & CutOperationMode)
-	| ({ _tag: "DragAndDrop" } & DragAndDropOperationMode);
+	| { _tag: "Transfer"; value: TransferOperationMode };
 
 /** @public */
 export const absorbOperationMode = ({
@@ -41,22 +70,9 @@ export const absorbOperationMode = ({
 });
 
 /** @public */
-export const cutOperationMode = ({ source, operationType }: CutOperationMode): OperationMode => ({
-	_tag: "Cut",
-	source,
-	operationType,
-});
-
-/** @public */
-export const dragAndDropOperationMode = ({
-	source,
-	target,
-	operationType,
-}: DragAndDropOperationMode): OperationMode => ({
-	_tag: "DragAndDrop",
-	source,
-	target,
-	operationType,
+export const transferOperationMode = (value: TransferOperationMode): OperationMode => ({
+	_tag: "Transfer",
+	value,
 });
 
 /** @public */
@@ -115,16 +131,14 @@ export const isValidOutlineModeForSelection = ({
 		}),
 	);
 
-export const getBinaryOperation = ({ mode, target }: { mode: OperationMode; target: Operand }) => {
-	const operationType = Match.value(mode).pipe(
-		Match.withReturnType<OperationType | null>(),
-		Match.tags({
-			Absorb: () => null,
-			Cut: ({ operationType }) => operationType,
-			DragAndDrop: ({ operationType }) => operationType,
-		}),
-		Match.exhaustive,
-	);
+export const getTransferOperation = ({
+	mode,
+	target,
+}: {
+	mode: TransferOperationMode;
+	target: Operand;
+}) => {
+	const { operationType } = mode;
 	if (operationType === null) return null;
 	return getOperation({
 		source: mode.source,
@@ -137,6 +151,14 @@ const hasAnyOperation = (source: Operand, target: Operand) => {
 	const operations = getOperations(source, target);
 	return !!operations.rub || !!operations.moveAbove || !!operations.moveBelow;
 };
+
+const operationModeSource = (mode: OperationMode): Operand =>
+	Match.value(mode).pipe(
+		Match.tagsExhaustive({
+			Absorb: ({ source }) => source,
+			Transfer: ({ value: mode }) => mode.source,
+		}),
+	);
 
 export const isOperationModeCandidateTarget = ({
 	mode,
@@ -151,8 +173,7 @@ export const isOperationModeCandidateTarget = ({
 				absorptionPlan.some(({ stackId, commitId }) =>
 					operandEquals(commitOperand({ stackId, commitId }), target),
 				),
-			DragAndDrop: ({ source }) => hasAnyOperation(source, target),
-			Cut: ({ source }) => hasAnyOperation(source, target),
+			Transfer: ({ value: mode }) => hasAnyOperation(mode.source, target),
 		}),
 	);
 
@@ -170,7 +191,7 @@ export const filterNavigationIndexForOutlineMode = ({
 				filterNavigationIndex(
 					navigationIndexUnfiltered,
 					(operand) =>
-						operandContains(operand, operationMode.source) ||
+						operandContains(operand, operationModeSource(operationMode)) ||
 						isOperationModeCandidateTarget({ mode: operationMode, target: operand }),
 				),
 			RenameBranch: (x) =>

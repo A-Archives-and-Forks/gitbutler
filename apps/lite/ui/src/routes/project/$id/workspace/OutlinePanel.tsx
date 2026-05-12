@@ -32,13 +32,16 @@ import {
 	type CommitOperand,
 	type Operand,
 } from "#ui/operands.ts";
-import { filterNavigationIndexForOutlineMode, getBinaryOperation } from "#ui/outline/mode.ts";
+import {
+	filterNavigationIndexForOutlineMode,
+	getTransferOperation,
+	keyboardTransferOperationMode,
+} from "#ui/outline/mode.ts";
 import { focusPanel, useFocusedProjectPanel, useNavigationIndexHotkeys } from "#ui/panels.ts";
 import {
 	projectActions,
 	selectProjectHighlightedCommitIds,
 	selectProjectOperationModeState,
-	selectProjectOperationModeTarget,
 	selectProjectOutlineModeState,
 	selectProjectReplacedCommits,
 	selectProjectSelectionOutline,
@@ -263,13 +266,15 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 		selectProjectOperationModeState(state, projectId),
 	);
 
-	const dryRunTarget = useAppSelector((state) =>
-		selectProjectOperationModeTarget(state, projectId),
-	);
-	const dryRunOperation =
-		operationMode && dryRunTarget
-			? (getBinaryOperation({ mode: operationMode, target: dryRunTarget }) ?? undefined)
-			: undefined;
+	const dryRunOperation = operationMode
+		? Match.value(operationMode).pipe(
+				Match.tag(
+					"Transfer",
+					({ value: mode }) => getTransferOperation({ mode, target: selection }) ?? undefined,
+				),
+				Match.orElse(() => undefined),
+			)
+		: undefined;
 
 	// TODO: debounce?
 	const dryRunOperationQuery = useDryRunOperation({ projectId, operation: dryRunOperation });
@@ -312,12 +317,12 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 
 					{Match.value(operationMode).pipe(
 						Match.when(null, () => null),
-						Match.tag("DragAndDrop", () => null),
-						Match.orElse(({ source }) => (
+						Match.when({ _tag: "Transfer", value: { _tag: "Keyboard" } }, (mode) => (
 							<div className={styles.operationModePreview}>
-								<OperationSourceLabel headInfo={headInfo} source={source} />
+								<OperationSourceLabel headInfo={headInfo} source={mode.value.source} />
 							</div>
 						)),
+						Match.orElse(() => null),
 					)}
 				</Panel>
 			</DryRunWorkspaceContext>
@@ -596,7 +601,15 @@ const CommitRow: FC<
 	};
 
 	const cutCommit = () => {
-		dispatch(projectActions.enterCutMode({ projectId, source: operand, operationType: "rub" }));
+		dispatch(
+			projectActions.enterTransferMode({
+				projectId,
+				mode: keyboardTransferOperationMode({
+					source: operand,
+					operationType: "rub",
+				}),
+			}),
+		);
 	};
 
 	const startEditing = () => {
@@ -634,10 +647,12 @@ const CommitRow: FC<
 
 	const amendCommit = () => {
 		dispatch(
-			projectActions.enterCutMode({
+			projectActions.enterTransferMode({
 				projectId,
-				source: changesSectionOperand,
-				operationType: "rub",
+				mode: keyboardTransferOperationMode({
+					source: changesSectionOperand,
+					operationType: "rub",
+				}),
 			}),
 		);
 		focusPanel("outline");
