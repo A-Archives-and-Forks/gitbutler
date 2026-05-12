@@ -210,6 +210,10 @@ fn edit_commit_message_by_id_and_reword_commit(
                 commit_oid.attach(&repo).shorten_or_id(),
                 new_commit_oid.new_commit.attach(&repo).shorten_or_id()
             )?;
+        } else if let Some(out) = out.for_json() {
+            out.write_value(serde_json::json!({
+                "new_commit_id": new_commit_oid.new_commit.to_string(),
+            }))?;
         }
 
         Ok(())

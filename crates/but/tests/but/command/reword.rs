@@ -140,3 +140,33 @@ No changes to commit message - nothing to be done
 
     Ok(())
 }
+
+#[test]
+fn reword_commit_with_json_flag() -> anyhow::Result<()> {
+    let env = Sandbox::init_scenario_with_target_and_default_settings("one-stack")?;
+    insta::assert_snapshot!(env.git_log()?, @r"
+    * edd3eb7 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    * 9477ae7 (A) add A
+    * 0dc3733 (origin/main, origin/HEAD, main) add M
+    ");
+
+    env.setup_metadata(&["A"])?;
+
+    // Use reword with -m flag to change commit message (using commit ID)
+    env.but("reword 9477ae7 -m 'Updated commit message' --json")
+        .assert()
+        .success()
+        .stdout_eq(str![[r#"{
+  "new_commit_id": [..]
+}
+
+"#]]);
+
+    insta::assert_snapshot!(env.git_log()?, @"
+    * 8c69cf9 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    * 2f7c570 (A) Updated commit message
+    * 0dc3733 (origin/main, origin/HEAD, main, gitbutler/target) add M
+    ");
+
+    Ok(())
+}
