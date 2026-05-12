@@ -814,7 +814,7 @@ fn restore_snapshot(
         .to_str()
         .ok()
         .and_then(|msg| SnapshotDetails::from_str(msg).ok())
-        .map(|d| d.operation.to_string())
+        .map(|d| d.operation.title().to_owned())
         .unwrap_or_default();
 
     // create new snapshot
@@ -828,7 +828,7 @@ fn restore_snapshot(
     let details = SnapshotDetails {
         version: Default::default(),
         operation,
-        title: "Restored from snapshot".to_string(),
+        title: operation.as_persisted_str().to_owned(),
         body: None,
         trailers: vec![
             Trailer {
