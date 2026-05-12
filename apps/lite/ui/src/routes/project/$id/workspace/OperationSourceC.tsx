@@ -1,4 +1,5 @@
 import { Operand, operandEquals } from "#ui/operands.ts";
+import { pointerTransferOperationMode } from "#ui/outline/mode.ts";
 import styles from "./OperationSourceC.module.css";
 import { OperationSourceLabel } from "./OperationSourceLabel.tsx";
 import { headInfoQueryOptions } from "#ui/api/queries.ts";
@@ -14,6 +15,7 @@ import { centerUnderPointer } from "@atlaskit/pragmatic-drag-and-drop/element/ce
 import { setCustomNativeDragPreview } from "@atlaskit/pragmatic-drag-and-drop/element/set-custom-native-drag-preview";
 import { mergeProps, useRender } from "@base-ui/react";
 import { useSuspenseQuery } from "@tanstack/react-query";
+import { Match } from "effect";
 import { FC, type ReactNode, useEffect, useEffectEvent, useRef } from "react";
 import { createRoot } from "react-dom/client";
 
@@ -78,7 +80,15 @@ export const OperationSourceC: FC<
 			getInitialData: (): DragData => ({ source }),
 			onGenerateDragPreview,
 			onDragStart: () => {
-				dispatch(projectActions.enterDragAndDropMode({ projectId, source }));
+				dispatch(
+					projectActions.enterTransferMode({
+						projectId,
+						mode: pointerTransferOperationMode({
+							source,
+							operationType: null,
+						}),
+					}),
+				);
 			},
 			onDrop: () => {
 				dispatch(projectActions.exitMode({ projectId }));
@@ -86,7 +96,12 @@ export const OperationSourceC: FC<
 		});
 	}, [dispatch, projectId, source]);
 
-	const isActiveSource = operationMode?.source && operandEquals(operationMode.source, source);
+	const isActiveSource =
+		operationMode &&
+		Match.value(operationMode).pipe(
+			Match.tag("Transfer", ({ value: mode }) => operandEquals(mode.source, source)),
+			Match.orElse(() => false),
+		);
 
 	return useRender({
 		render,

@@ -567,11 +567,10 @@ export const getOperations = (source: Operand, target: Operand): OperationsByTyp
 export const getOperation = (x: {
 	source: Operand;
 	target: Operand;
-	operationType: OperationType | null;
+	operationType: OperationType;
 }): Operation | null => {
 	const { rub, moveAbove, moveBelow } = getOperations(x.source, x.target);
 	return Match.value(x.operationType).pipe(
-		Match.when(null, () => null),
 		Match.when("rub", () => rub),
 		Match.when("moveAbove", () => moveAbove),
 		Match.when("moveBelow", () => moveBelow),

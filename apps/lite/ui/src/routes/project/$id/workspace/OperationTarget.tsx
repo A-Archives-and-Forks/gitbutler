@@ -1,4 +1,4 @@
-import { operandEquals, type Operand } from "#ui/operands.ts";
+import { type Operand } from "#ui/operands.ts";
 import { parseDragData } from "./OperationSourceC.tsx";
 import styles from "./OperationTarget.module.css";
 import { OperationTooltip } from "./OperationTooltip.tsx";
@@ -9,11 +9,7 @@ import {
 	useRunOperationMutationOptions,
 } from "#ui/operations/operation.ts";
 import { classes } from "#ui/ui/classes.ts";
-import {
-	projectActions,
-	selectProjectOperationModeState,
-	selectProjectOperationModeTarget,
-} from "#ui/projects/state.ts";
+import { projectActions, selectProjectOperationModeState } from "#ui/projects/state.ts";
 import { useAppDispatch, useAppSelector } from "#ui/store.ts";
 import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import {
@@ -31,7 +27,6 @@ type GetDataArgs = Parameters<NonNullable<DropTargetParams["getData"]>>[0];
 
 type DropData = {
 	operationType: OperationType;
-	target: Operand;
 };
 
 const parseDropData = (data: unknown): DropData | null => {
@@ -94,7 +89,7 @@ const useOperationDropTarget = ({ target, projectId }: { target: Operand; projec
 		});
 		if (operationType === null) return null;
 
-		return { operationType, target };
+		return { operationType };
 	});
 
 	useEffect(() => {
@@ -114,16 +109,16 @@ const useOperationDropTarget = ({ target, projectId }: { target: Operand; projec
 				const dropData = parseDropData(args.self.data);
 
 				dispatch(
-					projectActions.updateDragAndDropMode({
+					projectActions.updatePointerTransfer({
 						projectId,
-						target: dropData?.target ?? null,
+						target: dropData ? target : null,
 						operationType: dropData?.operationType ?? null,
 					}),
 				);
 			},
 			onDragLeave: () => {
 				dispatch(
-					projectActions.updateDragAndDropMode({
+					projectActions.updatePointerTransfer({
 						projectId,
 						target: null,
 						operationType: null,
@@ -144,7 +139,7 @@ const useOperationDropTarget = ({ target, projectId }: { target: Operand; projec
 
 				const operation = getOperation({
 					source: dragData.source,
-					target: dropData.target,
+					target,
 					operationType: dropData.operationType,
 				});
 				if (!operation) return;
@@ -152,7 +147,7 @@ const useOperationDropTarget = ({ target, projectId }: { target: Operand; projec
 				runOperation(operation);
 			},
 		});
-	}, [dispatch, projectId, runOperation]);
+	}, [dispatch, projectId, runOperation, target]);
 
 	return { dropRef };
 };
@@ -168,22 +163,14 @@ export const OperationTarget: FC<
 	const operationMode = useAppSelector((state) =>
 		selectProjectOperationModeState(state, projectId),
 	);
-	const isActive = useAppSelector((state) => {
-		const activeTarget = selectProjectOperationModeTarget(state, projectId);
-		return activeTarget !== null && operandEquals(activeTarget, target);
-	});
 
 	const insertTargetOperationType = operationMode
 		? Match.value(operationMode).pipe(
 				Match.tagsExhaustive({
 					Absorb: () => null,
-					DragAndDrop: ({ operationType }) =>
-						isActive && (operationType === "moveAbove" || operationType === "moveBelow")
-							? operationType
-							: null,
-					Cut: ({ operationType }) =>
-						isActive && (operationType === "moveAbove" || operationType === "moveBelow")
-							? operationType
+					Transfer: ({ value: mode }) =>
+						isSelected && (mode.operationType === "moveAbove" || mode.operationType === "moveBelow")
+							? mode.operationType
 							: null,
 				}),
 			)
@@ -194,8 +181,7 @@ export const OperationTarget: FC<
 		Match.value(operationMode).pipe(
 			Match.tagsExhaustive({
 				Absorb: () => isOperationModeCandidateTarget({ mode: operationMode, target }),
-				DragAndDrop: ({ operationType }) => isActive && operationType === "rub",
-				Cut: ({ operationType }) => isActive && operationType === "rub",
+				Transfer: ({ value: mode }) => isSelected && mode.operationType === "rub",
 			}),
 		);
 
@@ -204,8 +190,7 @@ export const OperationTarget: FC<
 		Match.value(operationMode).pipe(
 			Match.tagsExhaustive({
 				Absorb: () => isSelected,
-				DragAndDrop: () => isMainTargetActive,
-				Cut: () => isMainTargetActive,
+				Transfer: () => isMainTargetActive,
 			}),
 		);
 

@@ -6,6 +6,7 @@ import { type Panel } from "#ui/panels.ts";
 import * as panels from "#ui/panels/state.ts";
 import * as workspace from "#ui/projects/workspace/state.ts";
 import { type OperationType } from "#ui/operations/operation.ts";
+import { type TransferOperationMode } from "#ui/outline/mode.ts";
 
 type Dialog =
 	| { _tag: "None" }
@@ -78,17 +79,13 @@ const projectSlice = createSlice({
 			const projectState = ensureProjectState(state, projectId);
 			workspace.startRenameBranch(projectState.workspace, branch);
 		},
-		enterCutMode: (
+		enterTransferMode: (
 			state,
-			action: PayloadAction<{
-				projectId: string;
-				source: Operand;
-				operationType: OperationType;
-			}>,
+			action: PayloadAction<{ projectId: string; mode: TransferOperationMode }>,
 		) => {
-			const { projectId, source, operationType } = action.payload;
+			const { projectId, mode } = action.payload;
 			const projectState = ensureProjectState(state, projectId);
-			workspace.enterCutMode(projectState.workspace, source, operationType);
+			workspace.enterTransferMode(projectState.workspace, mode);
 		},
 		enterAbsorbMode: (
 			state,
@@ -102,18 +99,7 @@ const projectSlice = createSlice({
 			const projectState = ensureProjectState(state, projectId);
 			workspace.enterAbsorbMode(projectState.workspace, source, absorptionPlan);
 		},
-		enterDragAndDropMode: (
-			state,
-			action: PayloadAction<{
-				projectId: string;
-				source: Operand;
-			}>,
-		) => {
-			const { projectId, source } = action.payload;
-			const projectState = ensureProjectState(state, projectId);
-			workspace.enterDragAndDropMode(projectState.workspace, source);
-		},
-		updateDragAndDropMode: (
+		updatePointerTransfer: (
 			state,
 			action: PayloadAction<{
 				projectId: string;
@@ -123,9 +109,9 @@ const projectSlice = createSlice({
 		) => {
 			const { projectId, target, operationType } = action.payload;
 			const projectState = ensureProjectState(state, projectId);
-			workspace.updateDragAndDropMode(projectState.workspace, target, operationType);
+			workspace.updatePointerTransfer(projectState.workspace, target, operationType);
 		},
-		updateCutMode: (
+		updateTransferOperationType: (
 			state,
 			action: PayloadAction<{
 				projectId: string;
@@ -134,7 +120,7 @@ const projectSlice = createSlice({
 		) => {
 			const { projectId, operationType } = action.payload;
 			const projectState = ensureProjectState(state, projectId);
-			workspace.updateCutMode(projectState.workspace, operationType);
+			workspace.updateTransferOperationType(projectState.workspace, operationType);
 		},
 		exitMode: (state, action: PayloadAction<{ projectId: string }>) => {
 			workspace.exitMode(ensureProjectState(state, action.payload.projectId).workspace);
@@ -226,9 +212,6 @@ export const selectProjectOutlineModeState = (state: RootState, projectId: strin
 
 export const selectProjectOperationModeState = (state: RootState, projectId: string) =>
 	workspace.selectOperationMode(selectProjectWorkspaceState(state, projectId));
-
-export const selectProjectOperationModeTarget = (state: RootState, projectId: string) =>
-	workspace.selectOperationModeTarget(selectProjectWorkspaceState(state, projectId));
 
 export const selectProjectHighlightedCommitIds = (state: RootState, projectId: string) =>
 	workspace.selectHighlightedCommitIds(selectProjectWorkspaceState(state, projectId));
