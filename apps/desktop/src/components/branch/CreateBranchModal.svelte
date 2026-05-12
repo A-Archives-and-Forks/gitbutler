@@ -101,7 +101,6 @@
 			createRefModal?.close();
 		} else {
 			if (!selectedStackId || !normalizedRefName) {
-				// TODO: Add input validation.
 				return;
 			}
 			await createNewBranch({

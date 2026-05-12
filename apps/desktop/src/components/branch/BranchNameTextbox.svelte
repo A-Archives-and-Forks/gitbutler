@@ -3,6 +3,7 @@
 	import { debounce } from "$lib/utils/debounce";
 	import { inject } from "@gitbutler/core/context";
 	import { Icon, Textbox } from "@gitbutler/ui";
+	import { onDestroy } from "svelte";
 
 	type Props = {
 		value?: string;
@@ -26,6 +27,7 @@
 	let isValidating = $state(false);
 	let validationError = $state<string | undefined>();
 	let validationCounter = $state(0);
+	let isDestroyed = false;
 
 	let normalizedResult = $state<{ fromValue: string; normalized: string } | undefined>();
 
@@ -50,6 +52,8 @@
 	);
 
 	const debouncedNormalize = debounce(async (inputValue: string) => {
+		if (isDestroyed) return;
+
 		if (!inputValue) {
 			isValidating = false;
 			validationError = undefined;
@@ -66,19 +70,19 @@
 			const result = await stackService.normalizeBranchName(inputValue);
 			// Only update if the value hasn't changed during the async call
 			// and no newer validation has started
-			if (value === inputValue && currentValidation === validationCounter) {
+			if (!isDestroyed && value === inputValue && currentValidation === validationCounter) {
 				normalizedResult = { fromValue: inputValue, normalized: result };
 				onnormalizedvalue?.(result);
 				validationError = undefined;
 			}
 		} catch {
-			if (value === inputValue && currentValidation === validationCounter) {
+			if (!isDestroyed && value === inputValue && currentValidation === validationCounter) {
 				normalizedResult = undefined;
 				onnormalizedvalue?.(undefined);
 				validationError = "Invalid branch name";
 			}
 		} finally {
-			if (currentValidation === validationCounter) {
+			if (!isDestroyed && currentValidation === validationCounter) {
 				isValidating = false;
 			}
 		}
@@ -91,6 +95,11 @@
 	export async function selectAll() {
 		await textbox?.selectAll();
 	}
+
+	onDestroy(() => {
+		isDestroyed = true;
+		validationCounter++;
+	});
 </script>
 
 <Textbox
