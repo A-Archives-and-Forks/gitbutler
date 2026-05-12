@@ -1,5 +1,5 @@
 import { Toast } from "@base-ui/react";
-import { mutationOptions, useQuery } from "@tanstack/react-query";
+import { mutationOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Match } from "effect";
 import {
 	type CommitAmendParams,
@@ -16,11 +16,10 @@ import {
 import { rejectedChangesToastOptions } from "#ui/operations/rejectedChangesToastOptions.tsx";
 import { CommitAbsorption, DiffSpec, InsertSide, RelativeTo } from "@gitbutler/but-sdk";
 import { Operand, operandEquals, operandFileParent } from "#ui/operands.ts";
-import { useResolveDiffSpecs } from "#ui/operations/diff-specs.ts";
+import { resolveDiffSpecs, useResolveDiffSpecs } from "#ui/operations/diff-specs.ts";
 import { decodeRefName } from "#ui/api/ref-name.ts";
-import { projectActions, selectProjectOperationModeState } from "#ui/projects/state.ts";
+import { projectActions } from "#ui/projects/state.ts";
 import { useAppDispatch } from "#ui/store.ts";
-import { useAppSelector } from "#ui/store.ts";
 import { useParams } from "@tanstack/react-router";
 
 /** @public */
@@ -303,6 +302,19 @@ const runOperation = async ({
 		}),
 	);
 
+const operationSource = (operation: Operation): Operand | undefined =>
+	Match.value(operation).pipe(
+		Match.withReturnType<Operand | undefined>(),
+		Match.tags({
+			CommitAmend: ({ source }) => source,
+			CommitCreate: ({ source }) => source,
+			CommitCreateFromCommittedChanges: ({ source }) => source,
+			CommitMoveChangesBetween: ({ source }) => source,
+			CommitUncommitChanges: ({ source }) => source,
+		}),
+		Match.orElse(() => undefined),
+	);
+
 export const useDryRunOperation = ({
 	projectId,
 	operation,
@@ -310,13 +322,9 @@ export const useDryRunOperation = ({
 	projectId: string;
 	operation?: Operation;
 }) => {
-	const operationMode = useAppSelector((state) =>
-		selectProjectOperationModeState(state, projectId),
-	);
-
 	const changes = useResolveDiffSpecs({
 		projectId,
-		source: operationMode?.source,
+		source: operation ? operationSource(operation) : undefined,
 	});
 
 	return useQuery({
@@ -334,20 +342,19 @@ export const useDryRunOperation = ({
 export const useRunOperationMutationOptions = () => {
 	const { id: projectId } = useParams({ from: "/project/$id/workspace" });
 	const dispatch = useAppDispatch();
+	const queryClient = useQueryClient();
 	const toastManager = Toast.useToastManager();
 
-	const operationMode = useAppSelector((state) =>
-		selectProjectOperationModeState(state, projectId),
-	);
-
-	const changes = useResolveDiffSpecs({
-		projectId,
-		source: operationMode?.source,
-	});
-
 	return mutationOptions({
-		mutationFn: (operation: Operation) =>
-			runOperation({ projectId, operation, changes, dryRun: false }),
+		mutationFn: async (operation: Operation) => {
+			const changes = await resolveDiffSpecs({
+				projectId,
+				queryClient,
+				source: operationSource(operation),
+			});
+
+			return runOperation({ projectId, operation, changes, dryRun: false });
+		},
 		onSuccess: async (response, input, _ctx, { client }) => {
 			if (response) {
 				dispatch(
