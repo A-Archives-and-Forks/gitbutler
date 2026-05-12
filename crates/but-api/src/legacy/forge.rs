@@ -89,9 +89,7 @@ but_schemars::register_sdk_type!(ReviewTemplateInfo);
 #[but_api(napi)]
 #[instrument(err(Debug))]
 pub fn review_template(ctx: &Context) -> Result<Option<ReviewTemplateInfo>> {
-    let project = gitbutler_project::get_validated(ctx.legacy_project.id.clone())?;
-    let ctx = Context::new_from_legacy_project(project.clone())?;
-    let base_branch = gitbutler_branch_actions::base::get_base_branch_data(&ctx)?;
+    let base_branch = gitbutler_branch_actions::base::get_base_branch_data(ctx)?;
     let forge_repo_info = but_forge::derive_forge_repo_info(&base_branch.remote_url);
     let forge = &forge_repo_info
         .as_ref()
