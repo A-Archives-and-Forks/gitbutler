@@ -72,6 +72,68 @@ fn reword(
     Ok(env.but("status").output()?)
 }
 
+#[track_caller]
+fn undo(
+    env: &Sandbox,
+    operation_reverted_to: &str,
+    snapshot_restored_to: &str,
+    expected_status: &std::process::Output,
+) {
+    env.but("undo").assert().success().stdout_eq(format!(
+        r#"Undoing operation...
+  Reverting to: {operation_reverted_to} (2000-01-02 00:00:00)
+✓ Undo completed successfully! Restored to snapshot: {snapshot_restored_to}
+"#
+    ));
+
+    env.but("status")
+        .assert()
+        .success()
+        .stdout_eq(expected_status.stdout.clone())
+        .stderr_eq(expected_status.stderr.clone());
+}
+
+#[track_caller]
+fn redo(
+    env: &Sandbox,
+    operation_reverted_to: &str,
+    snapshot_restored_to: &str,
+    expected_status: &std::process::Output,
+) {
+    env.but("redo").assert().success().stdout_eq(format!(
+        r#"Redoing operation...
+  Reverting to: {operation_reverted_to} (2000-01-02 00:00:00)
+✓ Redo completed successfully! Restored to snapshot: {snapshot_restored_to}
+"#,
+    ));
+
+    env.but("status")
+        .assert()
+        .success()
+        .stdout_eq(expected_status.stdout.clone())
+        .stderr_eq(expected_status.stderr.clone());
+}
+
+#[track_caller]
+fn restore(env: &Sandbox, operation_to_restore_to: &str, expected_status: &std::process::Output) {
+    env.but("oplog")
+        .args(["restore", operation_to_restore_to])
+        .assert()
+        .success()
+        .stdout_eq(
+            r#"
+✓ Restore completed successfully!
+
+Workspace has been restored to the selected snapshot.
+"#,
+        );
+    env.but("status")
+        .assert()
+        .success()
+        .stdout_eq(expected_status.stdout.clone())
+        .stderr_eq(expected_status.stderr.clone());
+}
+
 #[test]
 fn can_undo_discard() -> anyhow::Result<()> {
     let env = Sandbox::init_scenario_with_target_and_default_settings("one-stack")?;
@@ -216,17 +278,7 @@ e637109 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
 "#,
         );
 
-    env.but("undo").assert().success().stdout_eq(
-        r#"Undoing operation...
-  Reverting to: UpdateCommitMessage (2000-01-02 00:00:00)
-✓ Undo completed successfully! Restored to snapshot: f4e985f
-"#,
-    );
-    env.but("status")
-        .assert()
-        .success()
-        .stdout_eq(status_three.stdout)
-        .stderr_eq(status_three.stderr);
+    undo(&env, "UpdateCommitMessage", "f4e985f", &status_three);
 
     env.but("oplog")
         .args(["list"])
@@ -243,17 +295,7 @@ e637109 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
 "#,
         );
 
-    env.but("undo").assert().success().stdout_eq(
-        r#"Undoing operation...
-  Reverting to: UpdateCommitMessage (2000-01-02 00:00:00)
-✓ Undo completed successfully! Restored to snapshot: e637109
-"#,
-    );
-    env.but("status")
-        .assert()
-        .success()
-        .stdout_eq(status_two.stdout)
-        .stderr_eq(status_two.stderr);
+    undo(&env, "UpdateCommitMessage", "e637109", &status_two);
 
     env.but("oplog")
         .args(["list"])
@@ -271,17 +313,7 @@ e637109 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
 "#,
         );
 
-    env.but("undo").assert().success().stdout_eq(
-        r#"Undoing operation...
-  Reverting to: UpdateCommitMessage (2000-01-02 00:00:00)
-✓ Undo completed successfully! Restored to snapshot: 90c8e9b
-"#,
-    );
-    env.but("status")
-        .assert()
-        .success()
-        .stdout_eq(status_one.stdout)
-        .stderr_eq(status_one.stderr);
+    undo(&env, "UpdateCommitMessage", "90c8e9b", &status_one);
 
     env.but("oplog")
         .args(["list"])
@@ -327,22 +359,7 @@ e637109 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
 "#,
         );
 
-    env.but("oplog")
-        .args(["restore", "e637109"])
-        .assert()
-        .success()
-        .stdout_eq(
-            r#"
-✓ Restore completed successfully!
-
-Workspace has been restored to the selected snapshot.
-"#,
-        );
-    env.but("status")
-        .assert()
-        .success()
-        .stdout_eq(status_two.stdout.clone())
-        .stderr_eq(status_two.stderr.clone());
+    restore(&env, "e637109", &status_two);
 
     env.but("oplog")
         .args(["list"])
@@ -359,18 +376,7 @@ e637109 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
 "#,
         );
 
-    env.but("undo").assert().success().stdout_eq(
-        r#"Undoing operation...
-  Reverting to: Restored from snapshot (2000-01-02 00:00:00)
-✓ Undo completed successfully! Restored to snapshot: 2859d85
-"#,
-    );
-
-    env.but("status")
-        .assert()
-        .success()
-        .stdout_eq(status_four.stdout)
-        .stderr_eq(status_four.stderr);
+    undo(&env, "Restored from snapshot", "2859d85", &status_four);
 
     env.but("oplog")
         .args(["list"])
@@ -415,17 +421,7 @@ e637109 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
 "#,
         );
 
-    env.but("undo").assert().success().stdout_eq(
-        r#"Undoing operation...
-  Reverting to: UpdateCommitMessage (2000-01-02 00:00:00)
-✓ Undo completed successfully! Restored to snapshot: f4e985f
-"#,
-    );
-    env.but("status")
-        .assert()
-        .success()
-        .stdout_eq(status_three.stdout.clone())
-        .stderr_eq(status_three.stderr.clone());
+    undo(&env, "UpdateCommitMessage", "f4e985f", &status_three);
 
     reword(&env, "a1fa8e0", "022806e", "three-new")?;
 
@@ -445,17 +441,7 @@ e637109 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
 "#,
         );
 
-    env.but("undo").assert().success().stdout_eq(
-        r#"Undoing operation...
-  Reverting to: UpdateCommitMessage (2000-01-02 00:00:00)
-✓ Undo completed successfully! Restored to snapshot: f48a8d3
-"#,
-    );
-    env.but("status")
-        .assert()
-        .success()
-        .stdout_eq(status_three.stdout.clone())
-        .stderr_eq(status_three.stderr);
+    undo(&env, "UpdateCommitMessage", "f48a8d3", &status_three);
 
     env.but("oplog")
         .args(["list"])
@@ -474,18 +460,7 @@ e637109 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
 "#,
         );
 
-    env.but("undo").assert().success().stdout_eq(
-        r#"Undoing operation...
-  Reverting to: UpdateCommitMessage (2000-01-02 00:00:00)
-✓ Undo completed successfully! Restored to snapshot: e637109
-"#,
-    );
-
-    env.but("status")
-        .assert()
-        .success()
-        .stdout_eq(status_two.stdout.clone())
-        .stderr_eq(status_two.stderr.clone());
+    undo(&env, "UpdateCommitMessage", "e637109", &status_two);
 
     Ok(())
 }
@@ -511,18 +486,7 @@ fn undoing_past_end_of_oplog() -> anyhow::Result<()> {
 "#,
         );
 
-    env.but("undo").assert().success().stdout_eq(
-        r#"Undoing operation...
-  Reverting to: UpdateCommitMessage (2000-01-02 00:00:00)
-✓ Undo completed successfully! Restored to snapshot: 90c8e9b
-"#,
-    );
-
-    env.but("status")
-        .assert()
-        .success()
-        .stdout_eq(status_one.stdout.clone())
-        .stderr_eq(status_one.stderr.clone());
+    undo(&env, "UpdateCommitMessage", "90c8e9b", &status_one);
 
     env.but("oplog")
         .args(["list"])
@@ -537,12 +501,7 @@ fn undoing_past_end_of_oplog() -> anyhow::Result<()> {
 "#,
         );
 
-    env.but("undo").assert().success().stdout_eq(
-        r#"Undoing operation...
-  Reverting to: UpdateCommitMessage (2000-01-02 00:00:00)
-✓ Undo completed successfully! Restored to snapshot: 7665ea7
-"#,
-    );
+    undo(&env, "UpdateCommitMessage", "7665ea7", &status_zero);
 
     env.but("oplog")
         .args(["list"])
@@ -557,12 +516,6 @@ c6dfa5f 2000-01-02 00:00:00 [UNDO] Restored from snapshot
 7665ea7 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
 "#,
         );
-
-    env.but("status")
-        .assert()
-        .success()
-        .stdout_eq(status_zero.stdout.clone())
-        .stderr_eq(status_zero.stderr.clone());
 
     env.but("undo").assert().success().stdout_eq(
         r#"No previous operations to undo.
@@ -596,18 +549,7 @@ e637109 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
 "#,
         );
 
-    env.but("undo").assert().success().stdout_eq(
-        r#"Undoing operation...
-  Reverting to: UpdateCommitMessage (2000-01-02 00:00:00)
-✓ Undo completed successfully! Restored to snapshot: f4e985f
-"#,
-    );
-
-    env.but("status")
-        .assert()
-        .success()
-        .stdout_eq(status_three.stdout)
-        .stderr_eq(status_three.stderr);
+    undo(&env, "UpdateCommitMessage", "f4e985f", &status_three);
 
     env.but("oplog")
         .args(["list"])
@@ -624,18 +566,7 @@ e637109 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
 "#,
         );
 
-    env.but("redo").assert().success().stdout_eq(
-        r#"Redoing operation...
-  Reverting to: Restored from snapshot (2000-01-02 00:00:00)
-✓ Redo completed successfully! Restored to snapshot: d9fd48f
-"#,
-    );
-
-    env.but("status")
-        .assert()
-        .success()
-        .stdout_eq(status_four.stdout)
-        .stderr_eq(status_four.stderr);
+    redo(&env, "Restored from snapshot", "d9fd48f", &status_four);
 
     env.but("oplog")
         .args(["list"])
@@ -685,31 +616,8 @@ e637109 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
 "#,
         );
 
-    env.but("undo").assert().success().stdout_eq(
-        r#"Undoing operation...
-  Reverting to: UpdateCommitMessage (2000-01-02 00:00:00)
-✓ Undo completed successfully! Restored to snapshot: f4e985f
-"#,
-    );
-
-    env.but("status")
-        .assert()
-        .success()
-        .stdout_eq(status_three.stdout.clone())
-        .stderr_eq(status_three.stderr.clone());
-
-    env.but("undo").assert().success().stdout_eq(
-        r#"Undoing operation...
-  Reverting to: UpdateCommitMessage (2000-01-02 00:00:00)
-✓ Undo completed successfully! Restored to snapshot: e637109
-"#,
-    );
-
-    env.but("status")
-        .assert()
-        .success()
-        .stdout_eq(status_two.stdout.clone())
-        .stderr_eq(status_two.stderr.clone());
+    undo(&env, "UpdateCommitMessage", "f4e985f", &status_three);
+    undo(&env, "UpdateCommitMessage", "e637109", &status_two);
 
     env.but("oplog")
         .args(["list"])
@@ -727,19 +635,7 @@ e637109 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
 "#,
         );
 
-    // redo
-    env.but("redo").assert().success().stdout_eq(
-        r#"Redoing operation...
-  Reverting to: Restored from snapshot (2000-01-02 00:00:00)
-✓ Redo completed successfully! Restored to snapshot: 7214e58
-"#,
-    );
-
-    env.but("status")
-        .assert()
-        .success()
-        .stdout_eq(status_three.stdout.clone())
-        .stderr_eq(status_three.stderr.clone());
+    redo(&env, "Restored from snapshot", "7214e58", &status_three);
 
     env.but("oplog")
         .args(["list"])
@@ -758,13 +654,7 @@ e637109 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
 "#,
         );
 
-    // undo
-    env.but("undo").assert().success().stdout_eq(
-        r#"Undoing operation...
-  Reverting to: Restored from snapshot (2000-01-02 00:00:00)
-✓ Undo completed successfully! Restored to snapshot: 95f6f16
-"#,
-    );
+    undo(&env, "Restored from snapshot", "95f6f16", &status_two);
 
     env.but("oplog")
         .args(["list"])
@@ -784,25 +674,7 @@ e637109 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
 "#,
         );
 
-    env.but("status")
-        .assert()
-        .success()
-        .stdout_eq(status_two.stdout.clone())
-        .stderr_eq(status_two.stderr.clone());
-
-    // undo
-    env.but("undo").assert().success().stdout_eq(
-        r#"Undoing operation...
-  Reverting to: UpdateCommitMessage (2000-01-02 00:00:00)
-✓ Undo completed successfully! Restored to snapshot: 90c8e9b
-"#,
-    );
-
-    env.but("status")
-        .assert()
-        .success()
-        .stdout_eq(status_one.stdout)
-        .stderr_eq(status_one.stderr);
+    undo(&env, "UpdateCommitMessage", "90c8e9b", &status_one);
 
     env.but("oplog")
         .args(["list"])
@@ -823,19 +695,7 @@ e637109 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
 "#,
         );
 
-    // redo
-    env.but("redo").assert().success().stdout_eq(
-        r#"Redoing operation...
-  Reverting to: Restored from snapshot (2000-01-02 00:00:00)
-✓ Redo completed successfully! Restored to snapshot: 6d38f68
-"#,
-    );
-
-    env.but("status")
-        .assert()
-        .success()
-        .stdout_eq(status_two.stdout.clone())
-        .stderr_eq(status_two.stderr.clone());
+    redo(&env, "Restored from snapshot", "6d38f68", &status_two);
 
     env.but("oplog")
         .args(["list"])
@@ -857,19 +717,7 @@ e637109 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
 "#,
         );
 
-    // redo
-    env.but("redo").assert().success().stdout_eq(
-        r#"Redoing operation...
-  Reverting to: Restored from snapshot (2000-01-02 00:00:00)
-✓ Redo completed successfully! Restored to snapshot: 2cf5b5e
-"#,
-    );
-
-    env.but("status")
-        .assert()
-        .success()
-        .stdout_eq(status_three.stdout.clone())
-        .stderr_eq(status_three.stderr.clone());
+    redo(&env, "Restored from snapshot", "2cf5b5e", &status_three);
 
     env.but("oplog")
         .args(["list"])
@@ -892,19 +740,7 @@ e637109 2000-01-02 00:00:00 [REWORD] UpdateCommitMessage
 "#,
         );
 
-    // redo
-    env.but("redo").assert().success().stdout_eq(
-        r#"Redoing operation...
-  Reverting to: Restored from snapshot (2000-01-02 00:00:00)
-✓ Redo completed successfully! Restored to snapshot: d9fd48f
-"#,
-    );
-
-    env.but("status")
-        .assert()
-        .success()
-        .stdout_eq(status_four.stdout.clone())
-        .stderr_eq(status_four.stderr.clone());
+    redo(&env, "Restored from snapshot", "d9fd48f", &status_four);
 
     env.but("oplog")
         .args(["list"])
