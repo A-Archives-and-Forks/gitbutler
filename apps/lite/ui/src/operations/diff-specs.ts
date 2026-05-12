@@ -24,11 +24,11 @@ const createDiffSpec = (change: TreeChange, hunkHeaders: Array<HunkHeader>): Dif
 const resolvedDiffSpecsFromOperand = ({
 	operand,
 	worktreeChanges,
-	getCommitDetails,
+	commitDetails,
 }: {
 	operand: Operand;
 	worktreeChanges: WorktreeChanges | undefined;
-	getCommitDetails: (commitId: string) => CommitDetails | undefined;
+	commitDetails: CommitDetails | undefined;
 }) =>
 	Match.value(operand).pipe(
 		Match.withReturnType<Array<DiffSpec> | null>(),
@@ -43,10 +43,8 @@ const resolvedDiffSpecsFromOperand = ({
 
 							return [createDiffSpec(change, [])];
 						},
-						Commit: ({ commitId }) => {
-							const change = getCommitDetails(commitId)?.changes.find(
-								(candidate) => candidate.path === path,
-							);
+						Commit: () => {
+							const change = commitDetails?.changes.find((candidate) => candidate.path === path);
 							if (!change) return null;
 
 							return [createDiffSpec(change, [])];
@@ -64,7 +62,7 @@ const resolvedDiffSpecsFromOperand = ({
 				const changes = Match.value(parent.parent).pipe(
 					Match.tagsExhaustive({
 						Changes: () => worktreeChanges?.changes,
-						Commit: ({ commitId }) => getCommitDetails(commitId)?.changes,
+						Commit: () => commitDetails?.changes,
 						Branch: () => null,
 					}),
 				);
@@ -112,6 +110,6 @@ export const useResolveDiffSpecs = ({
 	return resolvedDiffSpecsFromOperand({
 		operand: source,
 		worktreeChanges,
-		getCommitDetails: () => commitDetails,
+		commitDetails,
 	});
 };
