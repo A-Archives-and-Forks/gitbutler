@@ -1,15 +1,13 @@
 use std::{
-    fmt,
-    fmt::{Debug, Display, Formatter},
+    borrow::Cow,
+    fmt::{self, Debug, Display, Formatter},
     str::FromStr,
 };
 
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-
-const OPERATION_TRAILER_KEY: &str = "Operation";
-const VERSION_TRAILER_KEY: &str = "Version";
+use strum::IntoEnumIterator as _;
 
 /// A snapshot of the repository and virtual branches state that GitButler can restore to.
 /// It captures the state of the working directory, virtual branches and commits.
@@ -62,8 +60,8 @@ impl SnapshotDetails {
         self
     }
 
-    pub fn with_trailers(mut self, trailers: Vec<Trailer>) -> Self {
-        self.trailers = trailers;
+    pub fn with_trailers(mut self, trailers: impl IntoIterator<Item = Trailer>) -> Self {
+        self.trailers.extend(trailers);
         self
     }
 }
@@ -86,20 +84,22 @@ impl FromStr for SnapshotDetails {
 
         let version = trailers
             .iter()
-            .find(|t| t.key == VERSION_TRAILER_KEY)
-            .ok_or(anyhow!("No version found on snapshot commit message"))?
-            .value
-            .parse()?;
+            .find_map(|t| match t {
+                Trailer::Version(version) => Some(*version),
+                _ => None,
+            })
+            .context("No version found on snapshot commit message")?;
 
-        let operation_trailer = &trailers
+        let operation = trailers
             .iter()
-            .find(|t| t.key == OPERATION_TRAILER_KEY)
-            .ok_or(anyhow!("No operation found on snapshot commit message"))?;
-        let operation = OperationKind::parse_persisted_str(&operation_trailer.value)
-            .unwrap_or(OperationKind::Unknown);
+            .find_map(|t| match t {
+                Trailer::Operation(operation_kind) => Some(*operation_kind),
+                _ => None,
+            })
+            .context("No operation found on snapshot commit message")?;
 
         // remove the version and operation attributes from the trailers since they have dedicated fields
-        trailers.retain(|t| t.key != VERSION_TRAILER_KEY && t.key != OPERATION_TRAILER_KEY);
+        trailers.retain(|t| !matches!(t, Trailer::Version(..) | Trailer::Operation(..)));
 
         Ok(SnapshotDetails {
             version,
@@ -117,14 +117,13 @@ impl Display for SnapshotDetails {
         if let Some(body) = &self.body {
             writeln!(f, "{body}\n")?;
         }
-        writeln!(f, "{VERSION_TRAILER_KEY}: {}", self.version)?;
-        writeln!(
-            f,
-            "{OPERATION_TRAILER_KEY}: {}",
-            self.operation.as_persisted_str()
-        )?;
-        for line in &self.trailers {
-            writeln!(f, "{line}")?;
+        writeln!(f, "{}", Trailer::Version(self.version))?;
+        writeln!(f, "{}", Trailer::Operation(self.operation))?;
+        for trailer in &self.trailers {
+            if matches!(trailer, Trailer::Version(..) | Trailer::Operation(..)) {
+                continue;
+            }
+            writeln!(f, "{trailer}")?;
         }
         Ok(())
     }
@@ -442,34 +441,243 @@ impl FromStr for Version {
 
 /// Represents a key value pair stored in a snapshot, like `key: value\n`
 /// Using the git trailer format (<https://git-scm.com/docs/git-interpret-trailers>)
-#[derive(Debug, PartialEq, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Trailer {
-    /// Trailer key
-    pub key: String,
-    /// Trailer value
-    pub value: String,
+#[derive(Debug, PartialEq, Clone, strum::EnumDiscriminants)]
+#[strum_discriminants(derive(strum::EnumIter))]
+pub enum Trailer {
+    Version(Version),
+    Operation(OperationKind),
+    RestoredFrom(gix::ObjectId),
+    RestoredOperation(OperationKind),
+    RestoredDate(i64),
+    File(String),
+    Name(String),
+    Error(String),
+    Message(String),
+    Branch(String),
+    Before(usize),
+    After(usize),
+    Sha(gix::ObjectId),
+    /// Trailer of unknown origin. GitButler should ideally never be generating such trailers but
+    /// we might see them when parsing user data.
+    Other {
+        key: String,
+        value: String,
+    },
+}
+
+impl Trailer {
+    const OPERATION_KEY: &str = "Operation";
+    const VERSION_KEY: &str = "Version";
+    const RESTORED_FROM_KEY: &str = "restored_from";
+    const RESTORED_OPERATION_KEY: &str = "restored_operation";
+    const RESTORED_DATE_KEY: &str = "restored_date";
+    const FILE_KEY: &str = "file";
+    const NAME_KEY: &str = "name";
+    const ERROR_KEY: &str = "error";
+    const BEFORE_KEY: &str = "before";
+    const AFTER_KEY: &str = "after";
+    const SHA_KEY: &str = "sha";
+    const MESSAGE_KEY: &str = "message";
+    const BRANCH_KEY: &str = "branch";
+
+    fn key(&self) -> &str {
+        match self {
+            Trailer::Other { key, .. } => key,
+            Trailer::Version(..) => Self::VERSION_KEY,
+            Trailer::Operation(..) => Self::OPERATION_KEY,
+            Trailer::RestoredFrom(..) => Self::RESTORED_FROM_KEY,
+            Trailer::RestoredOperation(..) => Self::RESTORED_OPERATION_KEY,
+            Trailer::RestoredDate(..) => Self::RESTORED_DATE_KEY,
+            Trailer::File(..) => Self::FILE_KEY,
+            Trailer::Name(..) => Self::NAME_KEY,
+            Trailer::Error(..) => Self::ERROR_KEY,
+            Trailer::Message(..) => Self::MESSAGE_KEY,
+            Trailer::Branch(..) => Self::BRANCH_KEY,
+            Trailer::Before(..) => Self::BEFORE_KEY,
+            Trailer::After(..) => Self::AFTER_KEY,
+            Trailer::Sha(..) => Self::SHA_KEY,
+        }
+    }
+
+    fn value(&self) -> Cow<'_, str> {
+        match self {
+            Trailer::Other { value, .. } => value.into(),
+            Trailer::Version(version) => version.0.to_string().into(),
+            Trailer::Operation(operation_kind) => operation_kind.as_persisted_str().into(),
+            Trailer::RestoredFrom(commit) => commit.to_string().into(),
+            Trailer::RestoredOperation(operation_kind) => operation_kind.as_persisted_str().into(),
+            Trailer::RestoredDate(timestamp) => timestamp.to_string().into(),
+            Trailer::File(name) => name.as_str().into(),
+            Trailer::Name(name) => name.as_str().into(),
+            Trailer::Error(error) => error.as_str().into(),
+            Trailer::Message(message) => message.as_str().into(),
+            Trailer::Branch(branch) => branch.as_str().into(),
+            Trailer::Before(n) => n.to_string().into(),
+            Trailer::After(n) => n.to_string().into(),
+            Trailer::Sha(commit) => commit.to_string().into(),
+        }
+    }
 }
 
 impl Display for Trailer {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let escaped_value = self.value.replace('\n', "\\n");
-        write!(f, "{}: {}", self.key, escaped_value)
+        let value = self.value();
+        let escaped_value = value.replace('\n', "\\n");
+        write!(f, "{}: {escaped_value}", self.key())
     }
 }
 
 impl FromStr for Trailer {
     type Err = anyhow::Error;
+
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let parts: Vec<&str> = s.splitn(2, ':').collect();
-        if parts.len() != 2 {
-            return Err(anyhow!("Invalid trailer format, expected `key: value`"));
+        let (key, value) = s
+            .split_once(':')
+            .context("Invalid trailer format, expected `key: value`")?;
+        let key = key.trim();
+        let unescaped_value = value.trim().replace("\\n", "\n");
+
+        for d in TrailerDiscriminants::iter() {
+            match d {
+                TrailerDiscriminants::Other => {
+                    // only used if no other variant matches
+                }
+                TrailerDiscriminants::Version => {
+                    if key == Self::VERSION_KEY {
+                        return Ok(Self::Version(
+                            unescaped_value.parse::<Version>().with_context(|| {
+                                format!(
+                                    "invalid version number in {} trailer: {unescaped_value:?}",
+                                    Self::VERSION_KEY
+                                )
+                            })?,
+                        ));
+                    }
+                }
+                TrailerDiscriminants::Operation => {
+                    if key == Self::OPERATION_KEY {
+                        return Ok(Self::Operation(
+                            OperationKind::parse_persisted_str(&unescaped_value)
+                                .unwrap_or(OperationKind::Unknown),
+                        ));
+                    }
+                }
+                TrailerDiscriminants::RestoredFrom => {
+                    if key == Self::RESTORED_FROM_KEY {
+                        return Ok(Self::RestoredFrom(unescaped_value.parse().with_context(
+                            || {
+                                format!(
+                                    "invalid commit in {} in trailer: {unescaped_value:?}",
+                                    Self::RESTORED_FROM_KEY
+                                )
+                            },
+                        )?));
+                    }
+                }
+                TrailerDiscriminants::RestoredOperation => {
+                    if key == Self::RESTORED_OPERATION_KEY {
+                        return Ok(Self::RestoredOperation(
+                            OperationKind::parse_persisted_str(&unescaped_value)
+                                .unwrap_or(OperationKind::Unknown),
+                        ));
+                    }
+                }
+                TrailerDiscriminants::RestoredDate => {
+                    if key == Self::RESTORED_DATE_KEY {
+                        return Ok(Self::RestoredDate(unescaped_value.parse().with_context(
+                            || {
+                                format!(
+                                    "invalid timestamp in {} trailer: {unescaped_value:?}",
+                                    Self::RESTORED_DATE_KEY
+                                )
+                            },
+                        )?));
+                    }
+                }
+                TrailerDiscriminants::File => {
+                    if key == Self::FILE_KEY {
+                        return Ok(Self::File(unescaped_value));
+                    }
+                }
+                TrailerDiscriminants::Name => {
+                    if key == Self::NAME_KEY {
+                        return Ok(Self::Name(unescaped_value));
+                    }
+                }
+                TrailerDiscriminants::Error => {
+                    if key == Self::ERROR_KEY {
+                        return Ok(Self::Error(unescaped_value));
+                    }
+                }
+                TrailerDiscriminants::Before => {
+                    if key == Self::BEFORE_KEY {
+                        return Ok(Self::Before(unescaped_value.parse().with_context(
+                            || {
+                                format!(
+                                    "invalid number in {} trailer: {unescaped_value:?}",
+                                    Self::BEFORE_KEY
+                                )
+                            },
+                        )?));
+                    }
+                }
+                TrailerDiscriminants::After => {
+                    if key == Self::AFTER_KEY {
+                        return Ok(Self::After(unescaped_value.parse().with_context(|| {
+                            format!(
+                                "invalid number in {} trailer: {unescaped_value:?}",
+                                Self::AFTER_KEY
+                            )
+                        })?));
+                    }
+                }
+                TrailerDiscriminants::Sha => {
+                    if key == Self::SHA_KEY {
+                        return Ok(Self::Sha(unescaped_value.parse().with_context(|| {
+                            format!(
+                                "invalid commit in {} trailer: {unescaped_value:?}",
+                                Self::SHA_KEY
+                            )
+                        })?));
+                    }
+                }
+                TrailerDiscriminants::Message => {
+                    if key == Self::MESSAGE_KEY {
+                        return Ok(Self::Message(unescaped_value));
+                    }
+                }
+                TrailerDiscriminants::Branch => {
+                    if key == Self::BRANCH_KEY {
+                        return Ok(Self::Branch(unescaped_value));
+                    }
+                }
+            }
         }
-        let unescaped_value = parts[1].trim().replace("\\n", "\n");
-        Ok(Self {
-            key: parts[0].trim().to_string(),
+
+        Ok(Self::Other {
+            key: key.to_string(),
             value: unescaped_value,
         })
+    }
+}
+
+impl Serialize for Trailer {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        #[derive(Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct KeyValue<'a> {
+            key: &'a str,
+            value: Cow<'a, str>,
+        }
+
+        KeyValue {
+            key: self.key(),
+            value: self.value(),
+        }
+        .serialize(serializer)
     }
 }
 

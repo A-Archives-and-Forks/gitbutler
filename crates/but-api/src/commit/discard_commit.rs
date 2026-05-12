@@ -82,10 +82,8 @@ pub fn commit_discard_with_perm(
     dry_run: DryRun,
     perm: &mut RepoExclusive,
 ) -> anyhow::Result<CommitDiscardResult> {
-    let details = SnapshotDetails::new(OperationKind::DiscardCommit).with_trailers(vec![Trailer {
-        key: "sha".to_string(),
-        value: subject_commit_id.to_string(),
-    }]);
+    let details = SnapshotDetails::new(OperationKind::DiscardCommit)
+        .with_trailers([Trailer::Sha(subject_commit_id)]);
     let maybe_oplog_entry = but_oplog::UnmaterializedOplogSnapshot::from_details_with_perm(
         ctx,
         details,

@@ -1,6 +1,6 @@
 use but_api::legacy::oplog::RestoreKind;
 use but_core::RepositoryExt;
-use gitbutler_oplog::entry::{OperationKind, Snapshot};
+use gitbutler_oplog::entry::{OperationKind, Snapshot, Trailer};
 use gix::{date::time::CustomFormat, prelude::ObjectIdExt};
 
 use crate::{
@@ -94,8 +94,13 @@ pub(crate) fn show_oplog(
                         let file_names = details
                             .trailers
                             .iter()
-                            .filter(|t| t.key == "file")
-                            .map(|t| &*t.value)
+                            .filter_map(|t| {
+                                if let Trailer::File(value) = t {
+                                    Some(&**value)
+                                } else {
+                                    None
+                                }
+                            })
                             .collect::<Vec<_>>();
                         if !file_names.is_empty() {
                             format!("{} ({})", details.operation.title(), file_names.join(", "))
@@ -358,8 +363,8 @@ fn restore_to_target_snapshot(
     let target_operation = target_snapshot
         .details
         .as_ref()
-        .map(|d| d.title.as_str())
-        .unwrap_or("Unknown operation");
+        .map(|d| d.operation.title())
+        .unwrap_or_else(|| OperationKind::Unknown.title());
 
     let target_time = snapshot_time_string(&target_snapshot);
 
