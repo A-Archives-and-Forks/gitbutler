@@ -94,12 +94,12 @@ pub(crate) fn show_oplog(
                         .unwrap_or_else(|| details.title.clone())
                 } else if details.operation == OperationKind::Discard {
                     // Extract file names from trailers
-                    let file_names: Vec<String> = details
+                    let file_names = details
                         .trailers
                         .iter()
                         .filter(|t| t.key == "file")
-                        .map(|t| t.value.clone())
-                        .collect();
+                        .map(|t| &*t.value)
+                        .collect::<Vec<_>>();
 
                     if !file_names.is_empty() {
                         format!("{} ({})", details.title, file_names.join(", "))
