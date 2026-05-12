@@ -83,50 +83,139 @@ pub(crate) fn show_oplog(
             let commit_id = t.cli_id.paint(short.to_string());
 
             let (operation_type, title) = if let Some(details) = &snapshot.details {
-                let op_type = details.operation.as_str();
-                // For OnDemandSnapshot, show the message (body) if available
-                // For Discard, show file names from trailers if available
-                let display_title = if details.operation == OperationKind::OnDemandSnapshot {
-                    details
+                let display_title = match details.operation {
+                    OperationKind::OnDemandSnapshot => details
                         .body
                         .as_ref()
                         .filter(|b| !b.is_empty())
                         .cloned()
-                        .unwrap_or_else(|| details.title.clone())
-                } else if details.operation == OperationKind::Discard {
-                    // Extract file names from trailers
-                    let file_names: Vec<String> = details
-                        .trailers
-                        .iter()
-                        .filter(|t| t.key == "file")
-                        .map(|t| t.value.clone())
-                        .collect();
-
-                    if !file_names.is_empty() {
-                        format!("{} ({})", details.title, file_names.join(", "))
-                    } else {
-                        details.title.clone()
+                        .unwrap_or_else(|| details.title.clone()),
+                    OperationKind::Discard => {
+                        let file_names = details
+                            .trailers
+                            .iter()
+                            .filter(|t| t.key == "file")
+                            .map(|t| &*t.value)
+                            .collect::<Vec<_>>();
+                        if !file_names.is_empty() {
+                            format!("{} ({})", details.title, file_names.join(", "))
+                        } else {
+                            details.title.clone()
+                        }
                     }
-                } else {
-                    details.title.clone()
+                    OperationKind::CreateCommit
+                    | OperationKind::CreateBranch
+                    | OperationKind::StashIntoBranch
+                    | OperationKind::SetBaseBranch
+                    | OperationKind::MergeUpstream
+                    | OperationKind::UpdateWorkspaceBase
+                    | OperationKind::MoveHunk
+                    | OperationKind::UpdateBranchName
+                    | OperationKind::UpdateBranchNotes
+                    | OperationKind::ReorderBranches
+                    | OperationKind::UpdateBranchRemoteName
+                    | OperationKind::GenericBranchUpdate
+                    | OperationKind::DeleteBranch
+                    | OperationKind::ApplyBranch
+                    | OperationKind::DiscardLines
+                    | OperationKind::DiscardHunk
+                    | OperationKind::DiscardFile
+                    | OperationKind::DiscardChanges
+                    | OperationKind::AmendCommit
+                    | OperationKind::Absorb
+                    | OperationKind::AutoCommit
+                    | OperationKind::UndoCommit
+                    | OperationKind::DiscardCommit
+                    | OperationKind::UnapplyBranch
+                    | OperationKind::CherryPick
+                    | OperationKind::SquashCommit
+                    | OperationKind::UpdateCommitMessage
+                    | OperationKind::MoveCommit
+                    | OperationKind::MoveBranch
+                    | OperationKind::TearOffBranch
+                    | OperationKind::RestoreFromSnapshotViaUndo
+                    | OperationKind::RestoreFromSnapshotViaRedo
+                    | OperationKind::RestoreFromSnapshot
+                    | OperationKind::ReorderCommit
+                    | OperationKind::InsertBlankCommit
+                    | OperationKind::MoveCommitFile
+                    | OperationKind::FileChanges
+                    | OperationKind::EnterEditMode
+                    | OperationKind::SyncWorkspace
+                    | OperationKind::CreateDependentBranch
+                    | OperationKind::RemoveDependentBranch
+                    | OperationKind::UpdateDependentBranchName
+                    | OperationKind::UpdateDependentBranchDescription
+                    | OperationKind::UpdateDependentBranchPrNumber
+                    | OperationKind::AutoHandleChangesBefore
+                    | OperationKind::AutoHandleChangesAfter
+                    | OperationKind::SplitBranch
+                    | OperationKind::CleanWorkspace
+                    | OperationKind::Unknown => details.title.clone(),
                 };
 
                 let display_title = out.truncate_if_unpaged(&display_title, 80);
-                (op_type, display_title)
+                (details.operation, display_title)
             } else {
-                ("UNKNOWN", "Unknown operation".to_string())
+                (OperationKind::Unknown, "Unknown operation".to_string())
             };
 
-            // TODO(david): don't use strings here, use the `OperationKind`
             let operation_colored = match operation_type {
-                "COMMIT" => t.success.paint(operation_type),
-                "AMEND" | "REWORD" => t.attention.paint(operation_type),
-                "UNDO_COMMIT" | "RESTORE" | "UNDO" | "REDO" => t.error.paint(operation_type),
-                "DISCARD" => t.error.paint(operation_type),
-                "BRANCH" | "CHECKOUT" => t.local_branch.paint(operation_type),
-                "MOVE" | "REORDER" | "MOVE_HUNK" => t.info.paint(operation_type),
-                "SNAPSHOT" => t.hint.paint(operation_type),
-                _ => t.default.paint(operation_type),
+                OperationKind::CreateCommit => t.success.paint(operation_type.kind_str()),
+                OperationKind::UpdateCommitMessage | OperationKind::AmendCommit => {
+                    t.attention.paint(operation_type.kind_str())
+                }
+                OperationKind::UndoCommit
+                | OperationKind::RestoreFromSnapshot
+                | OperationKind::RestoreFromSnapshotViaUndo
+                | OperationKind::RestoreFromSnapshotViaRedo => {
+                    t.error.paint(operation_type.kind_str())
+                }
+                OperationKind::DiscardChanges | OperationKind::Discard => {
+                    t.error.paint(operation_type.kind_str())
+                }
+                OperationKind::CreateBranch => t.local_branch.paint(operation_type.kind_str()),
+                OperationKind::MoveCommit
+                | OperationKind::ReorderCommit
+                | OperationKind::MoveHunk => t.info.paint(operation_type.kind_str()),
+                OperationKind::OnDemandSnapshot => t.hint.paint(operation_type.kind_str()),
+                OperationKind::StashIntoBranch
+                | OperationKind::SetBaseBranch
+                | OperationKind::MergeUpstream
+                | OperationKind::UpdateWorkspaceBase
+                | OperationKind::UpdateBranchName
+                | OperationKind::UpdateBranchNotes
+                | OperationKind::ReorderBranches
+                | OperationKind::UpdateBranchRemoteName
+                | OperationKind::GenericBranchUpdate
+                | OperationKind::DeleteBranch
+                | OperationKind::ApplyBranch
+                | OperationKind::DiscardLines
+                | OperationKind::DiscardHunk
+                | OperationKind::DiscardFile
+                | OperationKind::Absorb
+                | OperationKind::AutoCommit
+                | OperationKind::DiscardCommit
+                | OperationKind::UnapplyBranch
+                | OperationKind::CherryPick
+                | OperationKind::SquashCommit
+                | OperationKind::MoveBranch
+                | OperationKind::TearOffBranch
+                | OperationKind::InsertBlankCommit
+                | OperationKind::MoveCommitFile
+                | OperationKind::FileChanges
+                | OperationKind::EnterEditMode
+                | OperationKind::SyncWorkspace
+                | OperationKind::CreateDependentBranch
+                | OperationKind::RemoveDependentBranch
+                | OperationKind::UpdateDependentBranchName
+                | OperationKind::UpdateDependentBranchDescription
+                | OperationKind::UpdateDependentBranchPrNumber
+                | OperationKind::AutoHandleChangesBefore
+                | OperationKind::AutoHandleChangesAfter
+                | OperationKind::SplitBranch
+                | OperationKind::CleanWorkspace
+                | OperationKind::Unknown => t.default.paint(operation_type.kind_str()),
             };
 
             writeln!(

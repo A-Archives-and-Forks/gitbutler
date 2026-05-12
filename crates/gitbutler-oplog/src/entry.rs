@@ -7,7 +7,9 @@ use std::{
 use anyhow::{Result, anyhow};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use strum::EnumString;
+
+const OPERATION_TRAILER_KEY: &str = "Operation";
+const VERSION_TRAILER_KEY: &str = "Version";
 
 /// A snapshot of the repository and virtual branches state that GitButler can restore to.
 /// It captures the state of the working directory, virtual branches and commits.
@@ -44,21 +46,22 @@ pub struct SnapshotDetails {
 
 impl SnapshotDetails {
     pub fn new(operation: OperationKind) -> Self {
-        let title = operation.to_string();
         SnapshotDetails {
             version: Default::default(),
             operation,
-            title,
+            title: operation.to_string(),
             body: None,
             trailers: vec![],
         }
     }
+
     pub fn with_count(mut self, count: usize) -> Self {
         if count > 1 {
             self.title = format!("{} ({})", self.title, count);
         }
         self
     }
+
     pub fn with_trailers(mut self, trailers: Vec<Trailer>) -> Self {
         self.trailers = trailers;
         self
@@ -83,21 +86,20 @@ impl FromStr for SnapshotDetails {
 
         let version = trailers
             .iter()
-            .find(|t| t.key == "Version")
+            .find(|t| t.key == VERSION_TRAILER_KEY)
             .ok_or(anyhow!("No version found on snapshot commit message"))?
             .value
             .parse()?;
 
-        let operation = trailers
+        let operation_trailer = &trailers
             .iter()
-            .find(|t| t.key == "Operation")
-            .ok_or(anyhow!("No operation found on snapshot commit message"))?
-            .value
-            .parse()
-            .unwrap_or_default();
+            .find(|t| t.key == OPERATION_TRAILER_KEY)
+            .ok_or(anyhow!("No operation found on snapshot commit message"))?;
+        let operation = OperationKind::parse_persisted(&operation_trailer.value)
+            .unwrap_or(OperationKind::Unknown);
 
         // remove the version and operation attributes from the trailers since they have dedicated fields
-        trailers.retain(|t| t.key != "Version" && t.key != "Operation");
+        trailers.retain(|t| t.key != VERSION_TRAILER_KEY && t.key != OPERATION_TRAILER_KEY);
 
         Ok(SnapshotDetails {
             version,
@@ -115,8 +117,8 @@ impl Display for SnapshotDetails {
         if let Some(body) = &self.body {
             writeln!(f, "{body}\n")?;
         }
-        writeln!(f, "Version: {}", self.version)?;
-        writeln!(f, "Operation: {}", self.operation)?;
+        writeln!(f, "{VERSION_TRAILER_KEY}: {}", self.version)?;
+        writeln!(f, "{OPERATION_TRAILER_KEY}: {}", self.operation)?;
         for line in &self.trailers {
             writeln!(f, "{line}")?;
         }
@@ -124,7 +126,7 @@ impl Display for SnapshotDetails {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize, EnumString, Default)]
+#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub enum OperationKind {
     CreateCommit,
     CreateBranch,
@@ -182,12 +184,11 @@ pub enum OperationKind {
     SplitBranch,
     CleanWorkspace,
     OnDemandSnapshot,
-    #[default]
     Unknown,
 }
 
 impl OperationKind {
-    pub fn as_str(self) -> &'static str {
+    pub fn kind_str(self) -> &'static str {
         match self {
             OperationKind::CreateCommit => "COMMIT",
             OperationKind::CreateBranch => "BRANCH",
@@ -238,15 +239,66 @@ impl OperationKind {
             | OperationKind::EnterEditMode
             | OperationKind::SyncWorkspace
             | OperationKind::AutoHandleChangesBefore
-            | OperationKind::AutoHandleChangesAfter
-            | OperationKind::Unknown => "OTHER",
+            | OperationKind::AutoHandleChangesAfter => "OTHER",
+            OperationKind::Unknown => "UNKNOWN",
         }
     }
-}
 
-impl From<OperationKind> for SnapshotDetails {
-    fn from(value: OperationKind) -> Self {
-        SnapshotDetails::new(value)
+    pub fn parse_persisted(s: &str) -> Option<Self> {
+        Some(match s {
+            "CreateCommit" => Self::CreateCommit,
+            "CreateBranch" => Self::CreateBranch,
+            "StashIntoBranch" => Self::StashIntoBranch,
+            "SetBaseBranch" => Self::SetBaseBranch,
+            "MergeUpstream" => Self::MergeUpstream,
+            "UpdateWorkspaceBase" => Self::UpdateWorkspaceBase,
+            "MoveHunk" => Self::MoveHunk,
+            "UpdateBranchName" => Self::UpdateBranchName,
+            "UpdateBranchNotes" => Self::UpdateBranchNotes,
+            "ReorderBranches" => Self::ReorderBranches,
+            "UpdateBranchRemoteName" => Self::UpdateBranchRemoteName,
+            "GenericBranchUpdate" => Self::GenericBranchUpdate,
+            "DeleteBranch" => Self::DeleteBranch,
+            "ApplyBranch" => Self::ApplyBranch,
+            "DiscardLines" => Self::DiscardLines,
+            "DiscardHunk" => Self::DiscardHunk,
+            "DiscardFile" => Self::DiscardFile,
+            "DiscardChanges" => Self::DiscardChanges,
+            "Discard" => Self::Discard,
+            "AmendCommit" => Self::AmendCommit,
+            "Absorb" => Self::Absorb,
+            "AutoCommit" => Self::AutoCommit,
+            "UndoCommit" => Self::UndoCommit,
+            "DiscardCommit" => Self::DiscardCommit,
+            "UnapplyBranch" => Self::UnapplyBranch,
+            "CherryPick" => Self::CherryPick,
+            "SquashCommit" => Self::SquashCommit,
+            "UpdateCommitMessage" => Self::UpdateCommitMessage,
+            "MoveCommit" => Self::MoveCommit,
+            "MoveBranch" => Self::MoveBranch,
+            "TearOffBranch" => Self::TearOffBranch,
+            "RestoreFromSnapshotViaUndo" => Self::RestoreFromSnapshotViaUndo,
+            "RestoreFromSnapshotViaRedo" => Self::RestoreFromSnapshotViaRedo,
+            "RestoreFromSnapshot" => Self::RestoreFromSnapshot,
+            "ReorderCommit" => Self::ReorderCommit,
+            "InsertBlankCommit" => Self::InsertBlankCommit,
+            "MoveCommitFile" => Self::MoveCommitFile,
+            "FileChanges" => Self::FileChanges,
+            "EnterEditMode" => Self::EnterEditMode,
+            "SyncWorkspace" => Self::SyncWorkspace,
+            "CreateDependentBranch" => Self::CreateDependentBranch,
+            "RemoveDependentBranch" => Self::RemoveDependentBranch,
+            "UpdateDependentBranchName" => Self::UpdateDependentBranchName,
+            "UpdateDependentBranchDescription" => Self::UpdateDependentBranchDescription,
+            "UpdateDependentBranchPrNumber" => Self::UpdateDependentBranchPrNumber,
+            "AutoHandleChangesBefore" => Self::AutoHandleChangesBefore,
+            "AutoHandleChangesAfter" => Self::AutoHandleChangesAfter,
+            "SplitBranch" => Self::SplitBranch,
+            "CleanWorkspace" => Self::CleanWorkspace,
+            "OnDemandSnapshot" => Self::OnDemandSnapshot,
+            "Unknown" => Self::Unknown,
+            _ => return None,
+        })
     }
 }
 
@@ -258,6 +310,7 @@ impl fmt::Display for OperationKind {
 
 #[derive(Debug, PartialEq, Clone, Copy, Serialize)]
 pub struct Version(pub u32);
+
 impl Default for Version {
     fn default() -> Self {
         Version(3)
