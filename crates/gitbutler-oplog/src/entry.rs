@@ -7,7 +7,6 @@ use std::{
 use anyhow::{Result, anyhow};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use strum::EnumString;
 
 /// A snapshot of the repository and virtual branches state that GitButler can restore to.
 /// It captures the state of the working directory, virtual branches and commits.
@@ -53,12 +52,14 @@ impl SnapshotDetails {
             trailers: vec![],
         }
     }
+
     pub fn with_count(mut self, count: usize) -> Self {
         if count > 1 {
             self.title = format!("{} ({})", self.title, count);
         }
         self
     }
+
     pub fn with_trailers(mut self, trailers: Vec<Trailer>) -> Self {
         self.trailers = trailers;
         self
@@ -88,12 +89,11 @@ impl FromStr for SnapshotDetails {
             .value
             .parse()?;
 
-        let operation = trailers
+        let operation_trailer = &trailers
             .iter()
             .find(|t| t.key == "Operation")
-            .ok_or(anyhow!("No operation found on snapshot commit message"))?
-            .value
-            .parse()
+            .ok_or(anyhow!("No operation found on snapshot commit message"))?;
+        let operation = OperationKind::parse_persisted(&operation_trailer.value)
             .unwrap_or(OperationKind::Unknown);
 
         // remove the version and operation attributes from the trailers since they have dedicated fields
@@ -124,7 +124,7 @@ impl Display for SnapshotDetails {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize, EnumString)]
+#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub enum OperationKind {
     CreateCommit,
     CreateBranch,
@@ -240,6 +240,63 @@ impl OperationKind {
             | OperationKind::AutoHandleChangesAfter => "OTHER",
             OperationKind::Unknown => "UNKNOWN",
         }
+    }
+
+    pub fn parse_persisted(s: &str) -> Option<Self> {
+        Some(match s {
+            "CreateCommit" => Self::CreateCommit,
+            "CreateBranch" => Self::CreateBranch,
+            "StashIntoBranch" => Self::StashIntoBranch,
+            "SetBaseBranch" => Self::SetBaseBranch,
+            "MergeUpstream" => Self::MergeUpstream,
+            "UpdateWorkspaceBase" => Self::UpdateWorkspaceBase,
+            "MoveHunk" => Self::MoveHunk,
+            "UpdateBranchName" => Self::UpdateBranchName,
+            "UpdateBranchNotes" => Self::UpdateBranchNotes,
+            "ReorderBranches" => Self::ReorderBranches,
+            "UpdateBranchRemoteName" => Self::UpdateBranchRemoteName,
+            "GenericBranchUpdate" => Self::GenericBranchUpdate,
+            "DeleteBranch" => Self::DeleteBranch,
+            "ApplyBranch" => Self::ApplyBranch,
+            "DiscardLines" => Self::DiscardLines,
+            "DiscardHunk" => Self::DiscardHunk,
+            "DiscardFile" => Self::DiscardFile,
+            "DiscardChanges" => Self::DiscardChanges,
+            "Discard" => Self::Discard,
+            "AmendCommit" => Self::AmendCommit,
+            "Absorb" => Self::Absorb,
+            "AutoCommit" => Self::AutoCommit,
+            "UndoCommit" => Self::UndoCommit,
+            "DiscardCommit" => Self::DiscardCommit,
+            "UnapplyBranch" => Self::UnapplyBranch,
+            "CherryPick" => Self::CherryPick,
+            "SquashCommit" => Self::SquashCommit,
+            "UpdateCommitMessage" => Self::UpdateCommitMessage,
+            "MoveCommit" => Self::MoveCommit,
+            "MoveBranch" => Self::MoveBranch,
+            "TearOffBranch" => Self::TearOffBranch,
+            "RestoreFromSnapshotViaUndo" => Self::RestoreFromSnapshotViaUndo,
+            "RestoreFromSnapshotViaRedo" => Self::RestoreFromSnapshotViaRedo,
+            "RestoreFromSnapshot" => Self::RestoreFromSnapshot,
+            "ReorderCommit" => Self::ReorderCommit,
+            "InsertBlankCommit" => Self::InsertBlankCommit,
+            "MoveCommitFile" => Self::MoveCommitFile,
+            "FileChanges" => Self::FileChanges,
+            "EnterEditMode" => Self::EnterEditMode,
+            "SyncWorkspace" => Self::SyncWorkspace,
+            "CreateDependentBranch" => Self::CreateDependentBranch,
+            "RemoveDependentBranch" => Self::RemoveDependentBranch,
+            "UpdateDependentBranchName" => Self::UpdateDependentBranchName,
+            "UpdateDependentBranchDescription" => Self::UpdateDependentBranchDescription,
+            "UpdateDependentBranchPrNumber" => Self::UpdateDependentBranchPrNumber,
+            "AutoHandleChangesBefore" => Self::AutoHandleChangesBefore,
+            "AutoHandleChangesAfter" => Self::AutoHandleChangesAfter,
+            "SplitBranch" => Self::SplitBranch,
+            "CleanWorkspace" => Self::CleanWorkspace,
+            "OnDemandSnapshot" => Self::OnDemandSnapshot,
+            "Unknown" => Self::Unknown,
+            _ => return None,
+        })
     }
 }
 

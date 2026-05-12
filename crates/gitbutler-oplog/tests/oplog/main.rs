@@ -68,7 +68,7 @@ mod operation_kind {
     fn from_trailer() {
         let s = "Operation: CreateCommit";
         let trailer = Trailer::from_str(s).unwrap();
-        let operation = OperationKind::from_str(&trailer.value).unwrap();
+        let operation = OperationKind::parse_persisted(&trailer.value).unwrap();
         assert_eq!(operation, OperationKind::CreateCommit);
     }
 
