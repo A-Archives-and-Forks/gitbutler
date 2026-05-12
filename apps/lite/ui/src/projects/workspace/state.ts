@@ -54,7 +54,7 @@ export const enterMoveMode = (state: WorkspaceState, source: Operand) => {
 	state.mode = operationOutlineMode(
 		cutOperationMode({
 			source,
-			operationType: source._tag === "Branch" ? "moveAbove" : "moveBelow",
+			operationType: "moveAbove",
 		}),
 	);
 };
