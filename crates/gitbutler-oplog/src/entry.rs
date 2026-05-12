@@ -46,11 +46,10 @@ pub struct SnapshotDetails {
 
 impl SnapshotDetails {
     pub fn new(operation: OperationKind) -> Self {
-        let title = operation.to_string();
         SnapshotDetails {
             version: Default::default(),
             operation,
-            title,
+            title: operation.to_string(),
             body: None,
             trailers: vec![],
         }
@@ -300,12 +299,6 @@ impl OperationKind {
             "Unknown" => Self::Unknown,
             _ => return None,
         })
-    }
-}
-
-impl From<OperationKind> for SnapshotDetails {
-    fn from(value: OperationKind) -> Self {
-        SnapshotDetails::new(value)
     }
 }
 
