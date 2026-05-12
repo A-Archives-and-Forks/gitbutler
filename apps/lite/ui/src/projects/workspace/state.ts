@@ -154,6 +154,17 @@ export const selectMode = (state: WorkspaceState): OutlineMode => state.mode;
 
 export const selectOperationMode = (state: WorkspaceState) => getOperationMode(state.mode);
 
+export const selectOperationModeTarget = (state: WorkspaceState): Operand | null => {
+	const operationMode = selectOperationMode(state);
+	if (!operationMode) return null;
+
+	return Match.value(operationMode).pipe(
+		Match.withReturnType<Operand | null>(),
+		Match.tags({ DragAndDrop: ({ target }) => target }),
+		Match.orElse(() => selectSelectionOutlineState(state)),
+	);
+};
+
 export const selectHighlightedCommitIds = (state: WorkspaceState): Array<string> =>
 	state.highlightedCommitIds;
 

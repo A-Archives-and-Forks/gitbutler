@@ -1,4 +1,4 @@
-import { type Operand } from "#ui/operands.ts";
+import { operandEquals, type Operand } from "#ui/operands.ts";
 import { parseDragData } from "./OperationSourceC.tsx";
 import styles from "./OperationTarget.module.css";
 import { OperationTooltip } from "./OperationTooltip.tsx";
@@ -9,7 +9,11 @@ import {
 	useRunOperationMutationOptions,
 } from "#ui/operations/operation.ts";
 import { classes } from "#ui/ui/classes.ts";
-import { projectActions, selectProjectOperationModeState } from "#ui/projects/state.ts";
+import {
+	projectActions,
+	selectProjectOperationModeState,
+	selectProjectOperationModeTarget,
+} from "#ui/projects/state.ts";
 import { useAppDispatch, useAppSelector } from "#ui/store.ts";
 import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import {
@@ -18,7 +22,7 @@ import {
 } from "@atlaskit/pragmatic-drag-and-drop-hitbox/list-item";
 import { mergeProps, useRender } from "@base-ui/react";
 import { Match, pipe } from "effect";
-import { FC, useEffect, useEffectEvent, useRef, useState } from "react";
+import { FC, useEffect, useEffectEvent, useRef } from "react";
 import { isOperationModeCandidateTarget } from "#ui/outline/mode.ts";
 import { useMutation } from "@tanstack/react-query";
 
@@ -77,7 +81,6 @@ const useOperationDropTarget = ({ target, projectId }: { target: Operand; projec
 	const dispatch = useAppDispatch();
 	const { mutate: runOperation } = useMutation(useRunOperationMutationOptions());
 	const dropRef = useRef<HTMLElement>(null);
-	const [isActiveDropTarget, setIsActiveDropTarget] = useState<boolean>(false);
 
 	const getDropData = useEffectEvent(({ input, element, source }: GetDataArgs): DropData | null => {
 		const dragData = parseDragData(source.data);
@@ -106,8 +109,6 @@ const useOperationDropTarget = ({ target, projectId }: { target: Operand; projec
 				const [innerMost] = args.location.current.dropTargets;
 				const isActiveDropTarget = innerMost?.element === args.self.element;
 
-				setIsActiveDropTarget(isActiveDropTarget);
-
 				if (!isActiveDropTarget) return;
 
 				const dropData = parseDropData(args.self.data);
@@ -121,7 +122,6 @@ const useOperationDropTarget = ({ target, projectId }: { target: Operand; projec
 				);
 			},
 			onDragLeave: () => {
-				setIsActiveDropTarget(false);
 				dispatch(
 					projectActions.updateDragAndDropMode({
 						projectId,
@@ -131,8 +131,6 @@ const useOperationDropTarget = ({ target, projectId }: { target: Operand; projec
 				);
 			},
 			onDrop: (args) => {
-				setIsActiveDropTarget(false);
-
 				const [innerMost] = args.location.current.dropTargets;
 				const isActiveDropTarget = innerMost?.element === args.self.element;
 
@@ -156,7 +154,7 @@ const useOperationDropTarget = ({ target, projectId }: { target: Operand; projec
 		});
 	}, [dispatch, projectId, runOperation]);
 
-	return { dropRef, isActiveDropTarget };
+	return { dropRef };
 };
 
 export const OperationTarget: FC<
@@ -166,21 +164,25 @@ export const OperationTarget: FC<
 		isSelected: boolean;
 	} & useRender.ComponentProps<"div">
 > = ({ target, projectId, isSelected, render, ...props }) => {
-	const { dropRef, isActiveDropTarget } = useOperationDropTarget({ target, projectId });
+	const { dropRef } = useOperationDropTarget({ target, projectId });
 	const operationMode = useAppSelector((state) =>
 		selectProjectOperationModeState(state, projectId),
 	);
+	const isActive = useAppSelector((state) => {
+		const activeTarget = selectProjectOperationModeTarget(state, projectId);
+		return activeTarget !== null && operandEquals(activeTarget, target);
+	});
 
 	const insertTargetOperationType = operationMode
 		? Match.value(operationMode).pipe(
 				Match.tagsExhaustive({
 					Absorb: () => null,
 					DragAndDrop: ({ operationType }) =>
-						isActiveDropTarget && (operationType === "moveAbove" || operationType === "moveBelow")
+						isActive && (operationType === "moveAbove" || operationType === "moveBelow")
 							? operationType
 							: null,
 					Cut: ({ operationType }) =>
-						isSelected && (operationType === "moveAbove" || operationType === "moveBelow")
+						isActive && (operationType === "moveAbove" || operationType === "moveBelow")
 							? operationType
 							: null,
 				}),
@@ -192,8 +194,8 @@ export const OperationTarget: FC<
 		Match.value(operationMode).pipe(
 			Match.tagsExhaustive({
 				Absorb: () => isOperationModeCandidateTarget({ mode: operationMode, target }),
-				DragAndDrop: ({ operationType }) => isActiveDropTarget && operationType === "rub",
-				Cut: ({ operationType }) => isSelected && operationType === "rub",
+				DragAndDrop: ({ operationType }) => isActive && operationType === "rub",
+				Cut: ({ operationType }) => isActive && operationType === "rub",
 			}),
 		);
 
