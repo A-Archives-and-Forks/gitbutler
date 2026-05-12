@@ -8,6 +8,9 @@ use anyhow::{Result, anyhow};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
+const OPERATION_TRAILER_KEY: &str = "Operation";
+const VERSION_TRAILER_KEY: &str = "Version";
+
 /// A snapshot of the repository and virtual branches state that GitButler can restore to.
 /// It captures the state of the working directory, virtual branches and commits.
 #[derive(Debug, PartialEq, Clone, Serialize)]
@@ -84,20 +87,20 @@ impl FromStr for SnapshotDetails {
 
         let version = trailers
             .iter()
-            .find(|t| t.key == "Version")
+            .find(|t| t.key == VERSION_TRAILER_KEY)
             .ok_or(anyhow!("No version found on snapshot commit message"))?
             .value
             .parse()?;
 
         let operation_trailer = &trailers
             .iter()
-            .find(|t| t.key == "Operation")
+            .find(|t| t.key == OPERATION_TRAILER_KEY)
             .ok_or(anyhow!("No operation found on snapshot commit message"))?;
         let operation = OperationKind::parse_persisted(&operation_trailer.value)
             .unwrap_or(OperationKind::Unknown);
 
         // remove the version and operation attributes from the trailers since they have dedicated fields
-        trailers.retain(|t| t.key != "Version" && t.key != "Operation");
+        trailers.retain(|t| t.key != VERSION_TRAILER_KEY && t.key != OPERATION_TRAILER_KEY);
 
         Ok(SnapshotDetails {
             version,
@@ -115,8 +118,8 @@ impl Display for SnapshotDetails {
         if let Some(body) = &self.body {
             writeln!(f, "{body}\n")?;
         }
-        writeln!(f, "Version: {}", self.version)?;
-        writeln!(f, "Operation: {}", self.operation)?;
+        writeln!(f, "{VERSION_TRAILER_KEY}: {}", self.version)?;
+        writeln!(f, "{OPERATION_TRAILER_KEY}: {}", self.operation)?;
         for line in &self.trailers {
             writeln!(f, "{line}")?;
         }
@@ -314,6 +317,7 @@ impl fmt::Display for OperationKind {
 
 #[derive(Debug, PartialEq, Clone, Copy, Serialize)]
 pub struct Version(pub u32);
+
 impl Default for Version {
     fn default() -> Self {
         Version(3)
