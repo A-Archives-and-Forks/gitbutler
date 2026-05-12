@@ -1,3 +1,4 @@
+import { showWarning } from "$lib/notifications/toasts";
 import { InjectionToken } from "@gitbutler/core/context";
 import { chipToasts } from "@gitbutler/ui";
 import type { BackendApi } from "$lib/state/backendApi";
@@ -24,7 +25,8 @@ export class HooksService {
 
 			if (result?.status === "failure") {
 				chipToasts.removeChipToast(loadingToastId);
-				throw newHookError(formatError(result.error));
+				showWarning("Pre-commit hook failed", formatError(result.error));
+				throw new HookFailedError();
 			}
 
 			chipToasts.removeChipToast(loadingToastId);
@@ -45,7 +47,8 @@ export class HooksService {
 
 			if (result?.status === "failure") {
 				chipToasts.removeChipToast(loadingToastId);
-				throw newHookError(formatError(result.error));
+				showWarning("Post-commit hook failed", formatError(result.error));
+				throw new HookFailedError();
 			}
 
 			chipToasts.removeChipToast(loadingToastId);
@@ -57,10 +60,15 @@ export class HooksService {
 	}
 }
 
-function newHookError(message: string): Error {
-	const error = new Error(message);
-	error.name = "Git hook failed";
-	return error;
+/**
+ * Thrown after a hook failure warning has already been shown.
+ * Callers should catch this to abort the operation without showing a second toast.
+ */
+export class HookFailedError extends Error {
+	constructor() {
+		super("Git hook failed");
+		this.name = "HookFailedError";
+	}
 }
 
 function formatError(error: string): string {

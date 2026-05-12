@@ -3,7 +3,7 @@
 	import { COMMIT_ANALYTICS } from "$lib/analytics/commitAnalytics";
 	import { projectRunCommitHooks } from "$lib/config/config";
 	import { showError } from "$lib/error/showError";
-	import { HOOKS_SERVICE } from "$lib/git/hooksService";
+	import { HookFailedError, HOOKS_SERVICE } from "$lib/git/hooksService";
 	import { showToast } from "$lib/notifications/toasts";
 	import { FILE_SELECTION_MANAGER } from "$lib/selection/fileSelectionManager.svelte";
 	import { createWorktreeSelection } from "$lib/selection/key";
@@ -186,7 +186,9 @@
 		try {
 			await createCommit(message);
 		} catch (err: unknown) {
-			showError("Failed to commit", err);
+			if (!(err instanceof HookFailedError)) {
+				showError("Failed to commit", err);
+			}
 		}
 	}
 
