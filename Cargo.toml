@@ -21,7 +21,6 @@ members = [
     "crates/but-feedback",       # 📄It's very small and very special, but documented and well-enough tested.
     "crates/but-askpass",        # 📄Broker prompts from Git back to the application.
     "crates/but-project-handle", # 📄Temporary home of ProjectHandle until `gitbutler-project` is gone and it can merge back into `but-ctx`.
-    "crates/but-agentlog",       # 📄Capture coding-agent logs into Git metadata.
 
     ##
     ### 👷Needs work
@@ -82,6 +81,8 @@ members = [
     "crates/but-cherry-apply", # 📄Apply commits to different stacks.
     # 👉Experimental IRC support
     "crates/but-irc", # 📄IRC client with WebSocket transport and GitButler protocol support.
+    # 👉Experimental; needs docs, it's used from `but` CLI and not a library
+    "crates/but-agentlog",       # 📄Capture coding-agent logs into Git metadata.
 
     ##
     ### Soon obsolete
