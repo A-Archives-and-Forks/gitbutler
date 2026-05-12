@@ -183,12 +183,12 @@ export const operationLabel = (operation: Operation): string =>
 const runOperation = async ({
 	projectId,
 	operation,
-	changes,
+	resolveChanges,
 	dryRun,
 }: {
 	projectId: string;
 	operation: Operation;
-	changes: Array<DiffSpec> | null;
+	resolveChanges: (source: Operand) => Promise<Array<DiffSpec> | null>;
 	dryRun: boolean;
 }) =>
 	Match.value(operation).pipe(
@@ -200,8 +200,9 @@ const runOperation = async ({
 					absorptionPlan: operation.absorptionPlan,
 				});
 			},
-			CommitAmend: (operation) => {
-				if (!changes) return;
+			CommitAmend: async (operation) => {
+				const changes = await resolveChanges(operation.source);
+				if (!changes) return null;
 				return window.lite.commitAmend({
 					projectId,
 					commitId: operation.commitId,
@@ -209,8 +210,9 @@ const runOperation = async ({
 					dryRun,
 				});
 			},
-			CommitMoveChangesBetween: (operation) => {
-				if (!changes) return;
+			CommitMoveChangesBetween: async (operation) => {
+				const changes = await resolveChanges(operation.source);
+				if (!changes) return null;
 				return window.lite.commitMoveChangesBetween({
 					projectId,
 					sourceCommitId: operation.sourceCommitId,
@@ -233,8 +235,9 @@ const runOperation = async ({
 					assignTo: operation.assignTo,
 					dryRun,
 				}),
-			CommitUncommitChanges: (operation) => {
-				if (!changes) return;
+			CommitUncommitChanges: async (operation) => {
+				const changes = await resolveChanges(operation.source);
+				if (!changes) return null;
 				return window.lite.commitUncommitChanges({
 					projectId,
 					commitId: operation.commitId,
@@ -243,8 +246,9 @@ const runOperation = async ({
 					dryRun,
 				});
 			},
-			CommitCreate: (operation) => {
-				if (!changes) return;
+			CommitCreate: async (operation) => {
+				const changes = await resolveChanges(operation.source);
+				if (!changes) return null;
 				return window.lite.commitCreate({
 					projectId,
 					relativeTo: operation.relativeTo,
@@ -255,7 +259,8 @@ const runOperation = async ({
 				});
 			},
 			CommitCreateFromCommittedChanges: async (operation) => {
-				if (!changes) return;
+				const changes = await resolveChanges(operation.source);
+				if (!changes) return null;
 
 				// We can't dry run this as it's not an atomic operation. Ideally this
 				// would be an atomic backend operation.
@@ -332,7 +337,12 @@ export const useDryRunOperation = ({
 		queryKey: ["dryRun", projectId, operation, changes],
 		queryFn: () => {
 			if (!operation) return null;
-			return runOperation({ projectId, operation, changes, dryRun: true });
+			return runOperation({
+				projectId,
+				operation,
+				resolveChanges: async () => changes,
+				dryRun: true,
+			});
 		},
 		// We may have a lot of different dry runs in a short amount of time.
 		gcTime: 10_000,
@@ -346,15 +356,13 @@ export const useRunOperationMutationOptions = () => {
 	const toastManager = Toast.useToastManager();
 
 	return mutationOptions({
-		mutationFn: async (operation: Operation) => {
-			const changes = await resolveDiffSpecs({
+		mutationFn: (operation: Operation) =>
+			runOperation({
 				projectId,
-				queryClient,
-				source: operationSource(operation),
-			});
-
-			return runOperation({ projectId, operation, changes, dryRun: false });
-		},
+				operation,
+				resolveChanges: (source) => resolveDiffSpecs({ projectId, queryClient, source }),
+				dryRun: false,
+			}),
 		onSuccess: async (response, input, _ctx, { client }) => {
 			if (response) {
 				dispatch(
