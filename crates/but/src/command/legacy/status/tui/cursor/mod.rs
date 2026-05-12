@@ -9,7 +9,7 @@ use crate::{
         FilesStatusFlag, StatusOutputLine,
         output::StatusOutputLineData,
         tui::{
-            Mode, SelectAfterReload,
+            Mode, MoveSource, SelectAfterReload,
             render::{commit_operation_display, move_operation_display},
         },
     },
@@ -316,7 +316,7 @@ impl Cursor {
             .enumerate()
             .rev()
             .skip(lines.len() - self.0)
-            .find(|(_, line)| is_selectable_in_mode(line, mode, show_files))?;
+            .find(|(_, line)| is_cursor_selectable_in_mode(line, lines, mode, show_files))?;
         Some(Self(idx))
     }
 
@@ -335,7 +335,7 @@ impl Cursor {
             .iter()
             .enumerate()
             .skip(self.0 + 1)
-            .find(|(_, line)| is_selectable_in_mode(line, mode, show_files))?;
+            .find(|(_, line)| is_cursor_selectable_in_mode(line, lines, mode, show_files))?;
         Some(Self(idx))
     }
 
@@ -359,7 +359,7 @@ impl Cursor {
             .enumerate()
             .skip(self.0 + 1)
             .take(next_section_start.saturating_sub(self.0 + 1))
-            .find(|(_, line)| is_selectable_in_mode(line, mode, show_files))?;
+            .find(|(_, line)| is_cursor_selectable_in_mode(line, lines, mode, show_files))?;
         Some(Self(idx))
     }
 
@@ -484,7 +484,7 @@ fn first_selectable_in_section(
         .enumerate()
         .skip(section_start)
         .take(next_section_start.saturating_sub(section_start))
-        .find(|(_, line)| is_selectable_in_mode(line, mode, show_files))
+        .find(|(_, line)| is_cursor_selectable_in_mode(line, lines, mode, show_files))
         .map(|(idx, _)| idx)
 }
 
@@ -536,6 +536,103 @@ fn is_section_header(line: &StatusOutputLine, mode: &Mode) -> bool {
                     | StatusOutputLineData::MergeBase
             )
         }
+    }
+}
+
+fn is_cursor_selectable_in_mode(
+    line: &StatusOutputLine,
+    lines: &[StatusOutputLine],
+    mode: &Mode,
+    show_files_flag: FilesStatusFlag,
+) -> bool {
+    is_selectable_in_mode(line, mode, show_files_flag)
+        && !is_forbidden_move_commit_target(line, lines, mode)
+}
+
+pub(super) fn is_forbidden_move_commit_target(
+    line: &StatusOutputLine,
+    lines: &[StatusOutputLine],
+    mode: &Mode,
+) -> bool {
+    let Some(cli_id) = line.data.cli_id() else {
+        return false;
+    };
+
+    forbidden_move_target(lines, mode).is_some_and(|target| **cli_id == **target)
+}
+
+fn forbidden_move_target<'a>(lines: &'a [StatusOutputLine], mode: &Mode) -> Option<&'a Arc<CliId>> {
+    let Mode::Move(move_mode) = mode else {
+        return None;
+    };
+    let MoveSource::Commit { .. } = &*move_mode.source else {
+        return None;
+    };
+
+    let source_idx = lines.iter().position(|line| {
+        line.data
+            .cli_id()
+            .is_some_and(|cli_id| *move_mode.source == **cli_id)
+    })?;
+
+    commit_before(lines, source_idx).or_else(|| source_branch_if_top_commit(lines, source_idx))
+}
+
+fn commit_before(lines: &[StatusOutputLine], source_idx: usize) -> Option<&Arc<CliId>> {
+    lines[..source_idx]
+        .iter()
+        .rev()
+        .take_while(|line| !is_discard_commit_boundary(line))
+        .find_map(commit_cli_id)
+}
+
+fn source_branch_if_top_commit(
+    lines: &[StatusOutputLine],
+    source_idx: usize,
+) -> Option<&Arc<CliId>> {
+    lines[..source_idx]
+        .iter()
+        .rev()
+        .find(|line| is_discard_commit_boundary(line))
+        .and_then(|line| match &line.data {
+            StatusOutputLineData::Branch { cli_id } => Some(cli_id),
+            StatusOutputLineData::StagedChanges { .. }
+            | StatusOutputLineData::UnassignedChanges { .. }
+            | StatusOutputLineData::MergeBase => None,
+            StatusOutputLineData::UpdateNotice
+            | StatusOutputLineData::Connector
+            | StatusOutputLineData::StagedFile { .. }
+            | StatusOutputLineData::UnassignedFile { .. }
+            | StatusOutputLineData::Commit { .. }
+            | StatusOutputLineData::CommitMessage
+            | StatusOutputLineData::EmptyCommitMessage
+            | StatusOutputLineData::File { .. }
+            | StatusOutputLineData::UpstreamChanges
+            | StatusOutputLineData::Warning
+            | StatusOutputLineData::Hint
+            | StatusOutputLineData::NoAssignmentsUnstaged => None,
+        })
+}
+
+fn commit_cli_id(line: &StatusOutputLine) -> Option<&Arc<CliId>> {
+    match &line.data {
+        StatusOutputLineData::Commit { cli_id, .. } if line.is_selectable() => Some(cli_id),
+        StatusOutputLineData::UpdateNotice
+        | StatusOutputLineData::Connector
+        | StatusOutputLineData::StagedChanges { .. }
+        | StatusOutputLineData::StagedFile { .. }
+        | StatusOutputLineData::UnassignedChanges { .. }
+        | StatusOutputLineData::Commit { .. }
+        | StatusOutputLineData::UnassignedFile { .. }
+        | StatusOutputLineData::Branch { .. }
+        | StatusOutputLineData::CommitMessage
+        | StatusOutputLineData::EmptyCommitMessage
+        | StatusOutputLineData::File { .. }
+        | StatusOutputLineData::MergeBase
+        | StatusOutputLineData::UpstreamChanges
+        | StatusOutputLineData::Warning
+        | StatusOutputLineData::Hint
+        | StatusOutputLineData::NoAssignmentsUnstaged => None,
     }
 }
 

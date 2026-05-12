@@ -11,8 +11,9 @@ use crate::{
         CommitClassification, FilesStatusFlag,
         output::{StatusOutputContent, StatusOutputLine, StatusOutputLineData},
         tui::{
-            CommitMessageComposer, CommitMode, CommitSource, InlineRewordMode, Mode, NormalMode,
-            RubMode, RubSource, SelectAfterReload, mode::UnassignedCommitSource,
+            CommitMessageComposer, CommitMode, CommitSource, InlineRewordMode, Mode, MoveMode,
+            MoveSource, NormalMode, RubMode, RubSource, SelectAfterReload,
+            mode::UnassignedCommitSource,
         },
     },
 };
@@ -53,6 +54,37 @@ fn branch_cli_id(name: &str, id: &str, stack_id: Option<StackId>) -> Arc<CliId> 
         name: name.into(),
         id: id.into(),
         stack_id,
+    })
+}
+
+fn branch_line(name: &str, id: &str) -> StatusOutputLine {
+    line(StatusOutputLineData::Branch {
+        cli_id: branch_cli_id(name, id, None),
+    })
+}
+
+fn commit_line(hex: &str, id: &str) -> StatusOutputLine {
+    commit_line_with_classification(hex, id, CommitClassification::LocalOnly)
+}
+
+fn commit_line_with_classification(
+    hex: &str,
+    id: &str,
+    classification: CommitClassification,
+) -> StatusOutputLine {
+    line(StatusOutputLineData::Commit {
+        cli_id: commit_cli_id(hex, id),
+        stack_id: None,
+        classification,
+    })
+}
+
+fn move_commit_mode(hex: &str, id: &str) -> Mode {
+    Mode::Move(MoveMode {
+        source: Arc::new(MoveSource::Commit {
+            commit_id: commit_id(hex),
+            id: id.into(),
+        }),
     })
 }
 
@@ -1593,6 +1625,79 @@ fn is_selectable_in_rub_mode_requires_available_target() {
         &mode,
         FilesStatusFlag::All
     ));
+}
+
+#[test]
+fn move_up_skips_commit_directly_above_move_source() {
+    let source_hex = "2222222222222222222222222222222222222222";
+    let lines = vec![
+        branch_line("A", "b0"),
+        commit_line("1111111111111111111111111111111111111111", "c0"),
+        commit_line(source_hex, "c1"),
+        commit_line("3333333333333333333333333333333333333333", "c2"),
+    ];
+    let mode = move_commit_mode(source_hex, "c1");
+
+    assert_eq!(
+        Cursor(2).move_up(&lines, &mode, FilesStatusFlag::All),
+        Some(Cursor(0))
+    );
+}
+
+#[test]
+fn move_down_from_move_source_selects_commit_below_source() {
+    let source_hex = "2222222222222222222222222222222222222222";
+    let lines = vec![
+        branch_line("A", "b0"),
+        commit_line("1111111111111111111111111111111111111111", "c0"),
+        commit_line(source_hex, "c1"),
+        commit_line("3333333333333333333333333333333333333333", "c2"),
+    ];
+    let mode = move_commit_mode(source_hex, "c1");
+
+    assert_eq!(
+        Cursor(2).move_down(&lines, &mode, FilesStatusFlag::All),
+        Some(Cursor(3))
+    );
+}
+
+#[test]
+fn move_up_from_top_move_source_skips_source_branch() {
+    let source_hex = "2222222222222222222222222222222222222222";
+    let lines = vec![
+        branch_line("A", "b0"),
+        commit_line("1111111111111111111111111111111111111111", "c0"),
+        branch_line("B", "b1"),
+        commit_line(source_hex, "c1"),
+    ];
+    let mode = move_commit_mode(source_hex, "c1");
+
+    assert_eq!(
+        Cursor(3).move_up(&lines, &mode, FilesStatusFlag::All),
+        Some(Cursor(1))
+    );
+}
+
+#[test]
+fn move_up_from_top_move_source_skips_source_branch_after_unselectable_commit() {
+    let source_hex = "3333333333333333333333333333333333333333";
+    let lines = vec![
+        branch_line("A", "b0"),
+        commit_line("1111111111111111111111111111111111111111", "c0"),
+        branch_line("B", "b1"),
+        commit_line_with_classification(
+            "2222222222222222222222222222222222222222",
+            "c1",
+            CommitClassification::Upstream,
+        ),
+        commit_line(source_hex, "c2"),
+    ];
+    let mode = move_commit_mode(source_hex, "c2");
+
+    assert_eq!(
+        Cursor(4).move_up(&lines, &mode, FilesStatusFlag::All),
+        Some(Cursor(1))
+    );
 }
 
 #[test]
