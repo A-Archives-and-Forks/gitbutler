@@ -38,6 +38,7 @@ import {
 	projectActions,
 	selectProjectHighlightedCommitIds,
 	selectProjectOperationModeState,
+	selectProjectOperationModeTarget,
 	selectProjectOutlineModeState,
 	selectProjectReplacedCommits,
 	selectProjectSelectionOutline,
@@ -262,13 +263,9 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 		selectProjectOperationModeState(state, projectId),
 	);
 
-	const dryRunTarget = operationMode
-		? Match.value(operationMode).pipe(
-				Match.withReturnType<Operand | null>(),
-				Match.tags({ DragAndDrop: ({ target }) => target }),
-				Match.orElse(() => selection),
-			)
-		: null;
+	const dryRunTarget = useAppSelector((state) =>
+		selectProjectOperationModeTarget(state, projectId),
+	);
 	const dryRunOperation =
 		operationMode && dryRunTarget
 			? (getBinaryOperation({ mode: operationMode, target: dryRunTarget }) ?? undefined)

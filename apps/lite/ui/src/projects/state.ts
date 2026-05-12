@@ -227,6 +227,9 @@ export const selectProjectOutlineModeState = (state: RootState, projectId: strin
 export const selectProjectOperationModeState = (state: RootState, projectId: string) =>
 	workspace.selectOperationMode(selectProjectWorkspaceState(state, projectId));
 
+export const selectProjectOperationModeTarget = (state: RootState, projectId: string) =>
+	workspace.selectOperationModeTarget(selectProjectWorkspaceState(state, projectId));
+
 export const selectProjectHighlightedCommitIds = (state: RootState, projectId: string) =>
 	workspace.selectHighlightedCommitIds(selectProjectWorkspaceState(state, projectId));
 
