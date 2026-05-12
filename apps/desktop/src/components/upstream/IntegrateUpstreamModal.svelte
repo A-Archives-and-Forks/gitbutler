@@ -79,7 +79,7 @@
 	let filteredReviews = $state<PullRequest[]>([]);
 	const reviewMap = $derived(new Map(filteredReviews?.map((r) => [r.sourceBranch, r])));
 
-	const isDivergedResolved = $derived(base?.diverged && !baseResolutionApproach);
+	const isDivergedResolved = $derived(base?.targetShaAheadOfRef && !baseResolutionApproach);
 	const [integrateUpstream] = $derived(upstreamIntegrationService.integrateUpstream());
 
 	function someBranchesShouldNotBeDeleted(branchNames: string[]): boolean {
@@ -134,7 +134,7 @@
 	// approach is changed
 	$effect(() => {
 		if (!modal?.imports.open) return;
-		if (base?.diverged && baseResolutionApproach) {
+		if (base?.targetShaAheadOfRef && baseResolutionApproach) {
 			upstreamIntegrationService
 				.resolveUpstreamIntegrationMutation({
 					projectId,
@@ -396,7 +396,7 @@
 			</div>
 		{/if}
 		<!-- DIVERGED -->
-		{#if base?.diverged}
+		{#if base?.targetShaAheadOfRef}
 			<div class="target-divergence">
 				<img class="target-icon" src="/images/domain-icons/trunk.svg" alt="" />
 

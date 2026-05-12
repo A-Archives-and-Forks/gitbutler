@@ -14,9 +14,7 @@ export function getMockBaseBranch(): BaseBranch {
 		recentCommits: [],
 		lastFetchedMs: null,
 		conflicted: false,
-		diverged: false,
-		divergedAhead: [],
-		divergedBehind: [],
+		targetShaAheadOfRef: false,
 		shortName: "mock-branch",
 	};
 }

@@ -455,9 +455,7 @@ export type BaseBranch = {
   recentCommits: Array<RemoteCommit>;
   lastFetchedMs: number | null;
   conflicted: boolean;
-  diverged: boolean;
-  divergedAhead: Array<string>;
-  divergedBehind: Array<string>;
+  targetShaAheadOfRef: boolean;
   shortName: string;
 };
 
