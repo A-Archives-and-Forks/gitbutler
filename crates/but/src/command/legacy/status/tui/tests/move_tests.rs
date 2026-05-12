@@ -84,7 +84,7 @@ fn move_commit_above_other_commit_reorders_tui() {
     tui.input_then_render('m')
         .assert_current_line_eq(str!["┊●   << source >> << noop >> [..] add A"]);
 
-    tui.input_then_render([KeyCode::Up, KeyCode::Up])
+    tui.input_then_render(KeyCode::Up)
         .assert_current_line_eq(str!["┊│   << move commit >>"]);
 
     tui.input_then_render(KeyCode::Up)
@@ -98,6 +98,56 @@ fn move_commit_above_other_commit_reorders_tui() {
         .assert_rendered_term_svg_eq(file![
             "snapshots/move_commit_above_other_commit_reorders_tui_final.svg"
         ]);
+}
+
+#[test]
+fn move_commit_down_from_source_selects_next_commit() {
+    let env = Sandbox::init_scenario_with_target_and_default_settings("one-stack").unwrap();
+    env.setup_metadata(&["A"]).unwrap();
+
+    let mut tui = test_tui(env);
+
+    tui.input_then_render(KeyCode::Down)
+        .assert_current_line_eq(str!["┊╭┄g0 [A]"]);
+
+    tui.input_then_render('n')
+        .assert_current_line_eq(str!["┊●   [..] (no commit message) (no changes)"]);
+
+    tui.input_then_render('n')
+        .assert_current_line_eq(str!["┊●   [..] (no commit message) (no changes)"]);
+
+    tui.input_then_render(KeyCode::Down)
+        .assert_current_line_eq(str!["┊●   [..] (no commit message) (no changes)"]);
+
+    tui.input_then_render('m').assert_current_line_eq(str![
+        "┊●   << source >> << noop >> [..] (no commit message) (no changes)"
+    ]);
+
+    tui.input_then_render(KeyCode::Down)
+        .assert_current_line_eq(str!["┊│   << move commit >>"]);
+}
+
+#[test]
+fn move_commit_up_from_top_commit_skips_source_branch() {
+    let env = Sandbox::open_or_init_scenario_with_target_and_default_settings(
+        "two-stacks-one-single-and-ready-to-mingle-one-double",
+    )
+    .unwrap();
+    env.setup_metadata(&["A", "B"]).unwrap();
+
+    let mut tui = test_tui(env);
+
+    tui.input_then_render([KeyCode::Down, KeyCode::Down, KeyCode::Down])
+        .assert_current_line_eq(str!["┊╭┄h0 [C]"]);
+
+    tui.input_then_render(KeyCode::Down)
+        .assert_current_line_eq(str!["┊●   [..] add C"]);
+
+    tui.input_then_render('m')
+        .assert_current_line_eq(str!["┊●   << source >> << noop >> [..] add C"]);
+
+    tui.input_then_render(KeyCode::Up)
+        .assert_current_line_eq(str!["┊│   << move commit >>"]);
 }
 
 #[test]

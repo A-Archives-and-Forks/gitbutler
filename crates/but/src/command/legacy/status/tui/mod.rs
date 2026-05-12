@@ -1919,6 +1919,10 @@ impl App {
             return Ok(());
         }
 
+        if cursor::is_forbidden_move_commit_target(selection, &self.status_lines, &self.mode) {
+            return Ok(());
+        }
+
         let target = match &selection.data {
             StatusOutputLineData::Branch { cli_id } => {
                 if let CliId::Branch { name, .. } = &**cli_id {
