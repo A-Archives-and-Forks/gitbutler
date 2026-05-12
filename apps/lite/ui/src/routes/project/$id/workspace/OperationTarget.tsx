@@ -5,11 +5,11 @@ import { OperationTooltip } from "./OperationTooltip.tsx";
 import {
 	getOperation,
 	getOperations,
-	OperationType,
+	type OperationType,
 	useRunOperationMutationOptions,
 } from "#ui/operations/operation.ts";
 import { classes } from "#ui/ui/classes.ts";
-import { projectActions, selectProjectOperationModeState } from "#ui/projects/state.ts";
+import { projectActions, selectProjectOutlineModeState } from "#ui/projects/state.ts";
 import { useAppDispatch, useAppSelector } from "#ui/store.ts";
 import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import {
@@ -19,7 +19,7 @@ import {
 import { mergeProps, useRender } from "@base-ui/react";
 import { Match, pipe } from "effect";
 import { FC, useEffect, useEffectEvent, useRef } from "react";
-import { isOperationModeCandidateTarget } from "#ui/outline/mode.ts";
+import { isOutlineModeCandidateTarget } from "#ui/outline/mode.ts";
 import { useMutation } from "@tanstack/react-query";
 
 type DropTargetParams = Parameters<typeof dropTargetForElements>[0];
@@ -160,39 +160,32 @@ export const OperationTarget: FC<
 	} & useRender.ComponentProps<"div">
 > = ({ target, projectId, isSelected, render, ...props }) => {
 	const { dropRef } = useOperationDropTarget({ target, projectId });
-	const operationMode = useAppSelector((state) =>
-		selectProjectOperationModeState(state, projectId),
+	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
+
+	const insertTargetOperationType = Match.value(outlineMode).pipe(
+		Match.tag("Transfer", ({ value: mode }) =>
+			isSelected && (mode.operationType === "moveAbove" || mode.operationType === "moveBelow")
+				? mode.operationType
+				: null,
+		),
+		Match.orElse(() => null),
 	);
 
-	const insertTargetOperationType = operationMode
-		? Match.value(operationMode).pipe(
-				Match.tagsExhaustive({
-					Absorb: () => null,
-					Transfer: ({ value: mode }) =>
-						isSelected && (mode.operationType === "moveAbove" || mode.operationType === "moveBelow")
-							? mode.operationType
-							: null,
-				}),
-			)
-		: null;
+	const isMainTargetActive = Match.value(outlineMode).pipe(
+		Match.tags({
+			Absorb: () => isOutlineModeCandidateTarget({ mode: outlineMode, target }),
+			Transfer: ({ value: mode }) => isSelected && mode.operationType === "rub",
+		}),
+		Match.orElse(() => false),
+	);
 
-	const isMainTargetActive =
-		!!operationMode &&
-		Match.value(operationMode).pipe(
-			Match.tagsExhaustive({
-				Absorb: () => isOperationModeCandidateTarget({ mode: operationMode, target }),
-				Transfer: ({ value: mode }) => isSelected && mode.operationType === "rub",
-			}),
-		);
-
-	const isMainTargetTooltipActive =
-		!!operationMode &&
-		Match.value(operationMode).pipe(
-			Match.tagsExhaustive({
-				Absorb: () => isSelected,
-				Transfer: () => isMainTargetActive,
-			}),
-		);
+	const isMainTargetTooltipActive = Match.value(outlineMode).pipe(
+		Match.tags({
+			Absorb: () => isSelected,
+			Transfer: () => isMainTargetActive,
+		}),
+		Match.orElse(() => false),
+	);
 
 	const targetEl = useRender({
 		render,
@@ -208,7 +201,7 @@ export const OperationTarget: FC<
 				projectId={projectId}
 				target={target}
 				isActive={isMainTargetTooltipActive}
-				operationMode={operationMode}
+				outlineMode={outlineMode}
 				render={targetEl}
 			/>
 
@@ -217,7 +210,7 @@ export const OperationTarget: FC<
 					projectId={projectId}
 					target={target}
 					isActive
-					operationMode={operationMode}
+					outlineMode={outlineMode}
 					className={classes(
 						styles.insertionTarget,
 						pipe(

@@ -41,7 +41,6 @@ import { focusPanel, useFocusedProjectPanel, useNavigationIndexHotkeys } from "#
 import {
 	projectActions,
 	selectProjectHighlightedCommitIds,
-	selectProjectOperationModeState,
 	selectProjectOutlineModeState,
 	selectProjectReplacedCommits,
 	selectProjectSelectionOutline,
@@ -262,19 +261,15 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 
 	const selection = useAppSelector((state) => selectProjectSelectionOutline(state, projectId));
 
-	const operationMode = useAppSelector((state) =>
-		selectProjectOperationModeState(state, projectId),
-	);
+	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
-	const dryRunOperation = operationMode
-		? Match.value(operationMode).pipe(
-				Match.tag(
-					"Transfer",
-					({ value: mode }) => getTransferOperation({ mode, target: selection }) ?? undefined,
-				),
-				Match.orElse(() => undefined),
-			)
-		: undefined;
+	const dryRunOperation = Match.value(outlineMode).pipe(
+		Match.tag(
+			"Transfer",
+			({ value: mode }) => getTransferOperation({ mode, target: selection }) ?? undefined,
+		),
+		Match.orElse(() => undefined),
+	);
 
 	// TODO: debounce?
 	const dryRunOperationQuery = useDryRunOperation({ projectId, operation: dryRunOperation });
@@ -315,10 +310,9 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 						<BaseCommit projectId={projectId} commitId={getCommonBaseCommitId(headInfo)} />
 					</div>
 
-					{Match.value(operationMode).pipe(
-						Match.when(null, () => null),
+					{Match.value(outlineMode).pipe(
 						Match.when({ _tag: "Transfer", value: { _tag: "Keyboard" } }, (mode) => (
-							<div className={styles.operationModePreview}>
+							<div className={styles.transferModePreview}>
 								<OperationSourceLabel headInfo={headInfo} source={mode.value.source} />
 							</div>
 						)),

@@ -4,11 +4,7 @@ import styles from "./OperationSourceC.module.css";
 import { OperationSourceLabel } from "./OperationSourceLabel.tsx";
 import { headInfoQueryOptions } from "#ui/api/queries.ts";
 import { classes } from "#ui/ui/classes.ts";
-import {
-	projectActions,
-	selectProjectOperationModeState,
-	selectProjectOutlineModeState,
-} from "#ui/projects/state.ts";
+import { projectActions, selectProjectOutlineModeState } from "#ui/projects/state.ts";
 import { useAppDispatch, useAppSelector } from "#ui/store.ts";
 import { draggable } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { centerUnderPointer } from "@atlaskit/pragmatic-drag-and-drop/element/center-under-pointer";
@@ -39,9 +35,6 @@ export const OperationSourceC: FC<
 	} & useRender.ComponentProps<"div">
 > = ({ projectId, source, render, ...props }) => {
 	const { data: headInfo } = useSuspenseQuery(headInfoQueryOptions(projectId));
-	const operationMode = useAppSelector((state) =>
-		selectProjectOperationModeState(state, projectId),
-	);
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
 	const dispatch = useAppDispatch();
@@ -96,12 +89,10 @@ export const OperationSourceC: FC<
 		});
 	}, [dispatch, projectId, source]);
 
-	const isActiveSource =
-		operationMode &&
-		Match.value(operationMode).pipe(
-			Match.tag("Transfer", ({ value: mode }) => operandEquals(mode.source, source)),
-			Match.orElse(() => false),
-		);
+	const isActiveSource = Match.value(outlineMode).pipe(
+		Match.tag("Transfer", ({ value: mode }) => operandEquals(mode.source, source)),
+		Match.orElse(() => false),
+	);
 
 	return useRender({
 		render,

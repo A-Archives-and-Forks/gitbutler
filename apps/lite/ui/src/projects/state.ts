@@ -210,9 +210,6 @@ export const selectProjectSelectionFiles = (state: RootState, projectId: string)
 export const selectProjectOutlineModeState = (state: RootState, projectId: string) =>
 	workspace.selectMode(selectProjectWorkspaceState(state, projectId));
 
-export const selectProjectOperationModeState = (state: RootState, projectId: string) =>
-	workspace.selectOperationMode(selectProjectWorkspaceState(state, projectId));
-
 export const selectProjectHighlightedCommitIds = (state: RootState, projectId: string) =>
 	workspace.selectHighlightedCommitIds(selectProjectWorkspaceState(state, projectId));
 

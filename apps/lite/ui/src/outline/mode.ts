@@ -13,7 +13,7 @@ import { filterNavigationIndex, NavigationIndex } from "#ui/workspace/navigation
 import { CommitAbsorption } from "@gitbutler/but-sdk";
 
 /** @public */
-export type AbsorbOperationMode = {
+export type AbsorbMode = {
 	source: Operand;
 	absorptionPlan: Array<CommitAbsorption>;
 };
@@ -55,22 +55,15 @@ export const pointerTransferOperationMode = ({
 	operationType,
 });
 
-export type OperationMode =
-	| ({ _tag: "Absorb" } & AbsorbOperationMode)
-	| { _tag: "Transfer"; value: TransferOperationMode };
-
 /** @public */
-export const absorbOperationMode = ({
-	source,
-	absorptionPlan,
-}: AbsorbOperationMode): OperationMode => ({
+export const absorbOutlineMode = ({ source, absorptionPlan }: AbsorbMode): OutlineMode => ({
 	_tag: "Absorb",
 	source,
 	absorptionPlan,
 });
 
 /** @public */
-export const transferOperationMode = (value: TransferOperationMode): OperationMode => ({
+export const transferOutlineMode = (value: TransferOperationMode): OutlineMode => ({
 	_tag: "Transfer",
 	value,
 });
@@ -83,18 +76,13 @@ export type OutlineMode =
 	| { _tag: "Default" }
 	| ({ _tag: "RewordCommit" } & RewordCommitOutlineMode)
 	| ({ _tag: "RenameBranch" } & RenameBranchOutlineMode)
-	| { _tag: "Operation"; value: OperationMode };
+	| ({ _tag: "Absorb" } & AbsorbMode)
+	| { _tag: "Transfer"; value: TransferOperationMode };
 
 /** @public */
 export const defaultOutlineMode: OutlineMode = {
 	_tag: "Default",
 };
-
-/** @public */
-export const operationOutlineMode = (value: OperationMode): OutlineMode => ({
-	_tag: "Operation",
-	value,
-});
 
 /** @public */
 export const rewordCommitOutlineMode = ({ operand }: RewordCommitOutlineMode): OutlineMode => ({
@@ -108,13 +96,6 @@ export const renameBranchOutlineMode = ({ operand }: RenameBranchOutlineMode): O
 	operand,
 });
 
-export const getOperationMode = (mode: OutlineMode): OperationMode | null =>
-	Match.value(mode).pipe(
-		Match.withReturnType<OperationMode | null>(),
-		Match.tags({ Operation: ({ value }) => value }),
-		Match.orElse(() => null),
-	);
-
 export const isValidOutlineModeForSelection = ({
 	mode,
 	selection,
@@ -125,7 +106,8 @@ export const isValidOutlineModeForSelection = ({
 	Match.value(mode).pipe(
 		Match.tagsExhaustive({
 			Default: () => true,
-			Operation: () => true,
+			Absorb: () => true,
+			Transfer: () => true,
 			RewordCommit: (mode) => operandEquals(selection, commitOperand(mode.operand)),
 			RenameBranch: (mode) => operandEquals(selection, branchOperand(mode.operand)),
 		}),
@@ -152,29 +134,32 @@ const hasAnyOperation = (source: Operand, target: Operand) => {
 	return !!operations.rub || !!operations.moveAbove || !!operations.moveBelow;
 };
 
-const operationModeSource = (mode: OperationMode): Operand =>
+const outlineModeSource = (mode: OutlineMode): Operand | null =>
 	Match.value(mode).pipe(
-		Match.tagsExhaustive({
+		Match.withReturnType<Operand | null>(),
+		Match.tags({
 			Absorb: ({ source }) => source,
 			Transfer: ({ value: mode }) => mode.source,
 		}),
+		Match.orElse(() => null),
 	);
 
-export const isOperationModeCandidateTarget = ({
+export const isOutlineModeCandidateTarget = ({
 	mode,
 	target,
 }: {
-	mode: OperationMode;
+	mode: OutlineMode;
 	target: Operand;
 }): boolean =>
 	Match.value(mode).pipe(
-		Match.tagsExhaustive({
+		Match.tags({
 			Absorb: ({ absorptionPlan }) =>
 				absorptionPlan.some(({ stackId, commitId }) =>
 					operandEquals(commitOperand({ stackId, commitId }), target),
 				),
 			Transfer: ({ value: mode }) => hasAnyOperation(mode.source, target),
 		}),
+		Match.orElse(() => false),
 	);
 
 export const filterNavigationIndexForOutlineMode = ({
@@ -187,13 +172,22 @@ export const filterNavigationIndexForOutlineMode = ({
 	Match.value(outlineMode).pipe(
 		Match.tagsExhaustive({
 			Default: () => navigationIndexUnfiltered,
-			Operation: ({ value: operationMode }) =>
-				filterNavigationIndex(
-					navigationIndexUnfiltered,
-					(operand) =>
-						operandContains(operand, operationModeSource(operationMode)) ||
-						isOperationModeCandidateTarget({ mode: operationMode, target: operand }),
-				),
+			Absorb: (activeMode) =>
+				filterNavigationIndex(navigationIndexUnfiltered, (operand) => {
+					const source = outlineModeSource(activeMode);
+					return (
+						(source !== null && operandContains(operand, source)) ||
+						isOutlineModeCandidateTarget({ mode: activeMode, target: operand })
+					);
+				}),
+			Transfer: (activeMode) =>
+				filterNavigationIndex(navigationIndexUnfiltered, (operand) => {
+					const source = outlineModeSource(activeMode);
+					return (
+						(source !== null && operandContains(operand, source)) ||
+						isOutlineModeCandidateTarget({ mode: activeMode, target: operand })
+					);
+				}),
 			RenameBranch: (x) =>
 				filterNavigationIndex(navigationIndexUnfiltered, (operand) =>
 					operandEquals(operand, branchOperand(x.operand)),
