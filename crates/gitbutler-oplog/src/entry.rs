@@ -94,7 +94,7 @@ impl FromStr for SnapshotDetails {
             .ok_or(anyhow!("No operation found on snapshot commit message"))?
             .value
             .parse()
-            .unwrap_or_default();
+            .unwrap_or(OperationKind::Unknown);
 
         // remove the version and operation attributes from the trailers since they have dedicated fields
         trailers.retain(|t| t.key != "Version" && t.key != "Operation");
@@ -124,7 +124,7 @@ impl Display for SnapshotDetails {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize, EnumString, Default)]
+#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize, EnumString)]
 pub enum OperationKind {
     CreateCommit,
     CreateBranch,
@@ -182,7 +182,6 @@ pub enum OperationKind {
     SplitBranch,
     CleanWorkspace,
     OnDemandSnapshot,
-    #[default]
     Unknown,
 }
 
