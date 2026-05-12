@@ -1,5 +1,5 @@
 import { Toast } from "@base-ui/react";
-import { mutationOptions, useQuery } from "@tanstack/react-query";
+import { mutationOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Match } from "effect";
 import {
 	type CommitAmendParams,
@@ -16,11 +16,10 @@ import {
 import { rejectedChangesToastOptions } from "#ui/operations/rejectedChangesToastOptions.tsx";
 import { CommitAbsorption, DiffSpec, InsertSide, RelativeTo } from "@gitbutler/but-sdk";
 import { Operand, operandEquals, operandFileParent } from "#ui/operands.ts";
-import { useResolveDiffSpecs } from "#ui/operations/diff-specs.ts";
+import { resolveDiffSpecs, useResolveDiffSpecs } from "#ui/operations/diff-specs.ts";
 import { decodeRefName } from "#ui/api/ref-name.ts";
-import { projectActions, selectProjectOperationModeState } from "#ui/projects/state.ts";
+import { projectActions } from "#ui/projects/state.ts";
 import { useAppDispatch } from "#ui/store.ts";
-import { useAppSelector } from "#ui/store.ts";
 import { useParams } from "@tanstack/react-router";
 
 /** @public */
@@ -184,12 +183,12 @@ export const operationLabel = (operation: Operation): string =>
 const runOperation = async ({
 	projectId,
 	operation,
-	changes,
+	resolveChanges,
 	dryRun,
 }: {
 	projectId: string;
 	operation: Operation;
-	changes: Array<DiffSpec> | null;
+	resolveChanges: (source: Operand) => Promise<Array<DiffSpec> | null>;
 	dryRun: boolean;
 }) =>
 	Match.value(operation).pipe(
@@ -201,8 +200,9 @@ const runOperation = async ({
 					absorptionPlan: operation.absorptionPlan,
 				});
 			},
-			CommitAmend: (operation) => {
-				if (!changes) return;
+			CommitAmend: async (operation) => {
+				const changes = await resolveChanges(operation.source);
+				if (!changes) return null;
 				return window.lite.commitAmend({
 					projectId,
 					commitId: operation.commitId,
@@ -210,8 +210,9 @@ const runOperation = async ({
 					dryRun,
 				});
 			},
-			CommitMoveChangesBetween: (operation) => {
-				if (!changes) return;
+			CommitMoveChangesBetween: async (operation) => {
+				const changes = await resolveChanges(operation.source);
+				if (!changes) return null;
 				return window.lite.commitMoveChangesBetween({
 					projectId,
 					sourceCommitId: operation.sourceCommitId,
@@ -234,8 +235,9 @@ const runOperation = async ({
 					assignTo: operation.assignTo,
 					dryRun,
 				}),
-			CommitUncommitChanges: (operation) => {
-				if (!changes) return;
+			CommitUncommitChanges: async (operation) => {
+				const changes = await resolveChanges(operation.source);
+				if (!changes) return null;
 				return window.lite.commitUncommitChanges({
 					projectId,
 					commitId: operation.commitId,
@@ -244,8 +246,9 @@ const runOperation = async ({
 					dryRun,
 				});
 			},
-			CommitCreate: (operation) => {
-				if (!changes) return;
+			CommitCreate: async (operation) => {
+				const changes = await resolveChanges(operation.source);
+				if (!changes) return null;
 				return window.lite.commitCreate({
 					projectId,
 					relativeTo: operation.relativeTo,
@@ -256,7 +259,8 @@ const runOperation = async ({
 				});
 			},
 			CommitCreateFromCommittedChanges: async (operation) => {
-				if (!changes) return;
+				const changes = await resolveChanges(operation.source);
+				if (!changes) return null;
 
 				// We can't dry run this as it's not an atomic operation. Ideally this
 				// would be an atomic backend operation.
@@ -303,6 +307,19 @@ const runOperation = async ({
 		}),
 	);
 
+const operationSource = (operation: Operation): Operand | undefined =>
+	Match.value(operation).pipe(
+		Match.withReturnType<Operand | undefined>(),
+		Match.tags({
+			CommitAmend: ({ source }) => source,
+			CommitCreate: ({ source }) => source,
+			CommitCreateFromCommittedChanges: ({ source }) => source,
+			CommitMoveChangesBetween: ({ source }) => source,
+			CommitUncommitChanges: ({ source }) => source,
+		}),
+		Match.orElse(() => undefined),
+	);
+
 export const useDryRunOperation = ({
 	projectId,
 	operation,
@@ -310,13 +327,9 @@ export const useDryRunOperation = ({
 	projectId: string;
 	operation?: Operation;
 }) => {
-	const operationMode = useAppSelector((state) =>
-		selectProjectOperationModeState(state, projectId),
-	);
-
 	const changes = useResolveDiffSpecs({
 		projectId,
-		source: operationMode?.source,
+		source: operation ? operationSource(operation) : undefined,
 	});
 
 	return useQuery({
@@ -324,7 +337,12 @@ export const useDryRunOperation = ({
 		queryKey: ["dryRun", projectId, operation, changes],
 		queryFn: () => {
 			if (!operation) return null;
-			return runOperation({ projectId, operation, changes, dryRun: true });
+			return runOperation({
+				projectId,
+				operation,
+				resolveChanges: async () => changes,
+				dryRun: true,
+			});
 		},
 		// We may have a lot of different dry runs in a short amount of time.
 		gcTime: 10_000,
@@ -334,20 +352,17 @@ export const useDryRunOperation = ({
 export const useRunOperationMutationOptions = () => {
 	const { id: projectId } = useParams({ from: "/project/$id/workspace" });
 	const dispatch = useAppDispatch();
+	const queryClient = useQueryClient();
 	const toastManager = Toast.useToastManager();
-
-	const operationMode = useAppSelector((state) =>
-		selectProjectOperationModeState(state, projectId),
-	);
-
-	const changes = useResolveDiffSpecs({
-		projectId,
-		source: operationMode?.source,
-	});
 
 	return mutationOptions({
 		mutationFn: (operation: Operation) =>
-			runOperation({ projectId, operation, changes, dryRun: false }),
+			runOperation({
+				projectId,
+				operation,
+				resolveChanges: (source) => resolveDiffSpecs({ projectId, queryClient, source }),
+				dryRun: false,
+			}),
 		onSuccess: async (response, input, _ctx, { client }) => {
 			if (response) {
 				dispatch(

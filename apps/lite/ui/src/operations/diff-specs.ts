@@ -3,7 +3,7 @@ import {
 	commitDetailsWithLineStatsQueryOptions,
 } from "#ui/api/queries.ts";
 import { FileParent, Operand, operandFileParent } from "#ui/operands.ts";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { type QueryClient, useQueries, useQuery } from "@tanstack/react-query";
 import {
 	CommitDetails,
 	DiffSpec,
@@ -86,6 +86,33 @@ const commitIdFromParent = (parent: FileParent) =>
 			Branch: () => null,
 		}),
 	);
+
+export const resolveDiffSpecs = async ({
+	source,
+	projectId,
+	queryClient,
+}: {
+	source?: Operand;
+	projectId: string;
+	queryClient: QueryClient;
+}) => {
+	if (!source) return null;
+
+	const fileParent = operandFileParent(source);
+	const commitId = fileParent ? commitIdFromParent(fileParent) : null;
+	const [worktreeChanges, commitDetails] = await Promise.all([
+		queryClient.fetchQuery(changesInWorktreeQueryOptions(projectId)),
+		commitId !== null
+			? queryClient.fetchQuery(commitDetailsWithLineStatsQueryOptions({ projectId, commitId }))
+			: Promise.resolve(undefined),
+	]);
+
+	return resolvedDiffSpecsFromOperand({
+		operand: source,
+		worktreeChanges,
+		commitDetails,
+	});
+};
 
 export const useResolveDiffSpecs = ({
 	source,

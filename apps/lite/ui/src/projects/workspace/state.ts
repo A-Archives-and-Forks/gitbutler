@@ -76,6 +76,8 @@ export const updateDragAndDropMode = (
 ) => {
 	Match.value(state.mode).pipe(
 		Match.when({ _tag: "Operation", value: { _tag: "DragAndDrop" } }, (mode) => {
+			if (mode.value.operationType === operationType) return;
+
 			state.mode = operationOutlineMode(
 				dragAndDropOperationMode({ source: mode.value.source, operationType }),
 			);
