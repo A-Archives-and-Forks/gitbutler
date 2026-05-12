@@ -182,12 +182,17 @@ export const operationLabel = (operation: Operation): string =>
 		}),
 	);
 
-const runOperation = async (
-	projectId: string,
-	operation: Operation,
-	changes: Array<DiffSpec> | null,
-	dryRun: boolean,
-) =>
+const runOperation = async ({
+	projectId,
+	operation,
+	changes,
+	dryRun,
+}: {
+	projectId: string;
+	operation: Operation;
+	changes: Array<DiffSpec> | null;
+	dryRun: boolean;
+}) =>
 	Match.value(operation).pipe(
 		Match.tagsExhaustive({
 			Absorb: async (operation) => {
@@ -320,7 +325,7 @@ export const useDryRunOperation = ({
 		queryKey: ["dryRun", Hash.string(JSON.stringify({ projectId, operation, changes }))],
 		queryFn: () => {
 			if (!operation) return null;
-			return runOperation(projectId, operation, changes, true);
+			return runOperation({ projectId, operation, changes, dryRun: true });
 		},
 		// We may have a lot of different dry runs in a short amount of time.
 		gcTime: 10_000,
@@ -342,7 +347,8 @@ export const useRunOperationMutationOptions = () => {
 	});
 
 	return mutationOptions({
-		mutationFn: (operation: Operation) => runOperation(projectId, operation, changes, false),
+		mutationFn: (operation: Operation) =>
+			runOperation({ projectId, operation, changes, dryRun: false }),
 		onSuccess: async (response, input, _ctx, { client }) => {
 			if (response) {
 				dispatch(
