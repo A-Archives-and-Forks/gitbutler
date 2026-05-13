@@ -313,7 +313,7 @@ const FilesTreePanel: FC<{ parent: Operand; files: Array<Operand> } & PanelProps
 					aria-label="All changes"
 					expanded
 					className={workspaceItemRowStyles.section}
-					render={<OperationSourceC projectId={projectId} source={parent} />}
+					render={<OperationSourceC projectId={projectId} selectionScope="files" source={parent} />}
 				>
 					<ItemRow projectId={projectId} operand={parent}>
 						<div
@@ -411,6 +411,7 @@ const TreeChangeRow: FC<{
 		render={
 			<OperationSourceC
 				projectId={projectId}
+				selectionScope="files"
 				source={operand}
 				render={<ItemRow projectId={projectId} operand={operand} />}
 			/>
@@ -434,6 +435,7 @@ const ConflictedFileRow: FC<{
 			render={
 				<OperationSourceC
 					projectId={projectId}
+					selectionScope="files"
 					source={operand}
 					render={<ItemRow projectId={projectId} operand={operand} />}
 				/>
@@ -499,6 +501,7 @@ const ChangesFileRow: FC<{
 			render={
 				<OperationSourceC
 					projectId={projectId}
+					selectionScope="files"
 					source={operand}
 					render={<ItemRow projectId={projectId} operand={operand} />}
 				/>

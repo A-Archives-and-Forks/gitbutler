@@ -389,6 +389,7 @@ const OperandC: FC<
 		render: (
 			<OperationSourceC
 				projectId={projectId}
+				selectionScope="outline"
 				source={operand}
 				render={
 					<OperationTarget
