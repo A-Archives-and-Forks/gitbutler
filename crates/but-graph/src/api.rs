@@ -110,8 +110,8 @@ impl Graph {
         commit_a: gix::ObjectId,
         commit_b: gix::ObjectId,
     ) -> anyhow::Result<SegmentRelation> {
-        let a = self.segment_id_by_id(commit_a)?;
-        let b = self.segment_id_by_id(commit_b)?;
+        let a = self.commit_id_to_segment_id(commit_a)?;
+        let b = self.commit_id_to_segment_id(commit_b)?;
         Ok(self.relation_between(a, b))
     }
 
@@ -145,8 +145,8 @@ impl Graph {
         commit_a: gix::ObjectId,
         commit_b: gix::ObjectId,
     ) -> anyhow::Result<Option<gix::ObjectId>> {
-        let a = self.segment_id_by_id(commit_a)?;
-        let b = self.segment_id_by_id(commit_b)?;
+        let a = self.commit_id_to_segment_id(commit_a)?;
+        let b = self.commit_id_to_segment_id(commit_b)?;
         self.find_merge_base(a, b)
             .map(|base| self.commit_id_for_segment(base))
             .transpose()
@@ -178,7 +178,7 @@ impl Graph {
     ) -> anyhow::Result<Option<gix::ObjectId>> {
         let mut segments = Vec::new();
         for commit_id in commits {
-            segments.push(self.segment_id_by_id(commit_id)?);
+            segments.push(self.commit_id_to_segment_id(commit_id)?);
         }
         self.find_merge_base_octopus(segments)
             .map(|base| self.commit_id_for_segment(base))
@@ -193,7 +193,12 @@ impl Graph {
             })
     }
 
-    fn segment_id_by_id(&self, commit_id: gix::ObjectId) -> anyhow::Result<SegmentIndex> {
+    /// Return the id of the segment that owns `commit_id`, or error if it wasn't found.
+    /// That is unexpected as the traversal is supposed to find all commits of interest.
+    pub fn commit_id_to_segment_id(
+        &self,
+        commit_id: gix::ObjectId,
+    ) -> anyhow::Result<SegmentIndex> {
         self.inner
             .node_weights()
             .find_map(|s| s.commits.iter().any(|c| c.id == commit_id).then_some(s.id))

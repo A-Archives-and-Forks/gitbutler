@@ -26,6 +26,9 @@ pub struct Args {
 pub enum Subcommands {
     /// Return a segmented graph starting from `HEAD`.
     Graph(GraphArgs),
+    /// Compute the octopus merge-base for two or more revisions.
+    #[command(name = "merge-base")]
+    MergeBase(MergeBaseArgs),
 }
 
 /// Arguments for the `graph` debugging subcommand.
@@ -71,14 +74,62 @@ pub struct GraphArgs {
     pub ref_name: Option<String>,
 }
 
+/// Arguments for the `merge-base` debugging subcommand.
+#[derive(Debug, clap::Args)]
+pub struct MergeBaseArgs {
+    /// The named reference to use as the workspace target during graph traversal.
+    #[arg(long)]
+    pub target_ref: Option<String>,
+    /// The rev-spec of the extra target to provide for graph traversal.
+    #[arg(long)]
+    pub extra_target: Option<String>,
+    /// The rev-specs whose octopus merge-base should be computed.
+    #[arg(required = true, num_args = 2.., value_name = "REV")]
+    pub revisions: Vec<String>,
+}
+
 #[cfg(test)]
 mod tests {
-    use clap::CommandFactory as _;
+    use clap::{CommandFactory as _, Parser as _};
 
-    use super::Args;
+    use super::{Args, Subcommands};
 
     #[test]
     fn clap_configuration_is_valid() {
         Args::command().debug_assert();
+    }
+
+    #[test]
+    fn merge_base_requires_at_least_two_revisions() {
+        assert!(Args::try_parse_from(["but-debug", "merge-base", "main"]).is_err());
+
+        let args = Args::parse_from(["but-debug", "merge-base", "main", "feature"]);
+        match args.cmd {
+            Subcommands::MergeBase(args) => assert_eq!(args.revisions, ["main", "feature"]),
+            _ => panic!("expected merge-base command"),
+        }
+    }
+
+    #[test]
+    fn merge_base_accepts_target_options() {
+        let args = Args::parse_from([
+            "but-debug",
+            "merge-base",
+            "--target-ref",
+            "refs/remotes/origin/main",
+            "--extra-target",
+            "origin/main~1",
+            "main",
+            "feature",
+        ]);
+
+        match args.cmd {
+            Subcommands::MergeBase(args) => {
+                assert_eq!(args.target_ref.as_deref(), Some("refs/remotes/origin/main"));
+                assert_eq!(args.extra_target.as_deref(), Some("origin/main~1"));
+                assert_eq!(args.revisions, ["main", "feature"]);
+            }
+            _ => panic!("expected merge-base command"),
+        }
     }
 }

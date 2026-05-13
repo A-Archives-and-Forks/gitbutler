@@ -19,7 +19,9 @@ pub fn handle_args(args: impl Iterator<Item = OsString>) -> Result<()> {
     let args = Args::parse_from(args);
     trace::init(args.trace)?;
 
+    let _span = tracing::info_span!("run").entered();
     match &args.cmd {
         Subcommands::Graph(graph_args) => command::graph::run(&args, graph_args),
+        Subcommands::MergeBase(merge_base_args) => command::merge_base::run(&args, merge_base_args),
     }
 }
