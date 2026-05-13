@@ -16,11 +16,13 @@ import { CommitAbsorption } from "@gitbutler/but-sdk";
 export type AbsorbMode = {
 	source: Operand;
 	absorptionPlan: Array<CommitAbsorption>;
+	restoreSelection: Operand;
 };
 
 /** @public */
 export type TransferMode = {
 	value: TransferOperationMode;
+	restoreSelection: Operand;
 };
 
 /** @public */
@@ -61,15 +63,21 @@ export const pointerTransferOperationMode = ({
 });
 
 /** @public */
-export const absorbOutlineMode = ({ source, absorptionPlan }: AbsorbMode): OutlineMode => ({
+export const absorbOutlineMode = ({
+	source,
+	absorptionPlan,
+	restoreSelection,
+}: AbsorbMode): OutlineMode => ({
 	_tag: "Absorb",
 	source,
 	absorptionPlan,
+	restoreSelection,
 });
 
 /** @public */
-export const transferOutlineMode = ({ value }: TransferMode): OutlineMode => ({
+export const transferOutlineMode = ({ value, restoreSelection }: TransferMode): OutlineMode => ({
 	_tag: "Transfer",
+	restoreSelection,
 	value,
 });
 

@@ -43,7 +43,7 @@ const AbsorbControls: FC<{
 		absorb();
 	};
 
-	const cancel = () => dispatch(projectActions.exitMode({ projectId }));
+	const cancel = () => dispatch(projectActions.cancelMode({ projectId }));
 
 	const confirmCommand = useCommand(confirm, {
 		enabled: absorptionPlan.length > 0,
@@ -99,7 +99,7 @@ const TransferOperationControls: FC<{
 		runOperation(operation);
 	};
 
-	const cancel = () => dispatch(projectActions.exitMode({ projectId }));
+	const cancel = () => dispatch(projectActions.cancelMode({ projectId }));
 
 	const setOperationType = (operationType: OperationType) =>
 		dispatch(projectActions.updateTransferOperationType({ projectId, operationType }));
