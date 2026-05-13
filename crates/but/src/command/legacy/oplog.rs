@@ -108,6 +108,28 @@ pub(crate) fn show_oplog(
                             details.operation.title().to_owned()
                         }
                     }
+                    OperationKind::RestoreFromSnapshotViaUndo
+                    | OperationKind::RestoreFromSnapshotViaRedo
+                    | OperationKind::RestoreFromSnapshot => {
+                        if let Ok(Some(restore_target)) =
+                            gitbutler_oplog::peel_restore_snapshot(ctx, &snapshot)
+                            && restore_target.commit_id != snapshot.commit_id
+                            && let Some(restore_target_details) = &restore_target.details
+                        {
+                            format!(
+                                "Restored from snapshot: {} ({})",
+                                restore_target_details.operation.title(),
+                                t.cli_id.paint(
+                                    restore_target
+                                        .commit_id
+                                        .to_hex_with_len(longest_short_id_len)
+                                        .to_string()
+                                ),
+                            )
+                        } else {
+                            details.operation.title().to_owned()
+                        }
+                    }
                     OperationKind::CreateCommit
                     | OperationKind::CreateBranch
                     | OperationKind::StashIntoBranch
@@ -138,9 +160,6 @@ pub(crate) fn show_oplog(
                     | OperationKind::MoveCommit
                     | OperationKind::MoveBranch
                     | OperationKind::TearOffBranch
-                    | OperationKind::RestoreFromSnapshotViaUndo
-                    | OperationKind::RestoreFromSnapshotViaRedo
-                    | OperationKind::RestoreFromSnapshot
                     | OperationKind::ReorderCommit
                     | OperationKind::InsertBlankCommit
                     | OperationKind::MoveCommitFile

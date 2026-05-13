@@ -1403,7 +1403,7 @@ impl App {
                 let drop_to_be_discarded =
                     message_on_drop::message_on_drop(Message::DropToBeDiscarded, messages);
                 Confirm::new(
-                    "Discard unassigned changes?".into(),
+                    NonEmpty::new("Discard unassigned changes?".into()),
                     self.theme,
                     move |ctx, messages| {
                         operations::discard_unassigned_legacy(ctx)?;
@@ -1441,7 +1441,7 @@ impl App {
                 let drop_to_be_discarded =
                     message_on_drop::message_on_drop(Message::DropToBeDiscarded, messages);
                 Confirm::new(
-                    format!("Discard {}?", uncommitted.describe()).into(),
+                    NonEmpty::new(format!("Discard {}?", uncommitted.describe()).into()),
                     self.theme,
                     move |ctx, messages| {
                         let hunk_assignments = uncommitted
@@ -1468,7 +1468,7 @@ impl App {
                 let drop_to_be_discarded =
                     message_on_drop::message_on_drop(Message::DropToBeDiscarded, messages);
                 Confirm::new(
-                    "Discard staged changes in this stack?".into(),
+                    NonEmpty::new("Discard staged changes in this stack?".into()),
                     self.theme,
                     move |ctx, messages| {
                         operations::discard_stack(ctx, stack_id)?;
@@ -1490,7 +1490,9 @@ impl App {
                 let drop_to_be_discarded =
                     message_on_drop::message_on_drop(Message::DropToBeDiscarded, messages);
                 Confirm::new(
-                    format!("Discard commit {}?", commit_id.to_hex_with_len(7)).into(),
+                    NonEmpty::new(
+                        format!("Discard commit {}?", commit_id.to_hex_with_len(7)).into(),
+                    ),
                     self.theme,
                     move |ctx, messages| {
                         let discard_result = operations::commit_discard(ctx, commit_id)?;
@@ -1526,7 +1528,7 @@ impl App {
                 let drop_to_be_discarded =
                     message_on_drop::message_on_drop(Message::DropToBeDiscarded, messages);
                 Confirm::new(
-                    format!("Discard branch {name}?").into(),
+                    NonEmpty::new(format!("Discard branch {name}?").into()),
                     self.theme,
                     move |ctx, messages| {
                         operations::remove_branch_legacy(ctx, stack_id, name)?;
@@ -2619,11 +2621,21 @@ impl App {
         };
 
         let text = {
-            let time = target_snapshot
+            let restore_from = if let Ok(Some(snapshot)) =
+                gitbutler_oplog::peel_restore_snapshot(ctx, &target_snapshot)
+                && snapshot.commit_id != target_snapshot.commit_id
+                && snapshot.details.is_some()
+            {
+                Cow::Owned(snapshot)
+            } else {
+                Cow::Borrowed(&target_snapshot)
+            };
+
+            let time = restore_from
                 .created_at
                 .format_or_unix(gix::date::time::format::DEFAULT);
 
-            let commit = target_snapshot.commit_id.to_hex_with_len(7);
+            let commit = restore_from.commit_id.to_hex_with_len(7);
 
             Line::from_iter(
                 [
@@ -2635,7 +2647,7 @@ impl App {
                 ]
                 .into_iter()
                 .chain([Span::raw(" "), Span::raw(time).style(self.theme.time)])
-                .chain(target_snapshot.details.iter().flat_map(|details| {
+                .chain(restore_from.details.iter().flat_map(|details| {
                     [
                         Span::raw(" "),
                         Span::raw(details.operation.title()).style(self.theme.attention),
@@ -2646,18 +2658,22 @@ impl App {
         };
 
         let commit = target_snapshot.commit_id;
-        self.confirm = Some(Confirm::new(text, self.theme, move |ctx, messages| {
-            but_api::legacy::oplog::restore_snapshot_with_kind(
-                ctx,
-                match kind {
-                    UndoOrRedo::Undo => RestoreKind::RestoreFromSnapshotViaUndo,
-                    UndoOrRedo::Redo => RestoreKind::RestoreFromSnapshotViaRedo,
-                },
-                commit,
-            )?;
-            messages.push(Message::Reload(None, ReloadCause::Mutation));
-            Ok(())
-        }));
+        self.confirm = Some(Confirm::new(
+            NonEmpty::new(text),
+            self.theme,
+            move |ctx, messages| {
+                but_api::legacy::oplog::restore_snapshot_with_kind(
+                    ctx,
+                    match kind {
+                        UndoOrRedo::Undo => RestoreKind::RestoreFromSnapshotViaUndo,
+                        UndoOrRedo::Redo => RestoreKind::RestoreFromSnapshotViaRedo,
+                    },
+                    commit,
+                )?;
+                messages.push(Message::Reload(None, ReloadCause::Mutation));
+                Ok(())
+            },
+        ));
 
         Ok(())
     }

@@ -1,4 +1,5 @@
 use but_ctx::Context;
+use nonempty::NonEmpty;
 use ratatui::{
     Frame,
     layout::{Constraint, Flex, Layout, Rect},
@@ -10,19 +11,19 @@ use crate::{command::legacy::status::tui::Message, theme::Theme, utils::DebugAsT
 
 #[derive(Debug)]
 pub(super) struct Confirm {
-    text: Line<'static>,
+    lines: NonEmpty<Line<'static>>,
     yes_selected: bool,
     on_yes: DebugAsType<Box<dyn FnOnce(&mut Context, &mut Vec<Message>) -> anyhow::Result<()>>>,
     theme: &'static Theme,
 }
 
 impl Confirm {
-    pub(super) fn new<F>(text: Line<'static>, theme: &'static Theme, on_yes: F) -> Self
+    pub(super) fn new<F>(lines: NonEmpty<Line<'static>>, theme: &'static Theme, on_yes: F) -> Self
     where
         F: FnOnce(&mut Context, &mut Vec<Message>) -> anyhow::Result<()> + 'static,
     {
         Self {
-            text,
+            lines,
             yes_selected: true,
             on_yes: DebugAsType(Box::new(on_yes)),
             theme,
@@ -36,27 +37,37 @@ impl Confirm {
 
         let space_taken_up_by_border: u16 = 2;
 
-        let items = Vec::from([
-            ListItem::new(self.text.clone()),
-            ListItem::new(""),
-            ListItem::new(Line::from_iter([
-                style_button(
-                    Span::raw("  Yes  "),
-                    self.yes_selected,
-                    has_focus,
-                    self.theme,
-                ),
-                style_button(
-                    Span::raw("  No  "),
-                    !self.yes_selected,
-                    has_focus,
-                    self.theme,
-                ),
-            ])),
-        ]);
+        let items = self
+            .lines
+            .iter()
+            .map(|line| ListItem::new(line.clone()))
+            .chain([
+                ListItem::new(""),
+                ListItem::new(Line::from_iter([
+                    style_button(
+                        Span::raw("  Yes  "),
+                        self.yes_selected,
+                        has_focus,
+                        self.theme,
+                    ),
+                    style_button(
+                        Span::raw("  No  "),
+                        !self.yes_selected,
+                        has_focus,
+                        self.theme,
+                    ),
+                ])),
+            ])
+            .collect::<Vec<_>>();
 
+        let line_width = self
+            .lines
+            .iter()
+            .map(|line| line.width())
+            .max()
+            .unwrap_or(0) as u16;
         let horizontal_layout = Layout::horizontal([Constraint::Length(
-            (self.text.width() as u16) + space_taken_up_by_border + horizontal_padding,
+            line_width + space_taken_up_by_border + horizontal_padding,
         )])
         .flex(Flex::Center)
         .split(area);
