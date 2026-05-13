@@ -302,10 +302,16 @@ const TopBarActions: FC = () => {
 	);
 };
 
-const usePanelsHotkeys = ({ focusedPanel }: { focusedPanel: PanelType | null }) => {
+const usePanelsHotkeys = ({
+	focusedPanel,
+	visiblePanels,
+}: {
+	focusedPanel: PanelType | null;
+	visiblePanels: Array<PanelType>;
+}) => {
 	useCommand(
 		() => {
-			focusAdjacentPanel(-1);
+			focusAdjacentPanel(-1, visiblePanels);
 		},
 		{
 			group: "Panels",
@@ -316,7 +322,7 @@ const usePanelsHotkeys = ({ focusedPanel }: { focusedPanel: PanelType | null }) 
 
 	useCommand(
 		() => {
-			focusAdjacentPanel(1);
+			focusAdjacentPanel(1, visiblePanels);
 		},
 		{
 			group: "Panels",
@@ -346,7 +352,7 @@ const WorkspacePage: FC = () => {
 		},
 	);
 
-	usePanelsHotkeys({ focusedPanel });
+	usePanelsHotkeys({ focusedPanel, visiblePanels: panelsState.visiblePanels });
 
 	const { defaultLayout, onLayoutChanged } = useDefaultLayout({
 		id: `project:${projectId}:layout`,
