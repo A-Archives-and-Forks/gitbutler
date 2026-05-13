@@ -191,3 +191,14 @@ export const filterNavigationIndexForOutlineMode = ({
 				),
 		}),
 	);
+
+export const getOperationSource = (mode: OutlineMode): Operand | null =>
+	Match.value(mode).pipe(
+		Match.tagsExhaustive({
+			Default: () => null,
+			Absorb: (x) => x.source,
+			Transfer: (x) => x.value.source,
+			RenameBranch: () => null,
+			RewordCommit: () => null,
+		}),
+	);

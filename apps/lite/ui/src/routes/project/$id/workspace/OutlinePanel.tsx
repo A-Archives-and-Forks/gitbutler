@@ -36,6 +36,7 @@ import {
 	filterNavigationIndexForOutlineMode,
 	getTransferOperation,
 	keyboardTransferOperationMode,
+	getOperationSource,
 } from "#ui/outline/mode.ts";
 import { focusPanel, useFocusedProjectPanel, useNavigationIndexHotkeys } from "#ui/panels.ts";
 import {
@@ -288,6 +289,8 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 		hotkeys: [{ hotkey: "T" }],
 	});
 
+	const operationSource = getOperationSource(outlineMode);
+
 	return (
 		<NavigationIndexContext value={navigationIndex}>
 			<DryRunWorkspaceContext value={dryRunWorkspace}>
@@ -310,19 +313,10 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 						<BaseCommit projectId={projectId} commitId={getCommonBaseCommitId(headInfo)} />
 					</div>
 
-					{Match.value(outlineMode).pipe(
-						Match.when({ _tag: "Absorb" }, (mode) => mode.source),
-						Match.when(
-							{ _tag: "Transfer", value: { _tag: "Keyboard" } },
-							(mode) => mode.value.source,
-						),
-						Match.orElse(() => null),
-						(source) =>
-							source && (
-								<div className={styles.operationSourcePreview}>
-									<OperationSourceLabel headInfo={headInfo} source={source} />
-								</div>
-							),
+					{operationSource && (
+						<div className={styles.operationSourcePreview}>
+							<OperationSourceLabel headInfo={headInfo} source={operationSource} />
+						</div>
 					)}
 				</Panel>
 			</DryRunWorkspaceContext>
