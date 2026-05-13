@@ -10,7 +10,7 @@ use but_ctx::Context;
 use but_error::{Code, Marker};
 use but_oxidize::ObjectIdExt;
 use gitbutler_git::GitContextExt as _;
-use gitbutler_project::FetchResult;
+use gitbutler_project::{FetchResult, Project};
 use gitbutler_reference::{Refname, RemoteRefname};
 use gitbutler_repo::first_parent_commit_ids_until;
 use gitbutler_stack::{Stack, Target, canned_branch_name};
@@ -84,14 +84,16 @@ impl BaseBranch {
 #[instrument(skip(ctx), err(Debug))]
 pub fn get_base_branch_data(ctx: &Context) -> Result<BaseBranch> {
     let target = default_target(ctx)?;
-    let base = target_to_base_branch(ctx, &target)?;
+    let repo = ctx.repo.get()?;
+    let base = target_to_base_branch(&repo, &ctx.legacy_project, &target)?;
     Ok(base)
 }
 
 #[instrument(skip(ctx), err(Debug))]
 pub fn get_base_branch_remote_url(ctx: &Context) -> Result<String> {
     let target = default_target(ctx)?;
-    remote_url_of_target_to_base_branch(ctx, &target)
+    let repo = ctx.repo.get()?;
+    remote_url_of_target_to_base_branch(&repo, &target)
 }
 
 /// Restore the default target metadata if it is missing in the currently configured storage
@@ -182,7 +184,7 @@ fn go_back_to_integration(ctx: &Context, default_target: &Target) -> Result<Base
             .context("failed to checkout tree")?;
     }
 
-    let base = target_to_base_branch(ctx, default_target)?;
+    let base = target_to_base_branch(&repo, &ctx.legacy_project, default_target)?;
     update_workspace_commit(ctx, false)?;
     Ok(base)
 }
@@ -307,7 +309,7 @@ pub(crate) fn set_base_branch(
 
     crate::integration::update_workspace_commit_with_vb_state(&vb_state, ctx, true)?;
 
-    let base = target_to_base_branch(ctx, &target)?;
+    let base = target_to_base_branch(&repo, &ctx.legacy_project, &target)?;
     Ok(base)
 }
 
@@ -342,8 +344,11 @@ fn set_exclude_decoration(ctx: &Context) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn target_to_base_branch(ctx: &Context, target: &Target) -> Result<BaseBranch> {
-    let repo = &*ctx.repo.get()?;
+pub(crate) fn target_to_base_branch(
+    repo: &gix::Repository,
+    project: &Project,
+    target: &Target,
+) -> Result<BaseBranch> {
     let target_ref_commit = repo
         .find_reference(&target.branch.to_string())?
         .peel_to_commit()?
@@ -423,7 +428,7 @@ pub(crate) fn target_to_base_branch(ctx: &Context, target: &Target) -> Result<Ba
         None => target.remote_url.clone(),
     };
 
-    let remote_url = remote_url_of_target_to_base_branch(ctx, target)?;
+    let remote_url = remote_url_of_target_to_base_branch(repo, target)?;
 
     let branch_name = target.branch.fullname();
     let remote_name = target.branch.remote().to_string();
@@ -443,8 +448,7 @@ pub(crate) fn target_to_base_branch(ctx: &Context, target: &Target) -> Result<Ba
         behind,
         upstream_commits,
         recent_commits,
-        last_fetched_ms: ctx
-            .legacy_project
+        last_fetched_ms: project
             .project_data_last_fetch
             .as_ref()
             .map(FetchResult::timestamp)
@@ -456,9 +460,7 @@ pub(crate) fn target_to_base_branch(ctx: &Context, target: &Target) -> Result<Ba
     Ok(base)
 }
 
-fn remote_url_of_target_to_base_branch(ctx: &Context, target: &Target) -> Result<String> {
-    let repo = &*ctx.repo.get()?;
-
+fn remote_url_of_target_to_base_branch(repo: &gix::Repository, target: &Target) -> Result<String> {
     // Fallback to the remote URL of the branch if the target remote URL is empty
     let remote_url = if target.remote_url.is_empty() {
         let remote = repo.find_remote(target.branch.remote()).context(format!(
