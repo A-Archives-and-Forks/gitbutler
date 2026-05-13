@@ -19,6 +19,11 @@ export type AbsorbMode = {
 };
 
 /** @public */
+export type TransferMode = {
+	value: TransferOperationMode;
+};
+
+/** @public */
 export type KeyboardTransferOperationMode = {
 	source: Operand;
 	operationType: OperationType;
@@ -63,7 +68,7 @@ export const absorbOutlineMode = ({ source, absorptionPlan }: AbsorbMode): Outli
 });
 
 /** @public */
-export const transferOutlineMode = (value: TransferOperationMode): OutlineMode => ({
+export const transferOutlineMode = ({ value }: TransferMode): OutlineMode => ({
 	_tag: "Transfer",
 	value,
 });
@@ -77,7 +82,7 @@ export type OutlineMode =
 	| ({ _tag: "RewordCommit" } & RewordCommitOutlineMode)
 	| ({ _tag: "RenameBranch" } & RenameBranchOutlineMode)
 	| ({ _tag: "Absorb" } & AbsorbMode)
-	| { _tag: "Transfer"; value: TransferOperationMode };
+	| ({ _tag: "Transfer" } & TransferMode);
 
 /** @public */
 export const defaultOutlineMode: OutlineMode = {

@@ -52,7 +52,7 @@ export const createInitialState = (): WorkspaceState => ({
 export const initialState: WorkspaceState = createInitialState();
 
 export const enterTransferMode = (state: WorkspaceState, mode: TransferOperationMode) => {
-	state.mode = transferOutlineMode(mode);
+	state.mode = transferOutlineMode({ value: mode });
 };
 
 export const enterAbsorbMode = (
@@ -75,12 +75,12 @@ export const updatePointerTransfer = (
 
 			if (mode.value.operationType === operationType) return;
 
-			state.mode = transferOutlineMode(
-				pointerTransferOperationMode({
+			state.mode = transferOutlineMode({
+				value: pointerTransferOperationMode({
 					source: mode.value.source,
 					operationType,
 				}),
-			);
+			});
 		}),
 		Match.orElse(() => {}),
 	);
@@ -92,12 +92,12 @@ export const updateTransferOperationType = (
 ) => {
 	Match.value(state.mode).pipe(
 		Match.when({ _tag: "Transfer", value: { _tag: "Keyboard" } }, (mode) => {
-			state.mode = transferOutlineMode(
-				keyboardTransferOperationMode({
+			state.mode = transferOutlineMode({
+				value: keyboardTransferOperationMode({
 					source: mode.value.source,
 					operationType,
 				}),
-			);
+			});
 		}),
 		Match.orElse(() => {}),
 	);
