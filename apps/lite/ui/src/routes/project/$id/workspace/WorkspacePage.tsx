@@ -257,20 +257,34 @@ const TopBarActions: FC = () => {
 	const openApplyBranchPicker = () => {
 		dispatch(projectActions.openApplyBranchPicker({ projectId }));
 	};
-	const toggleDetails = () => {
-		if (focusedPanel === "details" && isPanelVisible(panelsState, "details")) {
-			const detailsPanelIndex = panelsState.visiblePanels.indexOf("details");
-			const nextPanel = panelsState.visiblePanels[detailsPanelIndex - 1];
+	const togglePanel = (panel: PanelType) => {
+		if (focusedPanel === panel && isPanelVisible(panelsState, panel)) {
+			const panelIndex = panelsState.visiblePanels.indexOf(panel);
+			const nextPanel = panelsState.visiblePanels[panelIndex - 1];
 			if (nextPanel !== undefined) focusPanel(nextPanel);
 		}
 
-		dispatch(projectActions.togglePanel({ projectId, panel: "details" }));
+		dispatch(projectActions.togglePanel({ projectId, panel }));
+	};
+	const toggleFiles = () => {
+		togglePanel("files");
+	};
+	const toggleDetails = () => {
+		togglePanel("details");
 	};
 
 	const applyBranchCommand = useCommand(openApplyBranchPicker, {
 		group: "Branches",
 		commandPalette: { label: "Apply" },
 		hotkeys: [{ hotkey: "Mod+Shift+A" }],
+	});
+
+	const toggleFilesCommand = useCommand(toggleFiles, {
+		group: "Files",
+		commandPalette: {
+			label: isPanelVisible(panelsState, "files") ? "Close" : "Open",
+		},
+		hotkeys: [{ hotkey: "F" }],
 	});
 
 	const toggleDetailsCommand = useCommand(toggleDetails, {
@@ -292,6 +306,14 @@ const TopBarActions: FC = () => {
 			</ShortcutButton>
 			<ShortcutButton
 				className={uiStyles.button}
+				hotkeys={toggleFilesCommand.hotkeys}
+				aria-pressed={isPanelVisible(panelsState, "files")}
+				onClick={toggleFilesCommand.commandFn}
+			>
+				Files
+			</ShortcutButton>
+			<ShortcutButton
+				className={uiStyles.button}
 				hotkeys={toggleDetailsCommand.hotkeys}
 				aria-pressed={isPanelVisible(panelsState, "details")}
 				onClick={toggleDetailsCommand.commandFn}
@@ -302,10 +324,16 @@ const TopBarActions: FC = () => {
 	);
 };
 
-const usePanelsHotkeys = ({ focusedPanel }: { focusedPanel: PanelType | null }) => {
+const usePanelsHotkeys = ({
+	focusedPanel,
+	visiblePanels,
+}: {
+	focusedPanel: PanelType | null;
+	visiblePanels: Array<PanelType>;
+}) => {
 	useCommand(
 		() => {
-			focusAdjacentPanel(-1);
+			focusAdjacentPanel(-1, visiblePanels);
 		},
 		{
 			group: "Panels",
@@ -316,7 +344,7 @@ const usePanelsHotkeys = ({ focusedPanel }: { focusedPanel: PanelType | null }) 
 
 	useCommand(
 		() => {
-			focusAdjacentPanel(1);
+			focusAdjacentPanel(1, visiblePanels);
 		},
 		{
 			group: "Panels",
@@ -346,7 +374,7 @@ const WorkspacePage: FC = () => {
 		},
 	);
 
-	usePanelsHotkeys({ focusedPanel });
+	usePanelsHotkeys({ focusedPanel, visiblePanels: panelsState.visiblePanels });
 
 	const { defaultLayout, onLayoutChanged } = useDefaultLayout({
 		id: `project:${projectId}:layout`,

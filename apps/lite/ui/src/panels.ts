@@ -34,10 +34,10 @@ export const focusPanel = (panel: Panel) => {
 	document.getElementById(panel)?.focus({ focusVisible: false });
 };
 
-export const focusAdjacentPanel = (offset: -1 | 1) => {
+export const focusAdjacentPanel = (offset: -1 | 1, panels: Array<Panel>) => {
 	const currentPanel = getFocusedProjectPanel(document.activeElement);
 	if (currentPanel === null) return;
-	const nextPanel = orderedPanels[orderedPanels.indexOf(currentPanel) + offset];
+	const nextPanel = panels[panels.indexOf(currentPanel) + offset];
 	if (nextPanel === undefined) return;
 	focusPanel(nextPanel);
 };
