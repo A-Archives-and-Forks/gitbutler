@@ -333,7 +333,7 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 							<Changes projectId={projectId} />
 						</div>
 
-						<div className={styles.scroller}>
+						<div className={styles.headInfo}>
 							{headInfo?.stacks.map((stack) => (
 								<StackC key={stack.id} projectId={projectId} stack={stack} />
 							))}
