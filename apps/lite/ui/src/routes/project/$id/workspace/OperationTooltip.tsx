@@ -38,8 +38,6 @@ const AbsorbControls: FC<{
 	const confirm = () => {
 		dispatch(projectActions.exitMode({ projectId }));
 
-		if (absorptionPlan.length === 0) return;
-
 		absorb();
 	};
 
