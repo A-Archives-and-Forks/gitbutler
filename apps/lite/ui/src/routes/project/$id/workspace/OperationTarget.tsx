@@ -131,22 +131,16 @@ const useOperationDropTarget = ({ target, projectId }: { target: Operand; projec
 				if (!isActiveDropTarget) return;
 
 				const dragData = parseDragData(args.source.data);
-				if (!dragData) {
-					dispatch(projectActions.cancelMode({ projectId }));
-					return;
-				}
-
 				const dropData = parseDropData(args.self.data);
-				if (!dropData) {
-					dispatch(projectActions.cancelMode({ projectId }));
-					return;
-				}
+				const operation =
+					dragData && dropData
+						? getOperation({
+								source: dragData.source,
+								target,
+								operationType: dropData.operationType,
+							})
+						: null;
 
-				const operation = getOperation({
-					source: dragData.source,
-					target,
-					operationType: dropData.operationType,
-				});
 				if (!operation) {
 					dispatch(projectActions.cancelMode({ projectId }));
 					return;
