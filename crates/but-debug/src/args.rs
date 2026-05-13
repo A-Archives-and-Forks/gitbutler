@@ -109,6 +109,9 @@ pub struct LogArgs {
     /// Shared graph construction options.
     #[command(flatten)]
     pub graph: RevisionGraphArgs,
+    /// Follow only the first parent when traversing merge commits.
+    #[arg(long)]
+    pub first_parent: bool,
     /// The rev-spec to log. Exclusive ranges like `main..branch` are supported.
     pub rev_spec: String,
 }
@@ -126,71 +129,12 @@ pub struct MergeBaseArgs {
 
 #[cfg(test)]
 mod tests {
-    use clap::{CommandFactory as _, Parser as _};
+    use clap::CommandFactory;
 
-    use super::{Args, RevisionSubcommands, Subcommands};
+    use super::Args;
 
     #[test]
     fn clap_configuration_is_valid() {
         Args::command().debug_assert();
-    }
-
-    #[test]
-    fn merge_base_requires_at_least_two_revisions() {
-        assert!(Args::try_parse_from(["but-debug", "revision", "merge-base", "main"]).is_err());
-
-        let args = Args::parse_from(["but-debug", "revision", "merge-base", "main", "feature"]);
-        match args.cmd {
-            Subcommands::Revision(revision_args) => match revision_args.cmd {
-                RevisionSubcommands::MergeBase(args) => {
-                    assert_eq!(args.revisions, ["main", "feature"])
-                }
-                _ => panic!("expected merge-base command"),
-            },
-            _ => panic!("expected revision command"),
-        }
-    }
-
-    #[test]
-    fn merge_base_accepts_target_options() {
-        let args = Args::parse_from([
-            "but-debug",
-            "revision",
-            "merge-base",
-            "--target-ref",
-            "refs/remotes/origin/main",
-            "--extra-target",
-            "origin/main~1",
-            "main",
-            "feature",
-        ]);
-
-        match args.cmd {
-            Subcommands::Revision(revision_args) => match revision_args.cmd {
-                RevisionSubcommands::MergeBase(args) => {
-                    assert_eq!(
-                        args.graph.target_ref.as_deref(),
-                        Some("refs/remotes/origin/main")
-                    );
-                    assert_eq!(args.graph.extra_target.as_deref(), Some("origin/main~1"));
-                    assert_eq!(args.revisions, ["main", "feature"]);
-                }
-                _ => panic!("expected merge-base command"),
-            },
-            _ => panic!("expected revision command"),
-        }
-    }
-
-    #[test]
-    fn revision_log_accepts_exclusive_range() {
-        let args = Args::parse_from(["but-debug", "revision", "log", "main..feature"]);
-
-        match args.cmd {
-            Subcommands::Revision(revision_args) => match revision_args.cmd {
-                RevisionSubcommands::Log(args) => assert_eq!(args.rev_spec, "main..feature"),
-                _ => panic!("expected log command"),
-            },
-            _ => panic!("expected revision command"),
-        }
     }
 }

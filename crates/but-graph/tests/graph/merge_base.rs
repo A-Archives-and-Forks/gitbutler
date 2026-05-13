@@ -116,21 +116,30 @@ fn reachable_difference_returns_commits_in_traversal_order() -> anyhow::Result<(
     let merged_id = repo.rev_parse_single("merged")?.detach();
     let a_id = repo.rev_parse_single("A")?.detach();
 
-    let ids = graph.find_commit_ids_reachable_from_a_not_b(merged_id, a_id)?;
+    let ids = graph.find_commit_ids_reachable_from_a_not_b(merged_id, a_id, false)?;
     assert_eq!(ids, ids_by_revs(&repo, &["merged", "C", "C^1", "C^2"])?);
+    let first_parent_ids = graph.find_commit_ids_reachable_from_a_not_b(merged_id, a_id, true)?;
+    assert_eq!(first_parent_ids, ids_by_revs(&repo, &["merged"])?);
 
     let merged = segment_id_by_ref_name(&graph, "refs/heads/merged")?;
     let a = segment_id_by_ref_name(&graph, "refs/heads/A")?;
 
-    let commits = graph.find_segments_reachable_from_a_not_b(merged, a);
+    let commits = graph.find_segments_reachable_from_a_not_b(merged, a, false);
     assert_eq!(
         commits.iter().map(|commit| commit.id).collect::<Vec<_>>(),
         ids
     );
-
+    let first_parent_commits = graph.find_segments_reachable_from_a_not_b(merged, a, true);
+    assert_eq!(
+        first_parent_commits
+            .iter()
+            .map(|commit| commit.id)
+            .collect::<Vec<_>>(),
+        first_parent_ids
+    );
     assert!(
         graph
-            .find_commit_ids_reachable_from_a_not_b(a_id, a_id)?
+            .find_commit_ids_reachable_from_a_not_b(a_id, a_id, false)?
             .is_empty(),
         "self-exclusion means nothing is returned"
     );

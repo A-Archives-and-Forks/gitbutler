@@ -54,21 +54,9 @@ fn log(repo: &gix::Repository, meta: &EmptyRefMetadata, log_args: &LogArgs) -> R
 
     let _span = tracing::info_span!("traverse graph").entered();
     let commits = if let Some(excluded) = excluded {
-        graph.find_commit_ids_reachable_from_a_not_b(included, excluded)?
+        graph.find_commit_ids_reachable_from_a_not_b(included, excluded, log_args.first_parent)?
     } else {
-        let included_segment = graph.commit_id_to_segment_id(included).with_context(|| {
-            format!("Failed to map included commit {included} to a graph segment")
-        })?;
-        let mut commits = Vec::new();
-        graph.visit_all_segments_including_start_until(
-            included_segment,
-            but_graph::petgraph::Direction::Outgoing,
-            |segment| {
-                commits.extend(segment.commits.iter().map(|commit| commit.id));
-                false
-            },
-        );
-        commits
+        bail!("Need to specify a rev-spec of form `a..b` to indicate an exclusion for now.")
     };
 
     let mut out = Vec::with_capacity(512);
