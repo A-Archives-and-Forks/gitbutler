@@ -112,7 +112,7 @@ pub(crate) fn show_oplog(
                     | OperationKind::RestoreFromSnapshotViaRedo
                     | OperationKind::RestoreFromSnapshot => {
                         if let Ok(Some(restore_target)) =
-                            gitbutler_oplog::peel_restore_snapshot(ctx, &snapshot)
+                            but_api::legacy::oplog::peel_restore_snapshot(ctx, snapshot.commit_id)
                             && restore_target.commit_id != snapshot.commit_id
                             && let Some(restore_target_details) = &restore_target.details
                         {
