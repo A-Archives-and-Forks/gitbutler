@@ -1,3 +1,4 @@
+use anyhow::{Context as _, Result, bail};
 use gix::refs::FullNameRef;
 use uuid::Uuid;
 
@@ -34,6 +35,12 @@ pub struct Workspace {
     /// Note that even though this is per workspace, the implementation can fill in global information at will.
     pub target_ref: Option<gix::refs::FullName>,
 
+    /// The remote that we used to push to. Now primarily used to determine what
+    /// forge we're using.
+    ///
+    /// You probably want to use [`Self::push_remote_url`] instead in most
+    /// cases. Ideally we should wean this property out of the codebase.
+    pub remote_url: String,
     /// The commit id of a commit that was reachable by [`Self::target_ref`] and that should be included in the workspace.
     /// This is useful to make workspaces appear stable in relationship to the target reference, which may be updated each
     /// time a `git fetch` is performed.
@@ -53,6 +60,7 @@ impl std::fmt::Debug for Workspace {
             ref_info,
             stacks,
             target_ref,
+            remote_url,
             push_remote,
             target_commit_id,
         } = self;
@@ -63,6 +71,7 @@ impl std::fmt::Debug for Workspace {
                 "target_ref",
                 &MaybeDebug(&target_ref.as_ref().map(|rn| rn.as_bstr())),
             )
+            .field("remote_url", remote_url)
             .field("target_commit_id", &MaybeDebug(target_commit_id))
             .field("push_remote", &MaybeDebug(push_remote))
             .finish()
@@ -157,6 +166,51 @@ impl Workspace {
             },
         );
         Some(true)
+    }
+
+    /// Get the remote URL, falling back to the remote URL from the target_ref's
+    /// branch.
+    ///
+    /// You probably want to use [`Self::push_remote_url`] instead.
+    pub fn remote_url_with_fallback(&self, repo: &gix::Repository) -> Result<String> {
+        let remote_url = if self.remote_url.is_empty() {
+            let Some(target_ref) = self.target_ref.as_ref() else {
+                bail!("Target ref required for remote url fallback")
+            };
+            let remote = repo
+                .find_reference(target_ref)?
+                .remote(gix::remote::Direction::Fetch)
+                .transpose()?
+                .context(format!("failed to find remote for branch {target_ref}"))?;
+            remote
+                .url(gix::remote::Direction::Fetch)
+                .map(|url| url.to_bstring().to_string())
+                .context(format!("failed to get remote url for {target_ref}"))?
+        } else {
+            self.remote_url.clone()
+        };
+        Ok(remote_url)
+    }
+
+    /// The URL to push to, inferred by the [`Self::push_remote`] property.
+    ///
+    /// Falls back to [`Self::remote_url`] if the push remote is not set.
+    pub fn push_remote_url(&self, repo: &gix::Repository) -> Result<String> {
+        let push_remote_url = match self.push_remote {
+            Some(ref name) => repo
+                .find_remote(name.as_str())
+                .ok()
+                .and_then(|remote| {
+                    remote
+                        .url(gix::remote::Direction::Push)
+                        .or_else(|| remote.url(gix::remote::Direction::Fetch))
+                        .map(|url| url.to_bstring().to_string())
+                })
+                .unwrap_or_else(|| self.remote_url.clone()),
+            None => self.remote_url.clone(),
+        };
+
+        Ok(push_remote_url)
     }
 }
 

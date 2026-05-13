@@ -968,7 +968,7 @@ fn branch_from_ref_name(ref_name: &FullNameRef) -> anyhow::Result<RemoteRefname>
 
 impl VirtualBranchesTomlMetadata {
     fn workspace_from_data(data: &VirtualBranches) -> Workspace {
-        let (target_branch, target_commit_id, push_remote) = data
+        let (target_branch, target_commit_id, push_remote, remote_url) = data
             .default_target
             .as_ref()
             .map(|target| {
@@ -976,6 +976,7 @@ impl VirtualBranchesTomlMetadata {
                     gix::refs::FullName::try_from(target.branch.to_string()).ok(),
                     (!target.sha.is_null()).then_some(target.sha),
                     target.push_remote_name.clone(),
+                    target.remote_url.clone(),
                 )
             })
             .unwrap_or_default();
@@ -1017,6 +1018,7 @@ impl VirtualBranchesTomlMetadata {
                 })
                 .collect(),
             target_ref: target_branch,
+            remote_url,
             target_commit_id,
             push_remote,
         }
