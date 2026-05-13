@@ -97,7 +97,7 @@
 		{ identifier: "hyper", displayName: "Hyper", platform: "linux" },
 		{ identifier: "wezterm", displayName: "WezTerm", platform: "linux" },
 		{ identifier: "kitty", displayName: "Kitty", platform: "linux" },
-		{ identifier: "cosmic-term", displayName: "COSMIC Terminal", platform: "linux" }
+		{ identifier: "cosmic-term", displayName: "COSMIC Terminal", platform: "linux" },
 	];
 
 	const terminalOptions = allTerminalOptions.filter((t) => t.platform === platformName);
