@@ -105,6 +105,7 @@ import { useResolveDiffSpecs } from "#ui/operations/diff-specs.ts";
 import { rejectedChangesToastOptions } from "#ui/operations/rejectedChangesToastOptions.tsx";
 import { useCommand } from "#ui/commands/manager.ts";
 import { assert } from "#ui/assert.ts";
+import { Spinner } from "#ui/components/Spinner.tsx";
 
 const NavigationIndexContext = createContext<NavigationIndex | null>(null);
 
@@ -344,10 +345,7 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 							<div className={styles.operationSourcePreview}>
 								<OperationSourceLabel headInfo={headInfo} source={operationSource} />
 								{outlineMode._tag === "Absorb" && absorptionPlanQuery?.isPending && (
-									<span
-										className={styles.operationSourcePreviewSpinner}
-										aria-label="Loading absorb plan"
-									/>
+									<Spinner aria-label="Loading absorb plan" />
 								)}
 							</div>
 						)}
