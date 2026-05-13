@@ -96,12 +96,23 @@ impl Graph {
             return SegmentRelation::Identity;
         }
 
-        match self.find_git_merge_base(a, b) {
+        match self.find_merge_base(a, b) {
             Some(base) if base == a => SegmentRelation::Ancestor,
             Some(base) if base == b => SegmentRelation::Descendant,
             Some(_) => SegmentRelation::Diverged,
             None => SegmentRelation::Disjoint,
         }
+    }
+
+    /// Like [`Self::relation_between()`], but takes object ids of commits.
+    pub fn relation_between_by_commit_id(
+        &self,
+        commit_a: gix::ObjectId,
+        commit_b: gix::ObjectId,
+    ) -> anyhow::Result<SegmentRelation> {
+        let a = self.segment_id_by_id(commit_a)?;
+        let b = self.segment_id_by_id(commit_b)?;
+        Ok(self.relation_between(a, b))
     }
 
     /// Compute the merge-base just like Git would between segments `a` and `b`, but finding all possible merge-bases of a walk,
@@ -111,7 +122,7 @@ impl Graph {
     ///
     /// Returns `None` if there is no merge-base as `a` and `b` don't share history.
     /// If `a == b`, `Some(a)` is returned immediately.
-    pub fn find_git_merge_base(&self, a: SegmentIndex, b: SegmentIndex) -> Option<SegmentIndex> {
+    pub fn find_merge_base(&self, a: SegmentIndex, b: SegmentIndex) -> Option<SegmentIndex> {
         if a == b {
             return Some(a);
         }
@@ -127,14 +138,28 @@ impl Graph {
         result.first().copied()
     }
 
+    /// Like [`Self::find_merge_base()`], but takes object ids of commits,
+    /// returning the id of the commit that is the merge-base.
+    pub fn find_merge_base_by_commit_id(
+        &self,
+        commit_a: gix::ObjectId,
+        commit_b: gix::ObjectId,
+    ) -> anyhow::Result<Option<gix::ObjectId>> {
+        let a = self.segment_id_by_id(commit_a)?;
+        let b = self.segment_id_by_id(commit_b)?;
+        self.find_merge_base(a, b)
+            .map(|base| self.commit_id_for_segment(base))
+            .transpose()
+    }
+
     /// Compute an order-dependent octopus merge-base from multiple `segments`.
     ///
     /// The first segment becomes the initial candidate. Each following segment is
     /// folded into that candidate by computing their pairwise
-    /// [`Self::find_git_merge_base()`]. If a pair does not share history, the
+    /// [`Self::find_merge_base()`]. If a pair does not share history, the
     /// previous candidate is kept and folding continues.
     ///
-    /// Returns `None` if `segments` is empty, or if no merge-base could be found.
+    /// Returns `None` if `segments` is empty.
     /// If `segments` has one element, it returns that.
     pub fn find_merge_base_octopus(
         &self,
@@ -142,7 +167,39 @@ impl Graph {
     ) -> Option<SegmentIndex> {
         segments
             .into_iter()
-            .reduce(|a, b| self.find_git_merge_base(a, b).unwrap_or(a))
+            .reduce(|a, b| self.find_merge_base(a, b).unwrap_or(a))
+    }
+
+    /// Like [`Self::find_merge_base_octopus()`], but works with object ids of `commits`,
+    /// returning the id of the commit that is the merge-base.
+    pub fn find_merge_base_octopus_by_commit_id(
+        &self,
+        commits: impl IntoIterator<Item = gix::ObjectId>,
+    ) -> anyhow::Result<Option<gix::ObjectId>> {
+        let mut segments = Vec::new();
+        for commit_id in commits {
+            segments.push(self.segment_id_by_id(commit_id)?);
+        }
+        self.find_merge_base_octopus(segments)
+            .map(|base| self.commit_id_for_segment(base))
+            .transpose()
+    }
+
+    fn commit_id_for_segment(&self, segment: SegmentIndex) -> anyhow::Result<gix::ObjectId> {
+        self.tip_skip_empty(segment)
+            .map(|commit| commit.id)
+            .with_context(|| {
+                format!("BUG: Segment {segment:?} does not contain a reachable tip commit")
+            })
+    }
+
+    fn segment_id_by_id(&self, commit_id: gix::ObjectId) -> anyhow::Result<SegmentIndex> {
+        self.inner
+            .node_weights()
+            .find_map(|s| s.commits.iter().any(|c| c.id == commit_id).then_some(s.id))
+            .with_context(|| {
+                format!("Commit {commit_id} not found in any segment, it wasn't traversed")
+            })
     }
 
     /// Paint segments reachable from `first` with SEGMENT1 and from `second` with SEGMENT2.

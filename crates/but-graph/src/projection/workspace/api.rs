@@ -205,7 +205,7 @@ impl Workspace {
 
         let merge_base_segment_index = self
             .graph
-            .find_git_merge_base(commit_segment_index, target_segment_index)?;
+            .find_merge_base(commit_segment_index, target_segment_index)?;
 
         self.graph
             .tip_skip_empty(merge_base_segment_index)
