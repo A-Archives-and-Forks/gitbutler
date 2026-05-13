@@ -72,7 +72,7 @@ import {
 	WorkspaceState,
 } from "@gitbutler/but-sdk";
 import { formatForDisplay } from "@tanstack/react-hotkeys";
-import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { useMutation, useQueries, useSuspenseQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { Match } from "effect";
 
@@ -109,6 +109,8 @@ import { assert } from "#ui/assert.ts";
 const NavigationIndexContext = createContext<NavigationIndex | null>(null);
 
 const DryRunWorkspaceContext = createContext<WorkspaceState | null>(null);
+
+const AbsorptionTargetKeysContext = createContext<ReadonlySet<string> | null>(null);
 
 const useDryRunCommit = (commitId: string) => {
 	const dryRunWorkspace = use(DryRunWorkspaceContext);
@@ -166,7 +168,13 @@ const sections = (headInfo: RefInfo): NonEmptyArray<Section> => {
 	];
 };
 
-const useNavigationIndex = (projectId: string) => {
+const useNavigationIndex = ({
+	projectId,
+	absorptionTargetKeys,
+}: {
+	projectId: string;
+	absorptionTargetKeys: ReadonlySet<string>;
+}) => {
 	const { data: headInfo } = useSuspenseQuery(headInfoQueryOptions(projectId));
 
 	const dispatch = useAppDispatch();
@@ -222,6 +230,7 @@ const useNavigationIndex = (projectId: string) => {
 	const navigationIndex = filterNavigationIndexForOutlineMode({
 		navigationIndex: navigationIndexUnfiltered,
 		outlineMode,
+		absorptionTargetKeys,
 	});
 
 	const focusedPanel = useFocusedProjectPanel(projectId);
@@ -258,11 +267,29 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 	const { id: projectId } = useParams({ from: "/project/$id/workspace" });
 	const dispatch = useAppDispatch();
 
-	const navigationIndex = useNavigationIndex(projectId);
-
 	const selection = useAppSelector((state) => selectProjectSelectionOutline(state, projectId));
 
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
+
+	const absorptionPlanTarget = Match.value(outlineMode).pipe(
+		Match.tag("Absorb", ({ sourceTarget }) => sourceTarget),
+		Match.orElse(() => null),
+	);
+	const [absorptionPlanQuery] = useQueries({
+		queries: (absorptionPlanTarget ? [absorptionPlanTarget] : []).map((target) =>
+			absorptionPlanQueryOptions({ projectId, target }),
+		),
+	});
+	const absorptionTargetKeys = new Set(
+		absorptionPlanQuery?.data?.map(({ stackId, commitId }) =>
+			operandIdentityKey(commitOperand({ stackId, commitId })),
+		),
+	);
+
+	const navigationIndex = useNavigationIndex({
+		projectId,
+		absorptionTargetKeys,
+	});
 
 	const dryRunOperation = Match.value(outlineMode).pipe(
 		Match.tag(
@@ -293,33 +320,41 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 
 	return (
 		<NavigationIndexContext value={navigationIndex}>
-			<DryRunWorkspaceContext value={dryRunWorkspace}>
-				<Panel
-					{...panelProps}
-					tabIndex={0}
-					role="tree"
-					aria-activedescendant={treeItemId(selection)}
-					className={classes(panelProps.className, styles.panel)}
-				>
-					<div className={styles.panelPadding}>
-						<Changes projectId={projectId} />
-					</div>
-
-					<div className={styles.scroller}>
-						{headInfo.stacks.map((stack) => (
-							<StackC key={stack.id} projectId={projectId} stack={stack} />
-						))}
-
-						<BaseCommit projectId={projectId} commitId={getCommonBaseCommitId(headInfo)} />
-					</div>
-
-					{operationSource && (
-						<div className={styles.operationSourcePreview}>
-							<OperationSourceLabel headInfo={headInfo} source={operationSource} />
+			<AbsorptionTargetKeysContext value={absorptionTargetKeys}>
+				<DryRunWorkspaceContext value={dryRunWorkspace}>
+					<Panel
+						{...panelProps}
+						tabIndex={0}
+						role="tree"
+						aria-activedescendant={treeItemId(selection)}
+						className={classes(panelProps.className, styles.panel)}
+					>
+						<div className={styles.panelPadding}>
+							<Changes projectId={projectId} />
 						</div>
-					)}
-				</Panel>
-			</DryRunWorkspaceContext>
+
+						<div className={styles.scroller}>
+							{headInfo.stacks.map((stack) => (
+								<StackC key={stack.id} projectId={projectId} stack={stack} />
+							))}
+
+							<BaseCommit projectId={projectId} commitId={getCommonBaseCommitId(headInfo)} />
+						</div>
+
+						{operationSource && (
+							<div className={styles.operationSourcePreview}>
+								<OperationSourceLabel headInfo={headInfo} source={operationSource} />
+								{outlineMode._tag === "Absorb" && absorptionPlanQuery?.isPending && (
+									<span
+										className={styles.operationSourcePreviewSpinner}
+										aria-label="Loading absorb plan"
+									/>
+								)}
+							</div>
+						)}
+					</Panel>
+				</DryRunWorkspaceContext>
+			</AbsorptionTargetKeysContext>
 		</NavigationIndexContext>
 	);
 };
@@ -384,6 +419,8 @@ const OperandC: FC<
 	} & useRender.ComponentProps<"div">
 > = ({ projectId, operand, render, ...props }) => {
 	const isSelected = useIsSelected({ projectId, operand });
+	const absorptionTargetKeys = assert(use(AbsorptionTargetKeysContext));
+	const isAbsorptionTarget = absorptionTargetKeys.has(operandIdentityKey(operand));
 
 	return useRender({
 		render: (
@@ -396,6 +433,7 @@ const OperandC: FC<
 						projectId={projectId}
 						target={operand}
 						isSelected={isSelected}
+						isAbsorptionTarget={isAbsorptionTarget}
 						render={render}
 					/>
 				}
@@ -849,13 +887,8 @@ const ChangesSectionRow: FC<{
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
 	const dispatch = useAppDispatch();
-	const queryClient = useQueryClient();
 	const enterAbsorbMode = (source: Operand, sourceTarget: AbsorptionTarget) => {
-		void queryClient
-			.fetchQuery(absorptionPlanQueryOptions({ projectId, target: sourceTarget }))
-			.then((absorptionPlan) => {
-				dispatch(projectActions.enterAbsorbMode({ projectId, source, absorptionPlan }));
-			});
+		dispatch(projectActions.enterAbsorbMode({ projectId, source, sourceTarget }));
 	};
 
 	const absorb = () => {

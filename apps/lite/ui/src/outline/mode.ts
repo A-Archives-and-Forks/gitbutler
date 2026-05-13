@@ -6,16 +6,17 @@ import {
 	commitOperand,
 	operandContains,
 	operandEquals,
+	operandIdentityKey,
 	type Operand,
 } from "#ui/operands.ts";
 import { getOperation, getOperations, OperationType } from "#ui/operations/operation.ts";
 import { filterNavigationIndex, NavigationIndex } from "#ui/workspace/navigation-index.ts";
-import { CommitAbsorption } from "@gitbutler/but-sdk";
+import { AbsorptionTarget } from "@gitbutler/but-sdk";
 
 /** @public */
 export type AbsorbMode = {
 	source: Operand;
-	absorptionPlan: Array<CommitAbsorption>;
+	sourceTarget: AbsorptionTarget;
 	restoreSelection: Operand;
 };
 
@@ -65,13 +66,13 @@ export const pointerTransferOperationMode = ({
 /** @public */
 export const absorbOutlineMode = ({
 	source,
-	absorptionPlan,
 	restoreSelection,
+	sourceTarget,
 }: AbsorbMode): OutlineMode => ({
 	_tag: "Absorb",
 	source,
-	absorptionPlan,
 	restoreSelection,
+	sourceTarget,
 });
 
 /** @public */
@@ -150,9 +151,11 @@ const hasAnyOperation = (source: Operand, target: Operand) => {
 export const filterNavigationIndexForOutlineMode = ({
 	navigationIndex: navigationIndexUnfiltered,
 	outlineMode,
+	absorptionTargetKeys,
 }: {
 	navigationIndex: NavigationIndex;
 	outlineMode: OutlineMode;
+	absorptionTargetKeys: ReadonlySet<string>;
 }) =>
 	Match.value(outlineMode).pipe(
 		Match.tagsExhaustive({
@@ -162,9 +165,7 @@ export const filterNavigationIndexForOutlineMode = ({
 					navigationIndexUnfiltered,
 					(operand) =>
 						operandContains(operand, activeMode.source) ||
-						activeMode.absorptionPlan.some(({ stackId, commitId }) =>
-							operandEquals(commitOperand({ stackId, commitId }), operand),
-						),
+						absorptionTargetKeys.has(operandIdentityKey(operand)),
 				),
 			Transfer: (activeMode) =>
 				filterNavigationIndex(
