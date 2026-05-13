@@ -25,7 +25,7 @@ type DropTargetParams = Parameters<typeof dropTargetForElements>[0];
 type GetDataArgs = Parameters<NonNullable<DropTargetParams["getData"]>>[0];
 
 type DropData = {
-	operationType: OperationType;
+	operationType?: OperationType;
 };
 
 const parseDropData = (data: unknown): DropData | null => {
@@ -76,9 +76,9 @@ const useOperationDropTarget = ({ target, projectId }: { target: Operand; projec
 	const { mutate: runOperation } = useMutation(useRunOperationMutationOptions());
 	const dropRef = useRef<HTMLElement>(null);
 
-	const getDropData = useEffectEvent(({ input, element, source }: GetDataArgs): DropData | null => {
+	const getData = useEffectEvent(({ input, element, source }: GetDataArgs): DropData => {
 		const dragData = parseDragData(source.data);
-		if (!dragData) return null;
+		if (!dragData) return {};
 
 		const operationType = getDropOperationType({
 			source: dragData.source,
@@ -86,7 +86,7 @@ const useOperationDropTarget = ({ target, projectId }: { target: Operand; projec
 			input,
 			element,
 		});
-		if (operationType === null) return null;
+		if (operationType === null) return {};
 
 		return { operationType };
 	});
@@ -97,8 +97,7 @@ const useOperationDropTarget = ({ target, projectId }: { target: Operand; projec
 
 		return dropTargetForElements({
 			element,
-			getData: (args) => getDropData(args) ?? {},
-			canDrop: (args) => getDropData(args) !== null,
+			getData,
 			onDrag: (args) => {
 				const [innerMost] = args.location.current.dropTargets;
 				const isActiveDropTarget = innerMost?.element === args.self.element;
@@ -133,7 +132,7 @@ const useOperationDropTarget = ({ target, projectId }: { target: Operand; projec
 				const dragData = parseDragData(args.source.data);
 				const dropData = parseDropData(args.self.data);
 				const operation =
-					dragData && dropData
+					dragData && dropData?.operationType !== undefined
 						? getOperation({
 								source: dragData.source,
 								target,
