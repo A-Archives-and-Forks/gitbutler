@@ -19,6 +19,7 @@ export const handleWatcher = (
 				() => workspaceChanges,
 			);
 			void client.invalidateQueries({ queryKey: [QueryKey.TreeChangeDiffs, projectId] });
+			void client.invalidateQueries({ queryKey: [QueryKey.AbsorptionPlan, projectId] });
 			break;
 	}
 };
