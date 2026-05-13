@@ -67,15 +67,14 @@ const AbsorbControls: FC<{
 
 	return (
 		<>
-			{canAbsorb && (
-				<ShortcutButton
-					className={uiStyles.button}
-					hotkeys={confirmCommand.hotkeys}
-					onClick={confirmCommand.commandFn}
-				>
-					Absorb
-				</ShortcutButton>
-			)}
+			<ShortcutButton
+				className={uiStyles.button}
+				hotkeys={confirmCommand.hotkeys}
+				onClick={confirmCommand.commandFn}
+				disabled={!canAbsorb}
+			>
+				Absorb
+			</ShortcutButton>
 			<ShortcutButton
 				className={uiStyles.button}
 				hotkeys={cancelCommand.hotkeys}
