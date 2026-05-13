@@ -8,11 +8,12 @@ import { ShortcutButton } from "#ui/components/ShortcutButton.tsx";
 import { Spinner } from "#ui/components/Spinner.tsx";
 import uiStyles from "#ui/ui/ui.module.css";
 import { HotkeysProvider } from "@tanstack/react-hotkeys";
-import { useIsFetching, useSuspenseQuery } from "@tanstack/react-query";
+import { useIsFetching, useIsMutating, useSuspenseQuery } from "@tanstack/react-query";
 import { Outlet, useMatch, useNavigate } from "@tanstack/react-router";
 import { FC, useRef, useState } from "react";
 import styles from "./RootLayout.module.css";
 import { ProjectForFrontend } from "@gitbutler/but-sdk";
+import { Match } from "effect";
 
 const ProjectSelect: FC = () => {
 	const { data: projects } = useSuspenseQuery(listProjectsQueryOptions);
@@ -84,13 +85,22 @@ const TopBar: FC<{
 	setTopBarActionsElement: (element: HTMLDivElement | null) => void;
 }> = ({ setTopBarActionsElement }) => {
 	const fetchingCount = useIsFetching();
+	const mutatingCount = useIsMutating();
+
+	const isFetching = fetchingCount > 0;
+	const isMutating = mutatingCount > 0;
+
+	const status = Match.value({ isFetching, isMutating }).pipe(
+		Match.when({ isFetching: true, isMutating: true }, () => "Syncing"),
+		Match.when({ isFetching: true }, () => "Loading"),
+		Match.when({ isMutating: true }, () => "Saving"),
+		Match.orElse(() => null),
+	);
 
 	return (
 		<header className={styles.topBar}>
 			<ProjectSelect />
-			{fetchingCount > 0 && (
-				<Spinner className={styles.topBarSpinner} aria-label="Loading project data" />
-			)}
+			{status !== null && <Spinner className={styles.topBarSpinner} aria-label={status} />}
 			<div ref={setTopBarActionsElement} className={styles.topBarActions} />
 		</header>
 	);
