@@ -114,7 +114,7 @@ impl FileInfo {
     }
 }
 
-/// Lifecycle
+/// Utilities
 impl FileInfo {
     /// Returns true when a file is represented as UTF-8 text content.
     ///

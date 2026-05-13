@@ -6,7 +6,7 @@ use but_ctx::{Context, ThreadSafeContext};
 use but_forge::{
     ForgeName, ReviewTemplateFunctions, available_review_templates, get_review_template_functions,
 };
-use gitbutler_repo::RepoCommands;
+use gitbutler_repo::{FileInfo, RepoCommands};
 use tracing::instrument;
 
 pub fn remote_url(meta: &impl RefMetadata, repo: &gix::Repository) -> Result<String> {
@@ -21,6 +21,16 @@ pub fn push_remote_url(meta: &impl RefMetadata, repo: &gix::Repository) -> Resul
     // previous behaviour of calling `get_base_branch_data`.
     let ws = meta.workspace(WORKSPACE_REF_NAME.try_into()?)?;
     ws.push_remote_url(repo)
+}
+
+fn review_template_content(file: FileInfo) -> Result<String> {
+    if file.size.is_none() {
+        return Ok(String::new());
+    }
+    if !file.is_valid_utf8() {
+        anyhow::bail!("PR template exists but must be valid UTF-8 text or markdown");
+    }
+    Ok(file.content.unwrap_or_default())
 }
 
 /// (Deprecated) Get the list of PR template paths for the given project and forge.
@@ -81,10 +91,7 @@ pub fn pr_template(
         ));
     }
     let file = ctx.read_file_from_workspace(&relative_path)?;
-    if !file.is_valid_utf8() {
-        anyhow::bail!("PR template must be UTF-8 text or markdown");
-    }
-    Ok(file.content.unwrap_or_default())
+    review_template_content(file)
 }
 
 /// Information about the project's review template.
@@ -132,10 +139,7 @@ pub fn review_template(ctx: &Context) -> Result<Option<ReviewTemplateInfo>> {
                 ));
             }
             let file = ctx.read_file_from_workspace(&path)?;
-            if !file.is_valid_utf8() {
-                anyhow::bail!("PR template must be UTF-8 text or markdown");
-            }
-            let content = file.content.unwrap_or_default();
+            let content = review_template_content(file)?;
 
             Ok(Some(ReviewTemplateInfo {
                 path: template_path,
@@ -205,6 +209,30 @@ pub fn list_reviews(
         db,
         cache_config,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn missing_review_template_returns_empty_content() {
+        let content =
+            review_template_content(FileInfo::default()).expect("missing template is allowed");
+
+        assert_eq!(content, "");
+    }
+
+    #[test]
+    fn binary_review_template_errors_as_non_utf8() {
+        let err = review_template_content(FileInfo::binary("PULL_REQUEST_TEMPLATE.md".as_ref(), 4))
+            .expect_err("binary template must be rejected");
+
+        assert_eq!(
+            err.to_string(),
+            "PR template exists but must be valid UTF-8 text or markdown"
+        );
+    }
 }
 
 #[but_api(napi)]
