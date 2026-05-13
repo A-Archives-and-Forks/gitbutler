@@ -612,7 +612,6 @@ impl Graph {
         mut starts_next_stack_segment: impl FnMut(&Segment) -> bool,
         mut discard_stack: impl FnMut(&StackSegment) -> bool,
     ) -> anyhow::Result<Option<Vec<StackSegment>>> {
-        // TODO: Test what happens if a workspace commit is pointed at by a different ref (which is the entrypoint).
         let mut out = Vec::new();
         let mut next = Some(from);
         while let Some(from) = next.take() {
@@ -639,34 +638,7 @@ impl Graph {
                 .is_none_or(|c| c == Category::LocalBranch)
         }
 
-        // Prune empty invalid ones from the front as cleanup.
-        // This isn't an issue for algorithms as they always see the full version.
-        // TODO: remove this once we don't have remotes in a workspace because traversal logic can do it better.
-        if let Some(end) = out
-            .iter()
-            .enumerate()
-            .take_while(|(_idx, s)| s.commits.is_empty() && !is_entrypoint_or_local(s))
-            .map(|(idx, _s)| idx + 1)
-            .last()
-        {
-            out.drain(..end);
-        }
-
-        // Definitely remove non-local empties from behind.
-        // TODO: revise this
-        if let Some(new_len) = out
-            .iter()
-            .enumerate()
-            .rev()
-            .take_while(|(_idx, s)| s.commits.is_empty() && !is_entrypoint_or_local(s))
-            .last()
-            .map(|(idx, _s)| idx)
-        {
-            out.truncate(new_len);
-        }
-
-        // TODO: remove the hack of avoiding empty segments as special case, remove .is_empty() condition
-        let is_pruned = |s: &StackSegment| !s.commits.is_empty() && !is_entrypoint_or_local(s);
+        let is_pruned = |s: &StackSegment| !is_entrypoint_or_local(s);
         // Prune the whole stack if we start with unwanted segments.
         if out
             .first()
@@ -680,18 +652,6 @@ impl Graph {
             return Ok(None);
         }
 
-        // We may have picked up unwanted segments, if the graph isn't perfectly clean
-        // TODO: remove this to rather assure that non-local branches aren't linked up that way.
-        if let Some(new_len) = out
-            .iter()
-            .enumerate()
-            .rev()
-            .take_while(|(_idx, s)| is_pruned(s))
-            .last()
-            .map(|(idx, _s)| idx)
-        {
-            out.truncate(new_len);
-        }
         Ok((!out.is_empty()).then_some(out))
     }
 

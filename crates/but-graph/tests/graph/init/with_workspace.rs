@@ -6706,3 +6706,179 @@ fn integrated_commits_above_target_are_kept() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+/// A non-workspace ref (tag) points at the workspace commit itself,
+/// and that ref is used as the entrypoint for traversal.
+/// This verifies that the entrypoint is correctly identified even when it
+/// coincides with the workspace commit.
+#[test]
+fn entrypoint_on_workspace_commit() -> anyhow::Result<()> {
+    let (repo, mut meta) = read_only_in_memory_scenario("ws/entrypoint-on-workspace-commit")?;
+    insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
+    * 3ea2742 (HEAD -> gitbutler/workspace, tag: my-tag) GitButler Workspace Commit
+    * a62b0de (A) A2
+    * 120a217 A1
+    * fafd9d0 (origin/main, main) init
+    ");
+
+    add_workspace(&mut meta);
+    let graph = Graph::from_head(&repo, &*meta, standard_options())?.validated()?;
+    insta::assert_snapshot!(graph_tree(&graph), @"
+
+    ├── 👉📕►►►:0[0]:gitbutler/workspace[🌳]
+    │   └── ·3ea2742 (⌂|🏘|01) ►tags/my-tag
+    │       └── ►:3[1]:A
+    │           ├── ·a62b0de (⌂|🏘|01)
+    │           └── ·120a217 (⌂|🏘|01)
+    │               └── ►:2[2]:main <> origin/main →:1:
+    │                   └── 🏁·fafd9d0 (⌂|🏘|✓|11)
+    └── ►:1[0]:origin/main →:2:
+        └── →:2: (main →:1:)
+    ");
+
+    insta::assert_snapshot!(graph_workspace(&graph.into_workspace()?), @"
+    📕🏘️:0:gitbutler/workspace[🌳] <> ✓refs/remotes/origin/main on fafd9d0
+    └── ≡:3:A on fafd9d0
+        └── :3:A
+            ├── ·a62b0de (🏘️)
+            └── ·120a217 (🏘️)
+    ");
+
+    // Now traverse from the tag that points at the workspace commit.
+    let (id, name) = id_at(&repo, "my-tag");
+    let graph = Graph::from_commit_traversal(id, name, &*meta, standard_options())?.validated()?;
+    insta::assert_snapshot!(graph_tree(&graph), @"
+
+    ├── ►:0[0]:anon:
+    │   └── 👉►:5[1]:tags/my-tag
+    │       └── 📕►►►:1[2]:gitbutler/workspace[🌳]
+    │           └── ·3ea2742 (⌂|🏘|01)
+    │               └── ►:4[3]:A
+    │                   ├── ·a62b0de (⌂|🏘|01)
+    │                   └── ·120a217 (⌂|🏘|01)
+    │                       └── ►:3[4]:main <> origin/main →:2:
+    │                           └── 🏁·fafd9d0 (⌂|🏘|✓|11)
+    └── ►:2[0]:origin/main →:3:
+        └── →:3: (main →:2:)
+    ");
+    insta::assert_snapshot!(graph_workspace(&graph.into_workspace()?), @"
+    📕🏘️:1:gitbutler/workspace[🌳] <> ✓refs/remotes/origin/main on fafd9d0
+    └── ≡:4:A on fafd9d0
+        └── :4:A
+            ├── ·a62b0de (🏘️)
+            └── ·120a217 (🏘️)
+    ");
+    Ok(())
+}
+
+/// A workspace where the local branch was deleted, leaving only origin/A.
+/// The workspace commit still references the old branch tip as a parent.
+/// This probes whether a remote-only segment at the top of a stack is handled
+/// correctly (previously protected by front-pruning workaround).
+#[test]
+fn remote_only_stack_top() -> anyhow::Result<()> {
+    let (repo, mut meta) = read_only_in_memory_scenario("ws/remote-only-stack-top")?;
+    insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @"
+    * 3ea2742 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    * a62b0de (origin/A) A2
+    * 120a217 A1
+    * fafd9d0 (origin/main, main) init
+    ");
+
+    add_workspace(&mut meta);
+    let graph = Graph::from_head(&repo, &*meta, standard_options())?.validated()?;
+    insta::assert_snapshot!(graph_tree(&graph), @"
+
+    ├── 👉📕►►►:0[0]:gitbutler/workspace[🌳]
+    │   └── ·3ea2742 (⌂|🏘|01)
+    │       └── ►:3[1]:anon:
+    │           ├── ·a62b0de (⌂|🏘|01)
+    │           └── ·120a217 (⌂|🏘|01)
+    │               └── ►:2[2]:main <> origin/main →:1:
+    │                   └── 🏁·fafd9d0 (⌂|🏘|✓|11)
+    └── ►:1[0]:origin/main →:2:
+        └── →:2: (main →:1:)
+    ");
+    insta::assert_snapshot!(graph_workspace(&graph.into_workspace()?), @"
+    📕🏘️:0:gitbutler/workspace[🌳] <> ✓refs/remotes/origin/main on fafd9d0
+    └── ≡:3:anon: on fafd9d0
+        └── :3:anon:
+            ├── ·a62b0de (🏘️)
+            └── ·120a217 (🏘️)
+    ");
+    Ok(())
+}
+
+/// A local branch B is stacked on top of a remote-only origin/A (no local A).
+/// origin/A's commits are on the first-parent path between B and main.
+/// This probes whether a remote-only segment appearing after a local segment
+/// in a stack is handled correctly (previously protected by tail-pruning workaround).
+#[test]
+fn remote_trailing_local_stack() -> anyhow::Result<()> {
+    let (repo, mut meta) = read_only_in_memory_scenario("ws/remote-trailing-local-stack")?;
+    insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @"
+    * 5638b41 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    * cb7021b (B) B2
+    * ce3278a B1
+    * a62b0de (origin/A) A2
+    * 120a217 A1
+    * fafd9d0 (origin/main, main) init
+    ");
+
+    add_workspace(&mut meta);
+    let graph = Graph::from_head(&repo, &*meta, standard_options())?.validated()?;
+    insta::assert_snapshot!(graph_tree(&graph), @"
+
+    ├── 👉📕►►►:0[0]:gitbutler/workspace[🌳]
+    │   └── ·5638b41 (⌂|🏘|01)
+    │       └── ►:3[1]:B
+    │           ├── ·cb7021b (⌂|🏘|01)
+    │           └── 🏁·ce3278a (⌂|🏘|01)
+    └── ►:1[0]:origin/main →:2:
+        └── ►:2[1]:main <> origin/main →:1:
+            └── 🏁·fafd9d0 (⌂|✓|10)
+    ");
+    insta::assert_snapshot!(graph_workspace(&graph.into_workspace()?), "this is a weird state as the target is actually disjoint from the workspace - it appears empty now", @"📕🏘️:0:gitbutler/workspace[🌳] <> ✓refs/remotes/origin/main⇣1 on cb7021b");
+    Ok(())
+}
+
+/// A workspace that merges a remote-only branch (origin/A) with no local counterpart.
+/// Unlike `remote_only_stack_top` where the local was deleted after workspace creation,
+/// here the local never existed. This tests whether the `is_pruned` check correctly
+/// handles a stack that starts with a remote-only segment.
+#[test]
+fn remote_ref_as_stack_top() -> anyhow::Result<()> {
+    let (repo, mut meta) = read_only_in_memory_scenario("ws/remote-ref-as-stack-top")?;
+    insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
+    *   21bff1f (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    |\  
+    | * a62b0de (origin/A) A2
+    | * 120a217 A1
+    |/  
+    * fafd9d0 (origin/main, main) init
+    ");
+
+    add_workspace(&mut meta);
+    let graph = Graph::from_head(&repo, &*meta, standard_options())?.validated()?;
+    insta::assert_snapshot!(graph_tree(&graph), @"
+
+    ├── 👉📕►►►:0[0]:gitbutler/workspace[🌳]
+    │   └── ·21bff1f (⌂|🏘|01)
+    │       ├── ►:2[2]:main <> origin/main →:1:
+    │       │   └── 🏁·fafd9d0 (⌂|🏘|✓|11)
+    │       └── ►:3[1]:anon:
+    │           ├── ·a62b0de (⌂|🏘|01)
+    │           └── ·120a217 (⌂|🏘|01)
+    │               └── →:2: (main →:1:)
+    └── ►:1[0]:origin/main →:2:
+        └── →:2: (main →:1:)
+    ");
+    insta::assert_snapshot!(graph_workspace(&graph.into_workspace()?), @"
+    📕🏘️:0:gitbutler/workspace[🌳] <> ✓refs/remotes/origin/main on fafd9d0
+    └── ≡:3:anon: on fafd9d0
+        └── :3:anon:
+            ├── ·a62b0de (🏘️)
+            └── ·120a217 (🏘️)
+    ");
+    Ok(())
+}
