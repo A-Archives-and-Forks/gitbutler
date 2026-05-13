@@ -26,9 +26,9 @@ pub struct Args {
 pub enum Subcommands {
     /// Return a segmented graph starting from `HEAD`.
     Graph(GraphArgs),
-    /// Compute the octopus merge-base for two or more revisions.
-    #[command(name = "merge-base")]
-    MergeBase(MergeBaseArgs),
+    /// Debug revision graph operations.
+    #[clap(visible_alias = "rev")]
+    Revision(RevisionArgs),
 }
 
 /// Arguments for the `graph` debugging subcommand.
@@ -74,15 +74,51 @@ pub struct GraphArgs {
     pub ref_name: Option<String>,
 }
 
-/// Arguments for the `merge-base` debugging subcommand.
+/// Arguments for the `revision` subcommand.
 #[derive(Debug, clap::Args)]
-pub struct MergeBaseArgs {
+pub struct RevisionArgs {
+    /// The revision debugging command to run.
+    #[command(subcommand)]
+    pub cmd: RevisionSubcommands,
+}
+
+/// The debugging subcommands supported by `but-debug revision`.
+#[derive(Debug, clap::Subcommand)]
+pub enum RevisionSubcommands {
+    /// Print commits reachable by a rev-spec.
+    Log(LogArgs),
+    /// Compute the octopus merge-base for two or more revisions.
+    #[command(name = "merge-base")]
+    MergeBase(MergeBaseArgs),
+}
+
+/// Graph construction options shared by revision debugging subcommands.
+#[derive(Debug, clap::Args)]
+pub struct RevisionGraphArgs {
     /// The named reference to use as the workspace target during graph traversal.
     #[arg(long)]
     pub target_ref: Option<String>,
     /// The rev-spec of the extra target to provide for graph traversal.
     #[arg(long)]
     pub extra_target: Option<String>,
+}
+
+/// Arguments for the `revision log` debugging subcommand.
+#[derive(Debug, clap::Args)]
+pub struct LogArgs {
+    /// Shared graph construction options.
+    #[command(flatten)]
+    pub graph: RevisionGraphArgs,
+    /// The rev-spec to log. Exclusive ranges like `main..branch` are supported.
+    pub rev_spec: String,
+}
+
+/// Arguments for the `revision merge-base` debugging subcommand.
+#[derive(Debug, clap::Args)]
+pub struct MergeBaseArgs {
+    /// Shared graph construction options.
+    #[command(flatten)]
+    pub graph: RevisionGraphArgs,
     /// The rev-specs whose octopus merge-base should be computed.
     #[arg(required = true, num_args = 2.., value_name = "REV")]
     pub revisions: Vec<String>,
@@ -92,7 +128,7 @@ pub struct MergeBaseArgs {
 mod tests {
     use clap::{CommandFactory as _, Parser as _};
 
-    use super::{Args, Subcommands};
+    use super::{Args, RevisionSubcommands, Subcommands};
 
     #[test]
     fn clap_configuration_is_valid() {
@@ -101,12 +137,17 @@ mod tests {
 
     #[test]
     fn merge_base_requires_at_least_two_revisions() {
-        assert!(Args::try_parse_from(["but-debug", "merge-base", "main"]).is_err());
+        assert!(Args::try_parse_from(["but-debug", "revision", "merge-base", "main"]).is_err());
 
-        let args = Args::parse_from(["but-debug", "merge-base", "main", "feature"]);
+        let args = Args::parse_from(["but-debug", "revision", "merge-base", "main", "feature"]);
         match args.cmd {
-            Subcommands::MergeBase(args) => assert_eq!(args.revisions, ["main", "feature"]),
-            _ => panic!("expected merge-base command"),
+            Subcommands::Revision(revision_args) => match revision_args.cmd {
+                RevisionSubcommands::MergeBase(args) => {
+                    assert_eq!(args.revisions, ["main", "feature"])
+                }
+                _ => panic!("expected merge-base command"),
+            },
+            _ => panic!("expected revision command"),
         }
     }
 
@@ -114,6 +155,7 @@ mod tests {
     fn merge_base_accepts_target_options() {
         let args = Args::parse_from([
             "but-debug",
+            "revision",
             "merge-base",
             "--target-ref",
             "refs/remotes/origin/main",
@@ -124,12 +166,31 @@ mod tests {
         ]);
 
         match args.cmd {
-            Subcommands::MergeBase(args) => {
-                assert_eq!(args.target_ref.as_deref(), Some("refs/remotes/origin/main"));
-                assert_eq!(args.extra_target.as_deref(), Some("origin/main~1"));
-                assert_eq!(args.revisions, ["main", "feature"]);
-            }
-            _ => panic!("expected merge-base command"),
+            Subcommands::Revision(revision_args) => match revision_args.cmd {
+                RevisionSubcommands::MergeBase(args) => {
+                    assert_eq!(
+                        args.graph.target_ref.as_deref(),
+                        Some("refs/remotes/origin/main")
+                    );
+                    assert_eq!(args.graph.extra_target.as_deref(), Some("origin/main~1"));
+                    assert_eq!(args.revisions, ["main", "feature"]);
+                }
+                _ => panic!("expected merge-base command"),
+            },
+            _ => panic!("expected revision command"),
+        }
+    }
+
+    #[test]
+    fn revision_log_accepts_exclusive_range() {
+        let args = Args::parse_from(["but-debug", "revision", "log", "main..feature"]);
+
+        match args.cmd {
+            Subcommands::Revision(revision_args) => match revision_args.cmd {
+                RevisionSubcommands::Log(args) => assert_eq!(args.rev_spec, "main..feature"),
+                _ => panic!("expected log command"),
+            },
+            _ => panic!("expected revision command"),
         }
     }
 }

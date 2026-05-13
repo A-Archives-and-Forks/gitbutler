@@ -159,51 +159,167 @@ impl Graph {
     /// `included` towards history.
     ///
     /// Unlike Git's revision walk, this does not sort pending commits by date or enforce
-    /// global topo-order across segments: it uses FIFO segment traversal and emits each
-    /// segment's commits in their stored tip-to-base order.
-    ///
-    /// It also eagerly marks all segments reachable from `excluded` before walking `included`,
-    /// which can visit more of the excluded side than Git would for small reachable differences.
-    pub fn find_commits_reachable_from_a_not_b(
+    /// global topo-order across commits. It walks segments by their graph generation,
+    /// emits each segment's commits in stored tip-to-base order, and lazily paints the
+    /// excluded side only as far as needed to prove emitted segments are not hidden.
+    pub fn find_segments_reachable_from_a_not_b(
         &self,
         included: SegmentIndex,
         excluded: SegmentIndex,
     ) -> Vec<&Commit> {
         let mut flags = SegmentTable::new(self.inner.node_bound(), SegmentFlags::empty());
-        self.paint_down_to_reachable_eagerly(excluded, SegmentFlags::SEGMENT2, &mut flags);
+        let mut queue = BinaryHeap::new();
+        let mut sequence = 0;
+        self.queue_segment_for_reachable_difference(
+            included,
+            false,
+            &mut flags,
+            &mut queue,
+            &mut sequence,
+        );
+        self.queue_segment_for_reachable_difference(
+            excluded,
+            true,
+            &mut flags,
+            &mut queue,
+            &mut sequence,
+        );
 
-        let mut queue = VecDeque::new();
-        queue.push_back(included);
-
-        let mut commits = Vec::new();
-        while let Some(segment_id) = queue.pop_front() {
-            let segment_flags = flags.get_mut(segment_id);
-            if segment_flags.contains(SegmentFlags::SEGMENT1) {
-                continue;
-            }
-            segment_flags.insert(SegmentFlags::SEGMENT1);
-
-            if segment_flags.contains(SegmentFlags::SEGMENT2) {
-                continue;
-            }
-
-            let segment = &self[segment_id];
-            commits.extend(segment.commits.iter());
-            queue.extend(
-                self.inner
+        let mut segments = Vec::new();
+        let mut max_emitted_generation = None;
+        while let Some((_, _, is_excluded, segment_id)) = queue.pop() {
+            if is_excluded {
+                for parent_id in self
+                    .inner
                     .edges_directed(segment_id, Direction::Outgoing)
-                    .map(|edge| edge.target()),
-            );
+                    .map(|edge| edge.target())
+                {
+                    self.queue_segment_for_reachable_difference(
+                        parent_id,
+                        true,
+                        &mut flags,
+                        &mut queue,
+                        &mut sequence,
+                    );
+                }
+                if self.excluded_frontier_is_past_emitted_segments(
+                    &queue,
+                    &flags,
+                    max_emitted_generation,
+                ) {
+                    break;
+                }
+                continue;
+            }
+
+            if flags.get(segment_id).contains(SegmentFlags::SEGMENT2) {
+                continue;
+            }
+
+            let generation = self[segment_id].generation;
+            max_emitted_generation =
+                Some(max_emitted_generation.map_or(generation, |max| max.max(generation)));
+            segments.push(segment_id);
+            for parent_id in self
+                .inner
+                .edges_directed(segment_id, Direction::Outgoing)
+                .map(|edge| edge.target())
+            {
+                self.queue_segment_for_reachable_difference(
+                    parent_id,
+                    false,
+                    &mut flags,
+                    &mut queue,
+                    &mut sequence,
+                );
+            }
         }
 
-        commits
+        segments
+            .into_iter()
+            .filter(|segment_id| !flags.get(*segment_id).contains(SegmentFlags::SEGMENT2))
+            .flat_map(|segment_id| self[segment_id].commits.iter())
+            .collect()
+    }
+
+    /// Queue `segment_id` for the reachable-difference walk if this side has not seen it yet.
+    ///
+    /// `SEGMENT1` tracks the included side, `SEGMENT2` tracks the excluded side, and `STALE`
+    /// is reused here as the excluded-side queued/processed bit. Included segments that are
+    /// already known to be excluded are not queued because they cannot contribute to the result.
+    /// Queue keys sort by ascending generation and then insertion order so both frontiers advance
+    /// from tips toward history in a deterministic segment order.
+    fn queue_segment_for_reachable_difference(
+        &self,
+        segment_id: SegmentIndex,
+        is_excluded: bool,
+        flags: &mut SegmentTable<SegmentFlags>,
+        queue: &mut BinaryHeap<(Reverse<usize>, Reverse<usize>, bool, SegmentIndex)>,
+        sequence: &mut usize,
+    ) {
+        let segment_flags = flags.get_mut(segment_id);
+        if is_excluded {
+            segment_flags.insert(SegmentFlags::SEGMENT2);
+            if segment_flags.contains(SegmentFlags::STALE) {
+                return;
+            }
+            segment_flags.insert(SegmentFlags::STALE);
+        } else {
+            if segment_flags.intersects(SegmentFlags::SEGMENT1 | SegmentFlags::SEGMENT2) {
+                return;
+            }
+            segment_flags.insert(SegmentFlags::SEGMENT1);
+        }
+
+        queue.push((
+            Reverse(self[segment_id].generation),
+            Reverse(*sequence),
+            is_excluded,
+            segment_id,
+        ));
+        *sequence += 1;
+    }
+
+    /// Return `true` once the excluded-side frontier cannot still hide any segment already emitted.
+    ///
+    /// Segment generations are topological: edges point from lower generations toward higher
+    /// generations. After all non-hidden included work has left the queue, an excluded frontier
+    /// whose minimum generation is greater than the maximum emitted generation can only paint
+    /// deeper ancestors, not any emitted segment. At that point the caller may stop walking the
+    /// excluded side and filter the segments that were already marked hidden.
+    fn excluded_frontier_is_past_emitted_segments(
+        &self,
+        queue: &BinaryHeap<(Reverse<usize>, Reverse<usize>, bool, SegmentIndex)>,
+        flags: &SegmentTable<SegmentFlags>,
+        max_emitted_generation: Option<usize>,
+    ) -> bool {
+        if queue.iter().any(|(_, _, is_excluded, segment_id)| {
+            !*is_excluded && !flags.get(*segment_id).contains(SegmentFlags::SEGMENT2)
+        }) {
+            return false;
+        }
+
+        let Some(max_emitted_generation) = max_emitted_generation else {
+            return true;
+        };
+        let Some(min_excluded_generation) = queue
+            .iter()
+            .filter_map(|(_, _, is_excluded, segment_id)| {
+                is_excluded.then_some(self[*segment_id].generation)
+            })
+            .min()
+        else {
+            return true;
+        };
+
+        min_excluded_generation > max_emitted_generation
     }
 
     /// Return all commit ids reachable from `included`, but not reachable from `excluded`.
     ///
     /// This is a convenience wrapper around
-    /// [`Self::find_commits_reachable_from_a_not_b()`], taking object ids of commits.
-    pub fn find_commit_ids_from_a_not_b(
+    /// [`Self::find_segments_reachable_from_a_not_b()`], taking object ids of commits.
+    pub fn find_commit_ids_reachable_from_a_not_b(
         &self,
         included: gix::ObjectId,
         excluded: gix::ObjectId,
@@ -211,7 +327,7 @@ impl Graph {
         let included = self.commit_id_to_segment_id(included)?;
         let excluded = self.commit_id_to_segment_id(excluded)?;
         Ok(self
-            .find_commits_reachable_from_a_not_b(included, excluded)
+            .find_segments_reachable_from_a_not_b(included, excluded)
             .into_iter()
             .map(|commit| commit.id)
             .collect())
@@ -338,31 +454,6 @@ impl Graph {
         }
 
         out
-    }
-
-    /// Paint every segment reachable from `start` with `flag`.
-    fn paint_down_to_reachable_eagerly(
-        &self,
-        start: SegmentIndex,
-        flag: SegmentFlags,
-        flags: &mut SegmentTable<SegmentFlags>,
-    ) {
-        let mut queue = VecDeque::new();
-        flags.get_mut(start).insert(flag);
-        queue.push_back(start);
-
-        while let Some(segment_id) = queue.pop_front() {
-            for parent_id in self
-                .inner
-                .neighbors_directed(segment_id, Direction::Outgoing)
-            {
-                let parent_flags = flags.get_mut(parent_id);
-                if !parent_flags.contains(flag) {
-                    parent_flags.insert(flag);
-                    queue.push_back(parent_id);
-                }
-            }
-        }
     }
 
     /// Remove all those segments from `segments` if they are in the history of another segment in `segments`.

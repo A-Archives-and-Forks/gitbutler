@@ -1,23 +1,91 @@
-//! Implementation of the `merge-base` debug command.
+//! Implementation of the `revision` debug commands.
+
+use std::io::Write;
 
 use anyhow::{Context as _, Result, bail, ensure};
 use but_core::ref_metadata::{
     StackId, Workspace, WorkspaceCommitRelation, WorkspaceStack, WorkspaceStackBranch,
 };
-use gix::{odb::store::RefreshMode, reference::Category, refs::Target};
+use gix::{
+    bstr::ByteVec, odb::store::RefreshMode, reference::Category, refs::Target,
+    revision::plumbing::Spec,
+};
 
 use crate::{
-    args::{Args, MergeBaseArgs},
+    args::{Args, LogArgs, MergeBaseArgs, RevisionArgs, RevisionGraphArgs, RevisionSubcommands},
     metadata::EmptyRefMetadata,
     setup,
 };
 
-/// Execute the `merge-base` subcommand.
-pub(crate) fn run(args: &Args, merge_base_args: &MergeBaseArgs) -> Result<()> {
+/// Execute the `revision` subcommand.
+pub(crate) fn run(args: &Args, revision_args: &RevisionArgs) -> Result<()> {
     let mut repo = setup::repo_from_args(args)?;
     repo.objects.refresh = RefreshMode::Never;
     let meta = EmptyRefMetadata;
 
+    match &revision_args.cmd {
+        RevisionSubcommands::Log(log_args) => log(&repo, &meta, log_args),
+        RevisionSubcommands::MergeBase(merge_base_args) => {
+            merge_base(&repo, &meta, merge_base_args)
+        }
+    }
+}
+
+fn log(repo: &gix::Repository, meta: &EmptyRefMetadata, log_args: &LogArgs) -> Result<()> {
+    let parsed = repo
+        .rev_parse(log_args.rev_spec.as_str())
+        .with_context(|| format!("Failed to parse rev-spec '{}'", log_args.rev_spec))?
+        .detach();
+
+    let (included, excluded) = match parsed {
+        Spec::Include(commit_id) => (commit_id, None),
+        Spec::Range { from, to } => (to, Some(from)),
+        other => bail!("Unsupported rev-spec for revision log: {other}"),
+    };
+    let mut graph_commits = vec![included];
+    graph_commits.extend(excluded);
+
+    let graph_args = resolve_graph_args(repo, &log_args.graph)?;
+    let graph = {
+        let _span =
+            tracing::info_span!("build graph", commit_count = graph_commits.len()).entered();
+        graph_for_revisions(repo, meta, &graph_commits, graph_args)?
+    };
+
+    let _span = tracing::info_span!("traverse graph").entered();
+    let commits = if let Some(excluded) = excluded {
+        graph.find_commit_ids_reachable_from_a_not_b(included, excluded)?
+    } else {
+        let included_segment = graph.commit_id_to_segment_id(included).with_context(|| {
+            format!("Failed to map included commit {included} to a graph segment")
+        })?;
+        let mut commits = Vec::new();
+        graph.visit_all_segments_including_start_until(
+            included_segment,
+            but_graph::petgraph::Direction::Outgoing,
+            |segment| {
+                commits.extend(segment.commits.iter().map(|commit| commit.id));
+                false
+            },
+        );
+        commits
+    };
+
+    let mut out = Vec::with_capacity(512);
+    for commit_id in commits {
+        commit_id.write_hex_to(&mut out)?;
+        out.push_byte(b'\n');
+    }
+
+    std::io::stdout().write_all(&out)?;
+    Ok(())
+}
+
+fn merge_base(
+    repo: &gix::Repository,
+    meta: &EmptyRefMetadata,
+    merge_base_args: &MergeBaseArgs,
+) -> Result<()> {
     let commits = {
         let _span = tracing::info_span!(
             "resolve revisions",
@@ -35,39 +103,10 @@ pub(crate) fn run(args: &Args, merge_base_args: &MergeBaseArgs) -> Result<()> {
             .collect::<Result<Vec<_>>>()?
     };
 
-    let target_ref = {
-        merge_base_args
-            .target_ref
-            .as_deref()
-            .map(|target_ref| {
-                let reference = repo
-                    .find_reference(target_ref)
-                    .with_context(|| format!("Failed to find target ref '{target_ref}'"))?;
-                let name = reference.name().to_owned();
-                ensure!(
-                    name.category() == Some(Category::RemoteBranch),
-                    "Target ref '{name}' resolved from '{target_ref}' is not a remote-tracking branch; use --extra-target for arbitrary revisions"
-                );
-                Ok(name)
-            })
-            .transpose()?
-    };
-
-    let extra_target = {
-        merge_base_args
-            .extra_target
-            .as_deref()
-            .map(|rev| {
-                repo.rev_parse_single(rev)
-                    .map(|id| id.detach())
-                    .with_context(|| format!("Failed to resolve extra target '{rev}'"))
-            })
-            .transpose()?
-    };
-
+    let graph_args = resolve_graph_args(repo, &merge_base_args.graph)?;
     let graph = {
         let _span = tracing::info_span!("build graph", commit_count = commits.len()).entered();
-        graph_for_octopus_merge_base(&repo, &meta, &commits, target_ref, extra_target)?
+        graph_for_revisions(repo, meta, &commits, graph_args)?
     };
 
     let segments = {
@@ -111,20 +150,57 @@ pub(crate) fn run(args: &Args, merge_base_args: &MergeBaseArgs) -> Result<()> {
     Ok(())
 }
 
-fn graph_for_octopus_merge_base(
+struct GraphArgs {
+    target_ref: Option<gix::refs::FullName>,
+    extra_target: Option<gix::ObjectId>,
+}
+
+fn resolve_graph_args(repo: &gix::Repository, graph_args: &RevisionGraphArgs) -> Result<GraphArgs> {
+    let target_ref = graph_args
+        .target_ref
+        .as_deref()
+        .map(|target_ref| {
+            let reference = repo
+                .find_reference(target_ref)
+                .with_context(|| format!("Failed to find target ref '{target_ref}'"))?;
+            let name = reference.name().to_owned();
+            ensure!(
+                name.category() == Some(Category::RemoteBranch),
+                "Target ref '{name}' resolved from '{target_ref}' is not a remote-tracking branch; use --extra-target for arbitrary revisions"
+            );
+            Ok(name)
+        })
+        .transpose()?;
+
+    let extra_target = graph_args
+        .extra_target
+        .as_deref()
+        .map(|rev| {
+            repo.rev_parse_single(rev)
+                .map(|id| id.detach())
+                .with_context(|| format!("Failed to resolve extra target '{rev}'"))
+        })
+        .transpose()?;
+
+    Ok(GraphArgs {
+        target_ref,
+        extra_target,
+    })
+}
+
+fn graph_for_revisions(
     repo: &gix::Repository,
     meta: &EmptyRefMetadata,
     commits: &[gix::ObjectId],
-    target_ref: Option<gix::refs::FullName>,
-    extra_target: Option<gix::ObjectId>,
+    graph_args: GraphArgs,
 ) -> Result<but_graph::Graph> {
     let first = *commits
         .first()
-        .context("BUG: clap requires at least two revisions")?;
+        .context("BUG: revision graph requires at least one commit")?;
     let options = but_graph::init::Options {
         collect_tags: false,
         commits_limit_hint: None,
-        extra_target_commit_id: extra_target,
+        extra_target_commit_id: graph_args.extra_target,
         ..Default::default()
     };
     let mut graph = but_graph::Graph::default();
@@ -164,7 +240,7 @@ fn graph_for_octopus_merge_base(
                 workspacecommit_relation: WorkspaceCommitRelation::Merged,
             })
             .collect(),
-        target_ref,
+        target_ref: graph_args.target_ref,
         ..Default::default()
     };
     let overlay = but_graph::init::Overlay::default()
@@ -176,7 +252,7 @@ fn graph_for_octopus_merge_base(
 }
 
 fn synthetic_ref_name(suffix: &str) -> Result<gix::refs::FullName> {
-    format!("refs/heads/but-debug/merge-base/{suffix}")
+    format!("refs/heads/but-debug/revision/{suffix}")
         .try_into()
         .with_context(|| format!("BUG: invalid synthetic ref suffix '{suffix}'"))
 }
