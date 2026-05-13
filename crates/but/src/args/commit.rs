@@ -16,6 +16,9 @@ pub struct Platform {
     /// Only commit staged files, not unstaged files
     #[clap(short = 'o', long = "only")]
     pub only: bool,
+    /// No-op compatibility flag for `git commit -a`.
+    #[clap(short = 'a', long = "all")]
+    pub all: bool,
     /// Bypass pre-commit hooks
     #[clap(short = 'n', long = "no-hooks", alias = "no-verify")]
     pub no_hooks: bool,

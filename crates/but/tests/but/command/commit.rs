@@ -94,6 +94,27 @@ fn commit_with_message_flag() -> anyhow::Result<()> {
 }
 
 #[test]
+fn commit_with_git_all_flag_prints_hint() -> anyhow::Result<()> {
+    let env = Sandbox::init_scenario_with_target_and_default_settings("one-stack")?;
+    env.setup_metadata(&["A"])?;
+    env.file("new-file.txt", "test content");
+
+    env.but("commit -am 'Add new file'")
+        .assert()
+        .success()
+        .stdout_eq(str![[r#"
+no need for -a here my friend...
+✓ Created commit [..] on branch A
+
+"#]]);
+
+    let log = env.git_log()?;
+    assert!(log.contains("Add new file"));
+
+    Ok(())
+}
+
+#[test]
 fn commit_with_branch_hint() -> anyhow::Result<()> {
     let env = Sandbox::init_scenario_with_target_and_default_settings("two-stacks")?;
     insta::assert_snapshot!(env.git_log()?, @r"

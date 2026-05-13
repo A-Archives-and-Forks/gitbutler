@@ -297,6 +297,7 @@ pub(crate) fn commit(
     branch_hint: Option<&str>,
     file_ids: &[String],
     only: bool,
+    all: bool,
     create_branch: bool,
     no_hooks: bool,
     generate_message: Option<Option<String>>,
@@ -306,6 +307,10 @@ pub(crate) fn commit(
     let id_map = IdMap::new_from_context(ctx, None, guard.read_permission())?;
 
     let t = theme::get();
+
+    if all && let Some(out) = out.for_human() {
+        writeln!(out, "no need for -a here my friend...")?;
+    }
 
     // Get all stacks using but-api
     let stack_entries = workspace::stacks(ctx, None)?;
