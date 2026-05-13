@@ -307,6 +307,7 @@ pub fn open_url(url: String) -> Result<()> {
 /// - `hyper` - Hyper
 /// - `wezterm` - WezTerm
 /// - `kitty` - Kitty
+/// - `cosmic-term` - COSMIC Terminal
 ///
 /// # Errors
 /// Returns an error if:
@@ -459,7 +460,7 @@ pub fn open_in_terminal(terminal_id: String, path: String) -> Result<()> {
             // Note: `binary` is used instead of the terminal ID because some terminals
             // have a different binary name (e.g. "warp" launches "warp-terminal").
             "gnome-terminal" | "konsole" | "xfce4-terminal" | "alacritty" | "ghostty" | "warp"
-            | "kitty" => {
+            | "kitty" | "cosmic-term" => {
                 let mut cmd = Command::new(binary);
                 cmd.current_dir(&path);
                 spawn_and_reap(cmd, binary, &path)?;
