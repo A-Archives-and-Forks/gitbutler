@@ -350,12 +350,12 @@ impl Graph {
             .collect())
     }
 
-    /// Compute an order-dependent octopus merge-base from multiple `segments`.
+    /// Compute an octopus merge-base from multiple `segments`.
     ///
     /// The first segment becomes the initial candidate. Each following segment is
     /// folded into that candidate by computing their pairwise
-    /// [`Self::find_merge_base()`]. If a pair does not share history, the
-    /// previous candidate is kept and folding continues.
+    /// [`Self::find_merge_base()`]. If any pair does not share history, there
+    /// is no merge-base common to all segments.
     ///
     /// Returns `None` if `segments` is empty.
     /// If `segments` has one element, it returns that.
@@ -363,9 +363,9 @@ impl Graph {
         &self,
         segments: impl IntoIterator<Item = SegmentIndex>,
     ) -> Option<SegmentIndex> {
-        segments
-            .into_iter()
-            .reduce(|a, b| self.find_merge_base(a, b).unwrap_or(a))
+        let mut segments = segments.into_iter();
+        let first = segments.next()?;
+        segments.try_fold(first, |base, segment| self.find_merge_base(base, segment))
     }
 
     /// Like [`Self::find_merge_base_octopus()`], but works with object ids of `commits`,

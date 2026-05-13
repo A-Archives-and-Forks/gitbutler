@@ -153,6 +153,7 @@ fn relation_between_handles_identity_and_disjoint_segments() -> anyhow::Result<(
     let mut graph = Graph::from_head(&repo, &*meta, standard_options())?.validated()?;
 
     let main = segment_id_by_ref_name(&graph, "refs/heads/main")?;
+    let a = segment_id_by_ref_name(&graph, "refs/heads/A")?;
     assert_eq!(
         graph.relation_between(main, main),
         SegmentRelation::Identity
@@ -166,6 +167,8 @@ fn relation_between_handles_identity_and_disjoint_segments() -> anyhow::Result<(
         graph.relation_between(main, orphan),
         SegmentRelation::Disjoint
     );
+    assert_eq!(graph.find_merge_base_octopus([main, orphan]), None);
+    assert_eq!(graph.find_merge_base_octopus([main, orphan, a]), None);
 
     Ok(())
 }

@@ -145,7 +145,7 @@ impl Graph {
                 {
                     None
                 } else {
-                    self.find_merge_base_octopus(
+                    self.find_best_effort_workspace_base(
                         self.inner
                             .neighbors_directed(ws_tip_segment.id, Direction::Outgoing),
                     )
@@ -378,7 +378,10 @@ impl Graph {
     ///
     /// ## Note
     ///
-    /// This is a **merge-base octopus** effectively, and works without generation numbers.
+    /// This is a best-effort merge-base fold for workspace lower-bound compatibility.
+    ///
+    /// It does not use generation numbers to select a globally lowest base across all candidates;
+    /// it preserves the legacy pairwise fold behavior instead.
     // TODO: actually compute the lowest base, see `first_merge_base()` which should be `lowest_merge_base()` by itself,
     //       accounting for finding the lowest of all merge-bases which would be assumed to be reachable by all segments
     //       searching downward, a necessary trait for many search problems.
@@ -407,7 +410,7 @@ impl Graph {
             .chain(target_commit.map(|t| t.segment_index))
             .chain(additional);
 
-        let base = self.find_merge_base_octopus(all_segments.inspect(|_| count += 1))?;
+        let base = self.find_best_effort_workspace_base(all_segments.inspect(|_| count += 1))?;
 
         if count < 2 || base == actual_tip {
             match tip {
@@ -427,6 +430,21 @@ impl Graph {
             self.first_commit_or_find_along_first_parent(base)
                 .map(|(c, sidx)| (c.id, sidx))
         }
+    }
+
+    /// Fold pairwise merge-bases for workspace lower-bound projection.
+    ///
+    /// A workspace lower-bound is used to frame legacy presentation and mutation compatibility.
+    /// Historically, disjoint inputs kept the previous candidate instead of clearing the lower
+    /// bound, so keep that behavior local to workspace projection rather than weakening
+    ///[`Self::find_merge_base_octopus()`].
+    fn find_best_effort_workspace_base(
+        &self,
+        segments: impl IntoIterator<Item = SegmentIndex>,
+    ) -> Option<SegmentIndex> {
+        segments
+            .into_iter()
+            .reduce(|base, segment| self.find_merge_base(base, segment).unwrap_or(base))
     }
 }
 
