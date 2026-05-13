@@ -139,24 +139,6 @@ const hasAnyOperation = (source: Operand, target: Operand) => {
 	return !!operations.rub || !!operations.moveAbove || !!operations.moveBelow;
 };
 
-export const isOutlineModeCandidateTarget = ({
-	mode,
-	target,
-}: {
-	mode: OutlineMode;
-	target: Operand;
-}): boolean =>
-	Match.value(mode).pipe(
-		Match.tags({
-			Absorb: ({ absorptionPlan }) =>
-				absorptionPlan.some(({ stackId, commitId }) =>
-					operandEquals(commitOperand({ stackId, commitId }), target),
-				),
-			Transfer: ({ value: mode }) => hasAnyOperation(mode.source, target),
-		}),
-		Match.orElse(() => false),
-	);
-
 export const filterNavigationIndexForOutlineMode = ({
 	navigationIndex: navigationIndexUnfiltered,
 	outlineMode,
@@ -172,14 +154,16 @@ export const filterNavigationIndexForOutlineMode = ({
 					navigationIndexUnfiltered,
 					(operand) =>
 						operandContains(operand, activeMode.source) ||
-						isOutlineModeCandidateTarget({ mode: activeMode, target: operand }),
+						activeMode.absorptionPlan.some(({ stackId, commitId }) =>
+							operandEquals(commitOperand({ stackId, commitId }), operand),
+						),
 				),
 			Transfer: (activeMode) =>
 				filterNavigationIndex(
 					navigationIndexUnfiltered,
 					(operand) =>
 						operandContains(operand, activeMode.value.source) ||
-						isOutlineModeCandidateTarget({ mode: activeMode, target: operand }),
+						hasAnyOperation(activeMode.value.source, operand),
 				),
 			RenameBranch: (x) =>
 				filterNavigationIndex(navigationIndexUnfiltered, (operand) =>

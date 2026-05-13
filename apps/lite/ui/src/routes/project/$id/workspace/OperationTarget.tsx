@@ -1,4 +1,4 @@
-import { type Operand } from "#ui/operands.ts";
+import { commitOperand, operandEquals, type Operand } from "#ui/operands.ts";
 import { parseDragData } from "./OperationSourceC.tsx";
 import styles from "./OperationTarget.module.css";
 import { OperationTooltip } from "./OperationTooltip.tsx";
@@ -19,7 +19,6 @@ import {
 import { mergeProps, useRender } from "@base-ui/react";
 import { Match, pipe } from "effect";
 import { FC, useEffect, useEffectEvent, useRef } from "react";
-import { isOutlineModeCandidateTarget } from "#ui/outline/mode.ts";
 import { useMutation } from "@tanstack/react-query";
 
 type DropTargetParams = Parameters<typeof dropTargetForElements>[0];
@@ -173,7 +172,10 @@ export const OperationTarget: FC<
 
 	const isMainTargetActive = Match.value(outlineMode).pipe(
 		Match.tags({
-			Absorb: () => isOutlineModeCandidateTarget({ mode: outlineMode, target }),
+			Absorb: ({ absorptionPlan }) =>
+				absorptionPlan.some(({ stackId, commitId }) =>
+					operandEquals(commitOperand({ stackId, commitId }), target),
+				),
 			Transfer: ({ value: mode }) => isSelected && mode.operationType === "rub",
 		}),
 		Match.orElse(() => false),
