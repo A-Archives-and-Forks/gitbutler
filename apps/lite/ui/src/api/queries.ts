@@ -68,8 +68,8 @@ export const treeChangeDiffsQueryOptions = ({ projectId, change }: TreeChangeDif
 		queryFn: () => window.lite.treeChangeDiffs({ projectId, change }),
 	});
 
-export const absorptionPlanQueryOptions = (params: AbsorptionPlanParams) =>
+export const absorptionPlanQueryOptions = ({ projectId, target }: AbsorptionPlanParams) =>
 	queryOptions({
-		queryKey: [QueryKey.AbsorptionPlan, params],
-		queryFn: () => window.lite.absorptionPlan(params),
+		queryKey: [QueryKey.AbsorptionPlan, projectId, target],
+		queryFn: () => window.lite.absorptionPlan({ projectId, target }),
 	});

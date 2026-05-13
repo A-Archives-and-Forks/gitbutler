@@ -1,6 +1,6 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { RootState } from "#ui/store.ts";
-import { type CommitAbsorption } from "@gitbutler/but-sdk";
+import { type AbsorptionTarget } from "@gitbutler/but-sdk";
 import { type BranchOperand, type CommitOperand, type Operand } from "#ui/operands.ts";
 import { type Panel } from "#ui/panels.ts";
 import * as panels from "#ui/panels/state.ts";
@@ -92,12 +92,12 @@ const projectSlice = createSlice({
 			action: PayloadAction<{
 				projectId: string;
 				source: Operand;
-				absorptionPlan: Array<CommitAbsorption>;
+				sourceTarget: AbsorptionTarget;
 			}>,
 		) => {
-			const { projectId, source, absorptionPlan } = action.payload;
+			const { projectId, source, sourceTarget } = action.payload;
 			const projectState = ensureProjectState(state, projectId);
-			workspace.enterAbsorbMode(projectState.workspace, source, absorptionPlan);
+			workspace.enterAbsorbMode(projectState.workspace, source, sourceTarget);
 		},
 		updatePointerTransfer: (
 			state,

@@ -1,6 +1,5 @@
 import { useNavigationIndexHotkeys } from "#ui/panels.ts";
 import {
-	absorptionPlanQueryOptions,
 	branchDiffQueryOptions,
 	changesInWorktreeQueryOptions,
 	commitDetailsWithLineStatsQueryOptions,
@@ -35,7 +34,7 @@ import { DependencyIcon, MenuTriggerIcon } from "#ui/ui/icons.tsx";
 import { mergeProps, useRender } from "@base-ui/react";
 import { Toolbar } from "@base-ui/react/toolbar";
 import { AbsorptionTarget, TreeChange } from "@gitbutler/but-sdk";
-import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { Array, Match } from "effect";
 import { ComponentProps, createContext, FC, Suspense, use, useEffect } from "react";
@@ -458,14 +457,9 @@ const ChangesFileRow: FC<{
 	const focusedPanel = useFocusedProjectPanel(projectId);
 
 	const dispatch = useAppDispatch();
-	const queryClient = useQueryClient();
 	const enterAbsorbMode = (source: Operand, sourceTarget: AbsorptionTarget) => {
-		void queryClient
-			.fetchQuery(absorptionPlanQueryOptions({ projectId, target: sourceTarget }))
-			.then((absorptionPlan) => {
-				dispatch(projectActions.enterAbsorbMode({ projectId, source, absorptionPlan }));
-				focusPanel("outline");
-			});
+		dispatch(projectActions.enterAbsorbMode({ projectId, source, sourceTarget }));
+		focusPanel("outline");
 	};
 
 	const absorb = () => {

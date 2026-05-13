@@ -1,4 +1,4 @@
-import { commitOperand, operandEquals, type Operand } from "#ui/operands.ts";
+import { type Operand } from "#ui/operands.ts";
 import { parseDragData } from "./OperationSourceC.tsx";
 import styles from "./OperationTarget.module.css";
 import { OperationTooltip } from "./OperationTooltip.tsx";
@@ -166,8 +166,9 @@ export const OperationTarget: FC<
 		target: Operand;
 		projectId: string;
 		isSelected: boolean;
+		isAbsorptionTarget: boolean;
 	} & useRender.ComponentProps<"div">
-> = ({ target, projectId, isSelected, render, ...props }) => {
+> = ({ target, projectId, isSelected, isAbsorptionTarget, render, ...props }) => {
 	const { dropRef } = useOperationDropTarget({ target, projectId });
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
@@ -182,10 +183,7 @@ export const OperationTarget: FC<
 
 	const isMainTargetActive = Match.value(outlineMode).pipe(
 		Match.tags({
-			Absorb: ({ absorptionPlan }) =>
-				absorptionPlan.some(({ stackId, commitId }) =>
-					operandEquals(commitOperand({ stackId, commitId }), target),
-				),
+			Absorb: () => isAbsorptionTarget,
 			Transfer: ({ value: mode }) => isSelected && mode.operationType === "rub",
 		}),
 		Match.orElse(() => false),

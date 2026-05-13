@@ -1,3 +1,4 @@
+import { absorptionPlanQueryOptions } from "#ui/api/queries.ts";
 import { classes } from "#ui/ui/classes.ts";
 import {
 	getOperations,
@@ -19,17 +20,23 @@ import { projectActions } from "#ui/projects/state.ts";
 import { getTransferOperation, type OutlineMode } from "#ui/outline/mode.ts";
 import { Match } from "effect";
 import { useCommand } from "#ui/commands/manager.ts";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { type CommitAbsorption } from "@gitbutler/but-sdk";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type AbsorptionTarget } from "@gitbutler/but-sdk";
 
 const AbsorbControls: FC<{
 	projectId: string;
-	absorptionPlan: Array<CommitAbsorption>;
-}> = ({ projectId, absorptionPlan }) => {
+	sourceTarget: AbsorptionTarget;
+}> = ({ projectId, sourceTarget }) => {
 	const dispatch = useAppDispatch();
 	const queryClient = useQueryClient();
+	const absorptionPlan = useQuery(absorptionPlanQueryOptions({ projectId, target: sourceTarget }));
+	const canAbsorb =
+		!absorptionPlan.isPending && !!absorptionPlan.data && absorptionPlan.data.length > 0;
 	const { mutate: absorb } = useMutation({
-		mutationFn: () => window.lite.absorb({ projectId, absorptionPlan }),
+		mutationFn: () => {
+			if (!absorptionPlan.data) return Promise.resolve(0);
+			return window.lite.absorb({ projectId, absorptionPlan: absorptionPlan.data });
+		},
 		onSuccess: async () => {
 			await queryClient.invalidateQueries();
 		},
@@ -38,15 +45,13 @@ const AbsorbControls: FC<{
 	const confirm = () => {
 		dispatch(projectActions.exitMode({ projectId }));
 
-		if (absorptionPlan.length === 0) return;
-
 		absorb();
 	};
 
 	const cancel = () => dispatch(projectActions.cancelMode({ projectId }));
 
 	const confirmCommand = useCommand(confirm, {
-		enabled: absorptionPlan.length > 0,
+		enabled: canAbsorb,
 		group: "Operation mode",
 		commandPalette: { label: "Confirm" },
 		shortcutsBar: { label: "Confirm" },
@@ -62,15 +67,14 @@ const AbsorbControls: FC<{
 
 	return (
 		<>
-			{absorptionPlan.length > 0 && (
-				<ShortcutButton
-					className={uiStyles.button}
-					hotkeys={confirmCommand.hotkeys}
-					onClick={confirmCommand.commandFn}
-				>
-					Absorb
-				</ShortcutButton>
-			)}
+			<ShortcutButton
+				className={uiStyles.button}
+				hotkeys={confirmCommand.hotkeys}
+				onClick={confirmCommand.commandFn}
+				disabled={!canAbsorb}
+			>
+				Absorb
+			</ShortcutButton>
 			<ShortcutButton
 				className={uiStyles.button}
 				hotkeys={cancelCommand.hotkeys}
@@ -211,8 +215,8 @@ export const OperationTooltip: FC<
 	const tooltip = isActive
 		? Match.value(outlineMode).pipe(
 				Match.tags({
-					Absorb: ({ absorptionPlan }) => (
-						<AbsorbControls projectId={projectId} absorptionPlan={absorptionPlan} />
+					Absorb: ({ sourceTarget }) => (
+						<AbsorbControls projectId={projectId} sourceTarget={sourceTarget} />
 					),
 					Transfer: ({ value: mode }) =>
 						Match.value(mode).pipe(

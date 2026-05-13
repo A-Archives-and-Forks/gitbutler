@@ -1,5 +1,5 @@
 import { type OperationType } from "#ui/operations/operation.ts";
-import { CommitAbsorption } from "@gitbutler/but-sdk";
+import { AbsorptionTarget } from "@gitbutler/but-sdk";
 import { Match } from "effect";
 import {
 	branchOperand,
@@ -61,12 +61,12 @@ export const enterTransferMode = (state: WorkspaceState, mode: TransferOperation
 export const enterAbsorbMode = (
 	state: WorkspaceState,
 	source: Operand,
-	absorptionPlan: Array<CommitAbsorption>,
+	sourceTarget: AbsorptionTarget,
 ) => {
 	state.mode = absorbOutlineMode({
 		source,
-		absorptionPlan,
 		restoreSelection: state.selection.outline,
+		sourceTarget,
 	});
 };
 
