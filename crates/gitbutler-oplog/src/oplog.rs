@@ -1103,3 +1103,45 @@ impl Iterator for SnapshotIter {
         }
     }
 }
+
+/// Find the final snapshot that a restore snapshot will restore from.
+///
+/// For example if you do a reword and then a series of undos and redos the oplog would look like this:
+///
+/// 9ea77ad REDO
+/// 71c6be6 UNDO
+/// c33acf3 REDO
+/// 3a0c4d1 UNDO
+/// bd1724b REWORD
+///
+/// and `peel_restore_snapshot` will return the snapshot for `bd1724b`.
+///
+/// If the given snapshot is not a restore snapshot then the same snapshot will be returned.
+pub fn peel_restore_snapshot(ctx: &Context, snapshot: &Snapshot) -> Result<Option<Snapshot>> {
+    let mut current = snapshot.clone();
+
+    loop {
+        let Some(details) = &current.details else {
+            return Ok(None);
+        };
+
+        match details.operation {
+            OperationKind::RestoreFromSnapshotViaUndo
+            | OperationKind::RestoreFromSnapshotViaRedo
+            | OperationKind::RestoreFromSnapshot => {}
+            _ => return Ok(Some(current)),
+        }
+
+        let Some(restored_from) = details.trailers.iter().find_map(|trailer| {
+            if let Trailer::RestoredFrom(commit) = trailer {
+                Some(*commit)
+            } else {
+                None
+            }
+        }) else {
+            return Ok(None);
+        };
+
+        current = ctx.get_snapshot(restored_from)?;
+    }
+}

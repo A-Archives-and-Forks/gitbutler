@@ -2,6 +2,7 @@ pub mod entry;
 mod oplog;
 pub use oplog::OplogExt;
 pub use oplog::RestoreKind;
+pub use oplog::peel_restore_snapshot;
 mod reflog;
 mod snapshot;
 pub use snapshot::SnapshotExt;
