@@ -54,14 +54,12 @@ const AbsorbControls: FC<{
 		enabled: canAbsorb,
 		group: "Operation mode",
 		commandPalette: { label: "Confirm" },
-		shortcutsBar: { label: "Confirm" },
 		hotkeys: [{ hotkey: "Enter" }],
 	});
 
 	const cancelCommand = useCommand(cancel, {
 		group: "Operation mode",
 		commandPalette: { label: "Cancel" },
-		shortcutsBar: { label: "Cancel" },
 		hotkeys: [{ hotkey: "Escape" }],
 	});
 
@@ -136,14 +134,12 @@ const TransferOperationControls: FC<{
 		enabled: !!operation,
 		group: "Operation mode",
 		commandPalette: operation ? { label: operationLabel(operation) } : undefined,
-		shortcutsBar: operation ? { label: operationLabel(operation) } : undefined,
 		hotkeys: [{ hotkey: "Mod+V", ignoreInputs: true }, { hotkey: "Enter" }],
 	});
 
 	const cancelCommand = useCommand(cancel, {
 		group: "Operation mode",
 		commandPalette: { label: "Cancel" },
-		shortcutsBar: { label: "Cancel" },
 		hotkeys: [{ hotkey: "Escape" }],
 	});
 

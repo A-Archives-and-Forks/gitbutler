@@ -24,9 +24,6 @@ export type CommandOptions = {
 	commandPalette?: {
 		label: string;
 	};
-	shortcutsBar?: {
-		label: string;
-	};
 	contextMenu?: NativeMenuItemData;
 	hotkeys?: Array<CommandHotkey | CommandHotkeySequence>;
 };

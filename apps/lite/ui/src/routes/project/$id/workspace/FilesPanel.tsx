@@ -476,7 +476,6 @@ const ChangesFileRow: FC<{
 		enabled: isSelected && focusedPanel === "files" && outlineMode._tag === "Default",
 		group: "Changes file",
 		commandPalette: { label: "Absorb" },
-		shortcutsBar: { label: "Absorb" },
 		hotkeys: [{ hotkey: "A" }],
 		contextMenu: {
 			label: "Absorb",

@@ -6,7 +6,6 @@ import {
 	listBranchesQueryOptions,
 	listProjectsQueryOptions,
 } from "#ui/api/queries.ts";
-import { useActiveElement } from "#ui/focus.ts";
 import {
 	focusAdjacentPanel,
 	focusPanel,
@@ -19,19 +18,12 @@ import {
 	selectProjectDialogState,
 	selectProjectPanelsState,
 } from "#ui/projects/state.ts";
-import { ShortcutsBarPortal, TopBarActionsPortal } from "#ui/portals.tsx";
+import { TopBarActionsPortal } from "#ui/portals.tsx";
 import { Keys } from "#ui/components/Keys.tsx";
 import { ShortcutButton } from "#ui/components/ShortcutButton.tsx";
 import { useAppDispatch, useAppSelector } from "#ui/store.ts";
-import { isInputElement } from "#ui/commands/hotkeys.ts";
 import { BranchListing, Segment, Stack } from "@gitbutler/but-sdk";
-import {
-	formatForDisplay,
-	Hotkey,
-	HotkeyOptions,
-	HotkeySequence,
-	normalizeRegisterableHotkey,
-} from "@tanstack/react-hotkeys";
+import { Hotkey, HotkeySequence, normalizeRegisterableHotkey } from "@tanstack/react-hotkeys";
 import { useMutation, useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { Match, Order } from "effect";
@@ -278,7 +270,6 @@ const TopBarActions: FC = () => {
 	const applyBranchCommand = useCommand(openApplyBranchPicker, {
 		group: "Branches",
 		commandPalette: { label: "Apply" },
-		shortcutsBar: { label: "Apply" },
 		hotkeys: [{ hotkey: "Mod+Shift+A" }],
 	});
 
@@ -287,7 +278,6 @@ const TopBarActions: FC = () => {
 		commandPalette: {
 			label: isPanelVisible(panelsState, "details") ? "Close" : "Open",
 		},
-		shortcutsBar: { label: "Details" },
 		hotkeys: [{ hotkey: "D" }],
 	});
 
@@ -312,55 +302,6 @@ const TopBarActions: FC = () => {
 	);
 };
 
-const isInputIgnoredHotkey = ({
-	activeElement,
-	hotkeyOpts,
-}: {
-	activeElement: Element | null;
-	hotkeyOpts: HotkeyOptions;
-}): boolean =>
-	hotkeyOpts.ignoreInputs !== false &&
-	isInputElement(activeElement) &&
-	activeElement !== document.documentElement;
-
-const ShortcutsBar: FC = () => {
-	const { id: projectId } = useParams({ from: "/project/$id/workspace" });
-	const focusedPanel = useFocusedProjectPanel(projectId);
-	const activeElement = useActiveElement();
-	const regs = useAppSelector((state) => state.commands.registrations);
-	const visibleHotkeys = Object.values(regs)
-		.flatMap(({ enabled, hotkeys, shortcutsBar }) =>
-			enabled !== false && shortcutsBar !== undefined && hotkeys !== undefined
-				? hotkeys.flatMap((hk) =>
-						// TODO: Render sequences too.
-						"sequence" in hk ||
-						hk.enabled === false ||
-						isInputIgnoredHotkey({ activeElement, hotkeyOpts: hk })
-							? []
-							: {
-									label: shortcutsBar.label,
-									hotkey: formatForDisplay(hk.hotkey),
-								},
-					)
-				: [],
-		)
-		.toSorted(Order.mapInput(Order.string, (hk) => hk.hotkey));
-
-	if (visibleHotkeys.length === 0) return null;
-
-	return (
-		<div className={styles.shortcutsBarContainer}>
-			<span className={styles.shortcutsBarScope}>{focusedPanel ?? "Shortcuts"}</span>
-			{visibleHotkeys.map((hotkey) => (
-				<div key={hotkey.hotkey} className={styles.shortcutsBarItem}>
-					<kbd className={styles.shortcutsBarKeys}>{formatForDisplay(hotkey.hotkey)}</kbd>
-					<span className={styles.shortcutsBarName}>{hotkey.label}</span>
-				</div>
-			))}
-		</div>
-	);
-};
-
 const usePanelsHotkeys = ({ focusedPanel }: { focusedPanel: PanelType | null }) => {
 	useCommand(
 		() => {
@@ -369,7 +310,6 @@ const usePanelsHotkeys = ({ focusedPanel }: { focusedPanel: PanelType | null }) 
 		{
 			group: "Panels",
 			enabled: focusedPanel !== null,
-			shortcutsBar: { label: "Focus previous panel" },
 			hotkeys: [{ hotkey: "H" }],
 		},
 	);
@@ -381,7 +321,6 @@ const usePanelsHotkeys = ({ focusedPanel }: { focusedPanel: PanelType | null }) 
 		{
 			group: "Panels",
 			enabled: focusedPanel !== null,
-			shortcutsBar: { label: "Focus next panel" },
 			hotkeys: [{ hotkey: "L" }],
 		},
 	);
@@ -403,7 +342,6 @@ const WorkspacePage: FC = () => {
 		},
 		{
 			group: "Global",
-			shortcutsBar: { label: "Command palette" },
 			hotkeys: [{ hotkey: "Mod+K" }],
 		},
 	);
@@ -445,10 +383,6 @@ const WorkspacePage: FC = () => {
 			<TopBarActionsPortal>
 				<TopBarActions />
 			</TopBarActionsPortal>
-
-			<ShortcutsBarPortal>
-				<ShortcutsBar />
-			</ShortcutsBarPortal>
 
 			<Group className={styles.page} defaultLayout={defaultLayout} onLayoutChange={onLayoutChanged}>
 				<OutlinePanel
