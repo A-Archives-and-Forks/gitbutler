@@ -14,7 +14,13 @@ pub struct Args {
     #[arg(short = 't', long, action = clap::ArgAction::Count)]
     pub trace: u8,
     /// Run as if `but-debug` was started in `PATH` instead of the current working directory.
-    #[arg(short = 'C', long, default_value = ".", value_name = "PATH")]
+    #[arg(
+        short = 'C',
+        long,
+        default_value = ".",
+        value_name = "PATH",
+        global = true
+    )]
     pub current_dir: PathBuf,
     /// The debugging command to run.
     #[command(subcommand)]
@@ -24,11 +30,27 @@ pub struct Args {
 /// The debugging subcommands supported by `but-debug`.
 #[derive(Debug, clap::Subcommand)]
 pub enum Subcommands {
+    /// Archive a repository for debugging.
+    Dump(DumpArgs),
     /// Return a segmented graph starting from `HEAD`.
     Graph(GraphArgs),
     /// Debug revision graph operations.
     #[clap(visible_alias = "rev")]
     Revision(RevisionArgs),
+}
+
+/// Arguments for the `dump` debugging subcommand.
+#[derive(Debug, clap::Args)]
+pub struct DumpArgs {
+    /// Where to write the zip archive.
+    #[arg(long, value_name = "PATH")]
+    pub output: Option<PathBuf>,
+    /// Open the directory containing the archive after it is created.
+    #[arg(long, short = 'o')]
+    pub open_archive_dir: bool,
+    /// Include only Git directory state and skip worktree files.
+    #[arg(long)]
+    pub git_only: bool,
 }
 
 /// Arguments for the `graph` debugging subcommand.

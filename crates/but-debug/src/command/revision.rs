@@ -1,16 +1,13 @@
 //! Implementation of the `revision` debug commands.
 
-use std::io::Write;
+use std::io::{self, Write as _};
 
 use anyhow::{Context as _, Result, bail, ensure};
 use but_core::ref_metadata::{
     StackId, Workspace, WorkspaceCommitRelation, WorkspaceStack, WorkspaceStackBranch,
 };
 use but_graph::FirstParent;
-use gix::{
-    bstr::ByteVec, odb::store::RefreshMode, reference::Category, refs::Target,
-    revision::plumbing::Spec,
-};
+use gix::{odb::store::RefreshMode, reference::Category, refs::Target, revision::plumbing::Spec};
 
 use crate::{
     args::{Args, LogArgs, MergeBaseArgs, RevisionArgs, RevisionGraphArgs, RevisionSubcommands},
@@ -19,20 +16,29 @@ use crate::{
 };
 
 /// Execute the `revision` subcommand.
-pub(crate) fn run(args: &Args, revision_args: &RevisionArgs) -> Result<()> {
+pub(crate) fn run(
+    args: &Args,
+    revision_args: &RevisionArgs,
+    out: &mut dyn io::Write,
+) -> Result<()> {
     let mut repo = setup::repo_from_args(args)?;
     repo.objects.refresh = RefreshMode::Never;
     let meta = EmptyRefMetadata;
 
     match &revision_args.cmd {
-        RevisionSubcommands::Log(log_args) => log(&repo, &meta, log_args),
+        RevisionSubcommands::Log(log_args) => log(&repo, &meta, log_args, out),
         RevisionSubcommands::MergeBase(merge_base_args) => {
-            merge_base(&repo, &meta, merge_base_args)
+            merge_base(&repo, &meta, merge_base_args, out)
         }
     }
 }
 
-fn log(repo: &gix::Repository, meta: &EmptyRefMetadata, log_args: &LogArgs) -> Result<()> {
+fn log(
+    repo: &gix::Repository,
+    meta: &EmptyRefMetadata,
+    log_args: &LogArgs,
+    out: &mut dyn io::Write,
+) -> Result<()> {
     let parsed = repo
         .rev_parse(log_args.rev_spec.as_str())
         .with_context(|| format!("Failed to parse rev-spec '{}'", log_args.rev_spec))?
@@ -64,13 +70,11 @@ fn log(repo: &gix::Repository, meta: &EmptyRefMetadata, log_args: &LogArgs) -> R
         bail!("Need to specify a rev-spec of form `a..b` to indicate an exclusion for now.")
     };
 
-    let mut out = Vec::with_capacity(512);
+    let mut out = io::BufWriter::new(out);
     for commit_id in commits {
         commit_id.write_hex_to(&mut out)?;
-        out.push_byte(b'\n');
+        writeln!(out)?;
     }
-
-    std::io::stdout().write_all(&out)?;
     Ok(())
 }
 
@@ -78,6 +82,7 @@ fn merge_base(
     repo: &gix::Repository,
     meta: &EmptyRefMetadata,
     merge_base_args: &MergeBaseArgs,
+    out: &mut dyn io::Write,
 ) -> Result<()> {
     let commits = {
         let _span = tracing::info_span!(
@@ -138,7 +143,7 @@ fn merge_base(
             merge_base_args.revisions.join(", ")
         );
     };
-    println!("{merge_base}");
+    writeln!(out, "{merge_base}")?;
 
     Ok(())
 }

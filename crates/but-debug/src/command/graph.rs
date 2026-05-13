@@ -1,6 +1,6 @@
 //! Implementation of the `graph` debug command.
 
-use std::io::{self, Write as _};
+use std::io;
 
 use anyhow::Result;
 use gix::odb::store::RefreshMode;
@@ -23,7 +23,12 @@ enum DotMode {
 }
 
 /// Execute the `graph` subcommand.
-pub(crate) fn run(args: &Args, graph_args: &GraphArgs) -> Result<()> {
+pub(crate) fn run(
+    args: &Args,
+    graph_args: &GraphArgs,
+    out: &mut dyn io::Write,
+    err: &mut dyn io::Write,
+) -> Result<()> {
     let mut repo = setup::repo_from_args(args)?;
     repo.objects.refresh = RefreshMode::Never;
     let meta = EmptyRefMetadata;
@@ -67,15 +72,16 @@ pub(crate) fn run(args: &Args, graph_args: &GraphArgs) -> Result<()> {
 
     let errors = graph.validation_errors();
     if !errors.is_empty() {
-        eprintln!("VALIDATION FAILED: {errors:?}");
+        writeln!(err, "VALIDATION FAILED: {errors:?}")?;
     }
     if graph_args.stats {
-        eprintln!("{:#?}", graph.statistics());
+        writeln!(err, "{:#?}", graph.statistics())?;
     }
 
     let workspace = graph.into_workspace()?;
     if graph_args.no_debug_workspace {
-        eprintln!(
+        writeln!(
+            err,
             "Workspace with {} stacks and {} segments across all stacks with {} commits total",
             workspace.stacks.len(),
             workspace
@@ -88,21 +94,21 @@ pub(crate) fn run(args: &Args, graph_args: &GraphArgs) -> Result<()> {
                 .iter()
                 .flat_map(|stack| stack.segments.iter().map(|segment| segment.commits.len()))
                 .sum::<usize>(),
-        );
+        )?;
     } else {
-        eprintln!("{workspace:#?}");
+        writeln!(err, "{workspace:#?}")?;
     }
 
     match dot_mode(graph_args) {
         Some(DotMode::Print) => {
-            io::stdout().write_all(workspace.graph.dot_graph().as_bytes())?;
+            out.write_all(workspace.graph.dot_graph().as_bytes())?;
         }
         Some(DotMode::OpenAsSvg) => {
             #[cfg(unix)]
             workspace.graph.open_as_svg();
         }
         Some(DotMode::Debug) => {
-            eprintln!("{graph:#?}", graph = workspace.graph);
+            writeln!(err, "{graph:#?}", graph = workspace.graph)?;
         }
         None => {}
     }

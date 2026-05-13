@@ -26,10 +26,26 @@ clap = { workspace = true, features = [
     "usage",
     "suggestions",
 ] }
-gix.workspace = true
+gix = { workspace = true, features = ["excludes"] }
+open.workspace = true
+prodash = { version = "31.0.0", default-features = false, features = [
+    "progress-tree",
+    "render-line",
+    "render-line-autoconfigure",
+    "render-line-crossterm",
+    "unit-bytes",
+] }
+signal-hook = { version = "0.4.3", default-features = false }
 tracing.workspace = true
 tracing-forest.workspace = true
 tracing-subscriber = { workspace = true, features = ["std", "fmt"] }
+zip.workspace = true
+
+[dev-dependencies]
+but-testsupport.workspace = true
+insta.workspace = true
+termtree = "0.5.1"
+tempfile.workspace = true
 
 [lints]
 workspace = true

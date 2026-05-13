@@ -1,7 +1,7 @@
 //! Debugging utilities exposed as a dedicated CLI.
 #![forbid(unsafe_code)]
 
-use std::ffi::OsString;
+use std::{ffi::OsString, io};
 
 use anyhow::Result;
 use clap::Parser;
@@ -15,13 +15,18 @@ mod trace;
 use args::{Args, Subcommands};
 
 /// Parse CLI arguments and dispatch the requested subcommand.
-pub fn handle_args(args: impl Iterator<Item = OsString>) -> Result<()> {
+pub fn handle_args(
+    args: impl Iterator<Item = OsString>,
+    out: &mut dyn io::Write,
+    err: &mut dyn io::Write,
+) -> Result<()> {
     let args = Args::parse_from(args);
     trace::init(args.trace)?;
 
     let _span = tracing::info_span!("run").entered();
     match &args.cmd {
-        Subcommands::Graph(graph_args) => command::graph::run(&args, graph_args),
-        Subcommands::Revision(revision_args) => command::revision::run(&args, revision_args),
+        Subcommands::Dump(dump_args) => command::dump::run(&args, dump_args, out, err),
+        Subcommands::Graph(graph_args) => command::graph::run(&args, graph_args, out, err),
+        Subcommands::Revision(revision_args) => command::revision::run(&args, revision_args, out),
     }
 }

@@ -1224,11 +1224,19 @@ dependencies = [
  "anyhow",
  "but-core",
  "but-graph",
+ "but-testsupport",
  "clap",
  "gix 0.83.0 (git+https://github.com/GitoxideLabs/gitoxide?rev=575113dfb10b3ba12eb57f57a81b241e773968bd)",
+ "insta",
+ "open",
+ "prodash",
+ "signal-hook 0.4.3",
+ "tempfile",
+ "termtree",
  "tracing",
  "tracing-forest",
  "tracing-subscriber",
+ "zip",
 ]
 
 [[package]]
@@ -1878,6 +1886,12 @@ checksum = "1e748733b7cbc798e1434b6ac524f0c1ff2ab456fe201501e6497c8417a4fc33"
 dependencies = [
  "serde",
 ]
+
+[[package]]
+name = "bytesize"
+version = "2.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6bd91ee7b2422bcb158d90ef4d14f75ef67f340943fc4149891dcce8f8b972a3"
 
 [[package]]
 name = "bzip2"
@@ -2556,6 +2570,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "acdd7c62a3665c7f6830a51635d9ac9b23ed385797f70a83bb8bafe9c572ab2b"
 dependencies = [
  "winapi",
+]
+
+[[package]]
+name = "crosstermion"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6ae462f0b868614980d59df41e217a77648de7ad7cf8b2a407155659896d889"
+dependencies = [
+ "crossterm 0.29.0",
+ "nu-ansi-term",
 ]
 
 [[package]]
@@ -9046,7 +9070,12 @@ version = "31.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "962200e2d7d551451297d9fdce85138374019ada198e30ea9ede38034e27604c"
 dependencies = [
+ "bytesize",
+ "crosstermion",
+ "is-terminal",
+ "jiff",
  "parking_lot",
+ "unicode-width",
 ]
 
 [[package]]
