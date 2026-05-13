@@ -105,7 +105,7 @@ const Hunk: FC<{
 
 	return (
 		<div>
-			<OperationSourceC projectId={projectId} source={operand}>
+			<OperationSourceC projectId={projectId} selectionScope="files" source={operand}>
 				<div className={styles.hunkHeaderRow}>
 					{dependencyCommitIds && (
 						<DependencyIndicatorButton projectId={projectId} commitIds={dependencyCommitIds}>
@@ -177,7 +177,7 @@ const ChangesFileDiffList: FC<{
 
 				return (
 					<li key={change.path}>
-						<OperationSourceC projectId={projectId} source={source}>
+						<OperationSourceC projectId={projectId} selectionScope="files" source={source}>
 							<h4>{change.path}</h4>
 						</OperationSourceC>
 						<FileDiff

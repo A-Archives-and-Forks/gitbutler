@@ -80,7 +80,7 @@
 	resize: none;
 }
 
-.transferModePreview {
+.operationSourcePreview {
 	z-index: 1;
 	/* Relative to panel */
 	position: absolute;

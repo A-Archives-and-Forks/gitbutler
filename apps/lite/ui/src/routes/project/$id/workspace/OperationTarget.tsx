@@ -1,4 +1,4 @@
-import { type Operand } from "#ui/operands.ts";
+import { commitOperand, operandEquals, type Operand } from "#ui/operands.ts";
 import { parseDragData } from "./OperationSourceC.tsx";
 import styles from "./OperationTarget.module.css";
 import { OperationTooltip } from "./OperationTooltip.tsx";
@@ -19,7 +19,6 @@ import {
 import { mergeProps, useRender } from "@base-ui/react";
 import { Match, pipe } from "effect";
 import { FC, useEffect, useEffectEvent, useRef } from "react";
-import { isOutlineModeCandidateTarget } from "#ui/outline/mode.ts";
 import { useMutation } from "@tanstack/react-query";
 
 type DropTargetParams = Parameters<typeof dropTargetForElements>[0];
@@ -132,18 +131,28 @@ const useOperationDropTarget = ({ target, projectId }: { target: Operand; projec
 				if (!isActiveDropTarget) return;
 
 				const dragData = parseDragData(args.source.data);
-				if (!dragData) return;
+				if (!dragData) {
+					dispatch(projectActions.cancelMode({ projectId }));
+					return;
+				}
 
 				const dropData = parseDropData(args.self.data);
-				if (!dropData) return;
+				if (!dropData) {
+					dispatch(projectActions.cancelMode({ projectId }));
+					return;
+				}
 
 				const operation = getOperation({
 					source: dragData.source,
 					target,
 					operationType: dropData.operationType,
 				});
-				if (!operation) return;
+				if (!operation) {
+					dispatch(projectActions.cancelMode({ projectId }));
+					return;
+				}
 
+				dispatch(projectActions.exitMode({ projectId }));
 				runOperation(operation);
 			},
 		});
@@ -173,7 +182,10 @@ export const OperationTarget: FC<
 
 	const isMainTargetActive = Match.value(outlineMode).pipe(
 		Match.tags({
-			Absorb: () => isOutlineModeCandidateTarget({ mode: outlineMode, target }),
+			Absorb: ({ absorptionPlan }) =>
+				absorptionPlan.some(({ stackId, commitId }) =>
+					operandEquals(commitOperand({ stackId, commitId }), target),
+				),
 			Transfer: ({ value: mode }) => isSelected && mode.operationType === "rub",
 		}),
 		Match.orElse(() => false),

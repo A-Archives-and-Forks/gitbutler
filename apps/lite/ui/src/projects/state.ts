@@ -125,6 +125,9 @@ const projectSlice = createSlice({
 		exitMode: (state, action: PayloadAction<{ projectId: string }>) => {
 			workspace.exitMode(ensureProjectState(state, action.payload.projectId).workspace);
 		},
+		cancelMode: (state, action: PayloadAction<{ projectId: string }>) => {
+			workspace.cancelMode(ensureProjectState(state, action.payload.projectId).workspace);
+		},
 		setHighlightedCommitIds: (
 			state,
 			action: PayloadAction<{ projectId: string; commitIds: Array<string> | null }>,

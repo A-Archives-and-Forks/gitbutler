@@ -16,6 +16,13 @@ import { CommitAbsorption } from "@gitbutler/but-sdk";
 export type AbsorbMode = {
 	source: Operand;
 	absorptionPlan: Array<CommitAbsorption>;
+	restoreSelection: Operand;
+};
+
+/** @public */
+export type TransferMode = {
+	value: TransferOperationMode;
+	restoreSelection: Operand;
 };
 
 /** @public */
@@ -56,15 +63,21 @@ export const pointerTransferOperationMode = ({
 });
 
 /** @public */
-export const absorbOutlineMode = ({ source, absorptionPlan }: AbsorbMode): OutlineMode => ({
+export const absorbOutlineMode = ({
+	source,
+	absorptionPlan,
+	restoreSelection,
+}: AbsorbMode): OutlineMode => ({
 	_tag: "Absorb",
 	source,
 	absorptionPlan,
+	restoreSelection,
 });
 
 /** @public */
-export const transferOutlineMode = (value: TransferOperationMode): OutlineMode => ({
+export const transferOutlineMode = ({ value, restoreSelection }: TransferMode): OutlineMode => ({
 	_tag: "Transfer",
+	restoreSelection,
 	value,
 });
 
@@ -77,7 +90,7 @@ export type OutlineMode =
 	| ({ _tag: "RewordCommit" } & RewordCommitOutlineMode)
 	| ({ _tag: "RenameBranch" } & RenameBranchOutlineMode)
 	| ({ _tag: "Absorb" } & AbsorbMode)
-	| { _tag: "Transfer"; value: TransferOperationMode };
+	| ({ _tag: "Transfer" } & TransferMode);
 
 /** @public */
 export const defaultOutlineMode: OutlineMode = {
@@ -134,24 +147,6 @@ const hasAnyOperation = (source: Operand, target: Operand) => {
 	return !!operations.rub || !!operations.moveAbove || !!operations.moveBelow;
 };
 
-export const isOutlineModeCandidateTarget = ({
-	mode,
-	target,
-}: {
-	mode: OutlineMode;
-	target: Operand;
-}): boolean =>
-	Match.value(mode).pipe(
-		Match.tags({
-			Absorb: ({ absorptionPlan }) =>
-				absorptionPlan.some(({ stackId, commitId }) =>
-					operandEquals(commitOperand({ stackId, commitId }), target),
-				),
-			Transfer: ({ value: mode }) => hasAnyOperation(mode.source, target),
-		}),
-		Match.orElse(() => false),
-	);
-
 export const filterNavigationIndexForOutlineMode = ({
 	navigationIndex: navigationIndexUnfiltered,
 	outlineMode,
@@ -167,14 +162,16 @@ export const filterNavigationIndexForOutlineMode = ({
 					navigationIndexUnfiltered,
 					(operand) =>
 						operandContains(operand, activeMode.source) ||
-						isOutlineModeCandidateTarget({ mode: activeMode, target: operand }),
+						activeMode.absorptionPlan.some(({ stackId, commitId }) =>
+							operandEquals(commitOperand({ stackId, commitId }), operand),
+						),
 				),
 			Transfer: (activeMode) =>
 				filterNavigationIndex(
 					navigationIndexUnfiltered,
 					(operand) =>
 						operandContains(operand, activeMode.value.source) ||
-						isOutlineModeCandidateTarget({ mode: activeMode, target: operand }),
+						hasAnyOperation(activeMode.value.source, operand),
 				),
 			RenameBranch: (x) =>
 				filterNavigationIndex(navigationIndexUnfiltered, (operand) =>
@@ -184,5 +181,16 @@ export const filterNavigationIndexForOutlineMode = ({
 				filterNavigationIndex(navigationIndexUnfiltered, (operand) =>
 					operandEquals(operand, commitOperand(x.operand)),
 				),
+		}),
+	);
+
+export const getOperationSource = (mode: OutlineMode): Operand | null =>
+	Match.value(mode).pipe(
+		Match.tagsExhaustive({
+			Default: () => null,
+			Absorb: (x) => x.source,
+			Transfer: (x) => x.value.source,
+			RenameBranch: () => null,
+			RewordCommit: () => null,
 		}),
 	);

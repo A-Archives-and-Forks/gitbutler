@@ -31,9 +31,10 @@ const DragPreview: FC<{ children: ReactNode }> = ({ children }) => (
 export const OperationSourceC: FC<
 	{
 		projectId: string;
+		selectionScope: "files" | "outline";
 		source: Operand;
 	} & useRender.ComponentProps<"div">
-> = ({ projectId, source, render, ...props }) => {
+> = ({ projectId, selectionScope, source, render, ...props }) => {
 	const { data: headInfo } = useSuspenseQuery(headInfoQueryOptions(projectId));
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
@@ -73,6 +74,15 @@ export const OperationSourceC: FC<
 			getInitialData: (): DragData => ({ source }),
 			onGenerateDragPreview,
 			onDragStart: () => {
+				Match.value(selectionScope).pipe(
+					Match.when("files", () =>
+						dispatch(projectActions.selectFiles({ projectId, selection: source })),
+					),
+					Match.when("outline", () =>
+						dispatch(projectActions.selectOutline({ projectId, selection: source })),
+					),
+					Match.exhaustive,
+				);
 				dispatch(
 					projectActions.enterTransferMode({
 						projectId,
@@ -83,11 +93,13 @@ export const OperationSourceC: FC<
 					}),
 				);
 			},
-			onDrop: () => {
-				dispatch(projectActions.exitMode({ projectId }));
+			onDrop: ({ location }) => {
+				if (location.current.dropTargets.length > 0) return;
+
+				dispatch(projectActions.cancelMode({ projectId }));
 			},
 		});
-	}, [dispatch, projectId, source]);
+	}, [dispatch, projectId, selectionScope, source]);
 
 	const isActiveSource = Match.value(outlineMode).pipe(
 		Match.tag("Transfer", ({ value: mode }) => operandEquals(mode.source, source)),

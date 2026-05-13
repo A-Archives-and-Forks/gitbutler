@@ -310,10 +310,10 @@ const FilesTreePanel: FC<{ parent: Operand; files: Array<Operand> } & PanelProps
 				<TreeItem
 					projectId={projectId}
 					operand={parent}
-					label="All changes"
+					aria-label="All changes"
 					expanded
 					className={workspaceItemRowStyles.section}
-					render={<OperationSourceC projectId={projectId} source={parent} />}
+					render={<OperationSourceC projectId={projectId} selectionScope="files" source={parent} />}
 				>
 					<ItemRow projectId={projectId} operand={parent}>
 						<div
@@ -382,10 +382,9 @@ const TreeItem: FC<
 	{
 		projectId: string;
 		operand: Operand;
-		label: string;
 		expanded?: boolean;
 	} & useRender.ComponentProps<"div">
-> = ({ projectId, operand, label, expanded, render, ...props }) => {
+> = ({ projectId, operand, expanded, render, ...props }) => {
 	const isSelected = useIsSelected({ projectId, operand });
 
 	return useRender({
@@ -394,7 +393,6 @@ const TreeItem: FC<
 		props: mergeProps<"div">(props, {
 			id: treeItemId(operand),
 			role: "treeitem",
-			"aria-label": label,
 			"aria-selected": isSelected,
 			"aria-expanded": expanded,
 		}),
@@ -409,10 +407,11 @@ const TreeChangeRow: FC<{
 	<TreeItem
 		projectId={projectId}
 		operand={operand}
-		label={changeLabel(change)}
+		aria-label={changeLabel(change)}
 		render={
 			<OperationSourceC
 				projectId={projectId}
+				selectionScope="files"
 				source={operand}
 				render={<ItemRow projectId={projectId} operand={operand} />}
 			/>
@@ -432,10 +431,11 @@ const ConflictedFileRow: FC<{
 		<TreeItem
 			projectId={projectId}
 			operand={operand}
-			label={label}
+			aria-label={label}
 			render={
 				<OperationSourceC
 					projectId={projectId}
+					selectionScope="files"
 					source={operand}
 					render={<ItemRow projectId={projectId} operand={operand} />}
 				/>
@@ -497,10 +497,11 @@ const ChangesFileRow: FC<{
 		<TreeItem
 			projectId={projectId}
 			operand={operand}
-			label={changeLabel(change)}
+			aria-label={changeLabel(change)}
 			render={
 				<OperationSourceC
 					projectId={projectId}
+					selectionScope="files"
 					source={operand}
 					render={<ItemRow projectId={projectId} operand={operand} />}
 				/>

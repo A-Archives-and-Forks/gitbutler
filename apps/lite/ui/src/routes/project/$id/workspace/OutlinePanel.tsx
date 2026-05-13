@@ -36,6 +36,7 @@ import {
 	filterNavigationIndexForOutlineMode,
 	getTransferOperation,
 	keyboardTransferOperationMode,
+	getOperationSource,
 } from "#ui/outline/mode.ts";
 import { focusPanel, useFocusedProjectPanel, useNavigationIndexHotkeys } from "#ui/panels.ts";
 import {
@@ -288,6 +289,8 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 		hotkeys: [{ hotkey: "T" }],
 	});
 
+	const operationSource = getOperationSource(outlineMode);
+
 	return (
 		<NavigationIndexContext value={navigationIndex}>
 			<DryRunWorkspaceContext value={dryRunWorkspace}>
@@ -310,13 +313,10 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 						<BaseCommit projectId={projectId} commitId={getCommonBaseCommitId(headInfo)} />
 					</div>
 
-					{Match.value(outlineMode).pipe(
-						Match.when({ _tag: "Transfer", value: { _tag: "Keyboard" } }, (mode) => (
-							<div className={styles.transferModePreview}>
-								<OperationSourceLabel headInfo={headInfo} source={mode.value.source} />
-							</div>
-						)),
-						Match.orElse(() => null),
+					{operationSource && (
+						<div className={styles.operationSourcePreview}>
+							<OperationSourceLabel headInfo={headInfo} source={operationSource} />
+						</div>
 					)}
 				</Panel>
 			</DryRunWorkspaceContext>
@@ -361,10 +361,9 @@ const TreeItem: FC<
 	{
 		projectId: string;
 		operand: Operand;
-		label: string;
 		expanded?: boolean;
 	} & useRender.ComponentProps<"div">
-> = ({ projectId, operand, label, expanded, render, ...props }) => {
+> = ({ projectId, operand, expanded, render, ...props }) => {
 	const isSelected = useIsSelected({ projectId, operand });
 
 	return useRender({
@@ -373,7 +372,6 @@ const TreeItem: FC<
 		props: mergeProps<"div">(props, {
 			id: treeItemId(operand),
 			role: "treeitem",
-			"aria-label": label,
 			"aria-selected": isSelected,
 			"aria-expanded": expanded,
 		}),
@@ -391,6 +389,7 @@ const OperandC: FC<
 		render: (
 			<OperationSourceC
 				projectId={projectId}
+				selectionScope="outline"
 				source={operand}
 				render={
 					<OperationTarget
@@ -831,7 +830,7 @@ const CommitC: FC<{
 		<TreeItem
 			projectId={projectId}
 			operand={operand}
-			label={commitTitle(commit.message)}
+			aria-label={commitTitle(commit.message)}
 			render={<OperandC projectId={projectId} operand={operand} />}
 		>
 			<CommitRow commit={commit} projectId={projectId} stackId={stackId} />
@@ -923,7 +922,7 @@ const BaseCommit: FC<{
 			<TreeItem
 				projectId={projectId}
 				operand={operand}
-				label="Base commit"
+				aria-label="Base commit"
 				render={
 					<OperandC
 						projectId={projectId}
@@ -1118,7 +1117,7 @@ const Changes: FC<{
 		<TreeItem
 			projectId={projectId}
 			operand={operand}
-			label={`Changes (${worktreeChanges.changes.length})`}
+			aria-label={`Changes (${worktreeChanges.changes.length})`}
 			className={classes(workspaceItemRowStyles.section, styles.changesSection)}
 			render={<OperandC projectId={projectId} operand={operand} />}
 		>
@@ -1455,7 +1454,7 @@ const BranchSegment: FC<{
 		<TreeItem
 			projectId={projectId}
 			operand={operand}
-			label={refName.displayName}
+			aria-label={refName.displayName}
 			expanded
 			className={classes(workspaceItemRowStyles.section, styles.segment)}
 		>
@@ -1516,7 +1515,7 @@ const StackC: FC<{
 		<TreeItem
 			projectId={projectId}
 			operand={operand}
-			label="Stack"
+			aria-label="Stack"
 			expanded
 			className={classes(styles.stack, workspaceItemRowStyles.section)}
 			render={<OperandC projectId={projectId} operand={operand} />}
