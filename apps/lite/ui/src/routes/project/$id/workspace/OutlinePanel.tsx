@@ -425,6 +425,7 @@ const OperandC: FC<
 	const isSelected = useIsSelected({ projectId, operand });
 	const absorptionTargetKeys = assert(use(AbsorptionTargetKeysContext));
 	const isAbsorptionTarget = absorptionTargetKeys.has(operandIdentityKey(operand));
+	const navigationIndex = assert(use(NavigationIndexContext));
 
 	return useRender({
 		render: (
@@ -434,6 +435,7 @@ const OperandC: FC<
 				source={operand}
 				render={
 					<OperationTarget
+						enabled={navigationIndexIncludes(navigationIndex, operand)}
 						projectId={projectId}
 						target={operand}
 						isSelected={isSelected}

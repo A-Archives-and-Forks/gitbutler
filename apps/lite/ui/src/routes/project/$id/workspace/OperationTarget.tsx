@@ -40,7 +40,15 @@ const getOperationTypeFromData = (data: DropData): OperationType | null => {
 	);
 };
 
-const useOperationDropTarget = ({ target, projectId }: { target: Operand; projectId: string }) => {
+const useOperationDropTarget = ({
+	enabled,
+	target,
+	projectId,
+}: {
+	enabled: boolean;
+	target: Operand;
+	projectId: string;
+}) => {
 	const dispatch = useAppDispatch();
 	const { mutate: runOperation } = useMutation(useRunOperationMutationOptions());
 	const dropRef = useRef<HTMLElement>(null);
@@ -64,6 +72,8 @@ const useOperationDropTarget = ({ target, projectId }: { target: Operand; projec
 		);
 	});
 
+	const canDrop = useEffectEvent(() => enabled);
+
 	useEffect(() => {
 		const element = dropRef.current;
 		if (!element) return;
@@ -71,6 +81,7 @@ const useOperationDropTarget = ({ target, projectId }: { target: Operand; projec
 		return dropTargetForElements({
 			element,
 			getData,
+			canDrop,
 			onDrag: (args) => {
 				const [innerMost] = args.location.current.dropTargets;
 				const isActiveDropTarget = innerMost?.element === args.self.element;
@@ -129,13 +140,14 @@ const useOperationDropTarget = ({ target, projectId }: { target: Operand; projec
 
 export const OperationTarget: FC<
 	{
+		enabled: boolean;
 		target: Operand;
 		projectId: string;
 		isSelected: boolean;
 		isAbsorptionTarget: boolean;
 	} & useRender.ComponentProps<"div">
-> = ({ target, projectId, isSelected, isAbsorptionTarget, render, ...props }) => {
-	const { dropRef } = useOperationDropTarget({ target, projectId });
+> = ({ enabled, target, projectId, isSelected, isAbsorptionTarget, render, ...props }) => {
+	const { dropRef } = useOperationDropTarget({ enabled, target, projectId });
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
 	const insertTargetOperationType = Match.value(outlineMode).pipe(
