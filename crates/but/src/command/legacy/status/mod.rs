@@ -333,9 +333,12 @@ async fn build_status_context<'a>(
     // Calculate common_merge_base data and upstream state in a scope
     // to ensure repo reference is dropped before any async operations
     let (common_merge_base_data, upstream_state, last_fetched_ms, base_branch) = {
-        let base_branch = but_api::legacy::virtual_branches::get_base_branch_data(ctx)
-            .ok()
-            .flatten();
+        let base_branch = {
+            let mut guard = ctx.exclusive_worktree_access();
+            but_api::legacy::virtual_branches::get_base_branch_data(ctx, guard.write_permission())
+                .ok()
+                .flatten()
+        };
         let status_target = resolved_target.for_status(base_branch.as_ref());
         let repo = ctx.repo.get()?;
         let target_commit_id = status_target.commit_id;

@@ -275,7 +275,11 @@ mod behind_count {
 
         // Stack A is farthest behind (3 commits behind origin/master).
         // Stack C is 1 commit behind. The behind count should reflect the max.
-        let base = gitbutler_branch_actions::base::get_base_branch_data(ctx).unwrap();
+        let guard = ctx.shared_worktree_access();
+        let base =
+            gitbutler_branch_actions::base::get_base_branch_data(ctx, guard.read_permission())
+                .unwrap();
+        drop(guard);
         assert_eq!(
             base.behind, 3,
             "behind count should match the farthest-behind stack (A, which is 3 commits behind)"

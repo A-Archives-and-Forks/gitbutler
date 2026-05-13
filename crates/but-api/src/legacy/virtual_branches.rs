@@ -270,8 +270,9 @@ pub fn switch_back_to_workspace_with_perm(
     ctx: &mut but_ctx::Context,
     perm: &mut RepoExclusive,
 ) -> Result<BaseBranch> {
-    let base_branch = gitbutler_branch_actions::base::get_base_branch_data(ctx)
-        .context("Failed to get base branch data")?;
+    let base_branch =
+        gitbutler_branch_actions::base::get_base_branch_data(ctx, perm.read_permission())
+            .context("Failed to get base branch data")?;
 
     let branch_name = format!("refs/remotes/{}", base_branch.branch_name)
         .parse()
@@ -284,9 +285,14 @@ pub fn switch_back_to_workspace_with_perm(
 }
 
 #[but_api]
-#[instrument(err(Debug))]
-pub fn get_base_branch_data(ctx: &but_ctx::Context) -> Result<Option<BaseBranch>> {
-    if let Ok(base_branch) = gitbutler_branch_actions::base::get_base_branch_data(ctx) {
+#[instrument(skip(perm), err(Debug))]
+pub fn get_base_branch_data(
+    ctx: &but_ctx::Context,
+    perm: &mut RepoExclusive,
+) -> Result<Option<BaseBranch>> {
+    if let Ok(base_branch) =
+        gitbutler_branch_actions::base::get_base_branch_data(ctx, perm.read_permission())
+    {
         Ok(Some(base_branch))
     } else {
         Ok(None)
@@ -656,7 +662,9 @@ pub fn fetch_from_remotes(ctx: &Context, action: Option<String>) -> Result<BaseB
         return Err(anyhow!(error));
     }
 
-    let base_branch = gitbutler_branch_actions::base::get_base_branch_data(ctx)?;
+    let guard = ctx.shared_worktree_access();
+    let base_branch =
+        gitbutler_branch_actions::base::get_base_branch_data(ctx, guard.read_permission())?;
     Ok(base_branch)
 }
 
@@ -669,10 +677,11 @@ pub async fn upstream_integration_statuses(
 ) -> Result<StackStatuses> {
     let (base_branch, commit_id, ctx) = {
         let ctx = ctx.into_thread_local();
+        let guard = ctx.shared_worktree_access();
 
         // Get all the actively applied reviews
         (
-            gitbutler_branch_actions::base::get_base_branch_data(&ctx)?,
+            gitbutler_branch_actions::base::get_base_branch_data(&ctx, guard.read_permission())?,
             target_commit_id,
             ctx.into_sync(),
         )
@@ -692,7 +701,9 @@ pub async fn integrate_upstream(
 ) -> Result<IntegrationOutcome> {
     let (base_branch, ctx) = {
         let ctx = ctx.into_thread_local();
-        let base_branch = gitbutler_branch_actions::base::get_base_branch_data(&ctx)?;
+        let guard = ctx.shared_worktree_access();
+        let base_branch =
+            gitbutler_branch_actions::base::get_base_branch_data(&ctx, guard.read_permission())?;
         (base_branch, ctx.to_sync())
     };
     let resolved_reviews = resolve_review_map(ctx.clone(), &base_branch).await?;
@@ -703,6 +714,7 @@ pub async fn integrate_upstream(
         base_branch_resolution,
         &resolved_reviews,
     )?;
+    ctx.invalidate_workspace_cache()?;
 
     Ok(outcome)
 }
@@ -715,7 +727,9 @@ pub async fn resolve_upstream_integration(
 ) -> Result<String> {
     let (base_branch, sync_ctx) = {
         let ctx = ctx.into_thread_local();
-        let base_branch = gitbutler_branch_actions::base::get_base_branch_data(&ctx)?;
+        let guard = ctx.shared_worktree_access();
+        let base_branch =
+            gitbutler_branch_actions::base::get_base_branch_data(&ctx, guard.read_permission())?;
         (base_branch, ctx.into_sync())
     };
     let resolved_reviews = resolve_review_map(sync_ctx.clone(), &base_branch).await?;

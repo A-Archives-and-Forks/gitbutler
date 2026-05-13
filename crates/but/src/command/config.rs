@@ -143,7 +143,8 @@ async fn show_overview(ctx: &mut Context, out: &mut OutputChannel) -> Result<()>
     // Get target branch
     cfg_if! {
         if #[cfg(feature = "legacy")] {
-            let target_branch = but_api::legacy::virtual_branches::get_base_branch_data(ctx)?
+            let mut guard = ctx.exclusive_worktree_access();
+            let target_branch = but_api::legacy::virtual_branches::get_base_branch_data(ctx, guard.write_permission())?
                                     .map(|b| b.branch_name);
         } else {
             let target_branch = None::<String>;
@@ -1633,7 +1634,13 @@ async fn target_config(
         None => {
             #[cfg(feature = "legacy")]
             {
-                let target = but_api::legacy::virtual_branches::get_base_branch_data(ctx)?;
+                let target = {
+                    let mut guard = ctx.exclusive_worktree_access();
+                    but_api::legacy::virtual_branches::get_base_branch_data(
+                        ctx,
+                        guard.write_permission(),
+                    )?
+                };
 
                 if let Some(target_branch) = target {
                     if let Some(out) = out.for_human() {

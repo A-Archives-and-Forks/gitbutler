@@ -51,7 +51,7 @@ pub fn set_base_branch(
     perm: &mut RepoExclusive,
 ) -> Result<BaseBranch> {
     let _ = ctx.create_snapshot(SnapshotDetails::new(OperationKind::SetBaseBranch), perm);
-    base::set_base_branch(ctx, target_branch)
+    base::set_base_branch(ctx, perm.read_permission(), target_branch)
 }
 
 pub fn set_target_push_remote(ctx: &Context, push_remote: &str) -> Result<()> {

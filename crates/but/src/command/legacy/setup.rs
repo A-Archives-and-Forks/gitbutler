@@ -260,7 +260,7 @@ pub(crate) fn repo(
     }?;
 
     // Check if target branch is set
-    let target = but_api::legacy::virtual_branches::get_base_branch_data(ctx)?;
+    let target = but_api::legacy::virtual_branches::get_base_branch_data(ctx, perm)?;
 
     // If new or already exists but target is not set, set the target to be the remote's HEAD
     if (matches!(outcome, gitbutler_project::AddProjectOutcome::Added(_))

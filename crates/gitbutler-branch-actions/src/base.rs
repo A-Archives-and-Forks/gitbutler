@@ -4,6 +4,7 @@ use anyhow::{Context as _, Result, anyhow};
 use but_core::{
     RefMetadata, WORKSPACE_REF_NAME,
     git_config::{edit_repo_config, ensure_config_value},
+    sync::RepoShared,
     worktree::checkout::UncommitedWorktreeChanges,
 };
 use but_ctx::Context;
@@ -81,11 +82,11 @@ impl BaseBranch {
     }
 }
 
-#[instrument(skip(ctx), err(Debug))]
-pub fn get_base_branch_data(ctx: &Context) -> Result<BaseBranch> {
-    let repo = ctx.repo.get()?;
+#[instrument(skip(ctx, perm), err(Debug))]
+pub fn get_base_branch_data(ctx: &Context, perm: &RepoShared) -> Result<BaseBranch> {
     let meta = ctx.meta()?;
-    let base = target_to_base_branch(&repo, &ctx.legacy_project, &meta)?;
+    let (repo, ws, _) = ctx.workspace_and_db_with_perm(perm)?;
+    let base = target_to_base_branch(&repo, &ctx.legacy_project, &ws.graph, &meta)?;
     Ok(base)
 }
 
@@ -137,34 +138,43 @@ pub fn bootstrap_default_target_if_missing(ctx: &Context) -> Result<bool> {
     Ok(true)
 }
 
-#[instrument(skip(ctx), err(Debug))]
-fn go_back_to_integration(ctx: &Context, default_target: &Target) -> Result<BaseBranch> {
-    let repo = ctx.repo.get()?;
+#[instrument(skip(ctx, perm), err(Debug))]
+fn go_back_to_integration(
+    ctx: &Context,
+    perm: &RepoShared,
+    default_target: &Target,
+) -> Result<BaseBranch> {
     if ctx.settings.feature_flags.cv3 {
-        let workspace_commit_to_checkout =
-            but_workspace::legacy::remerged_workspace_commit_v2(ctx)?;
-        let tree_to_checkout_to_avoid_ref_update =
-            repo.find_commit(workspace_commit_to_checkout)?.tree_id()?;
-        but_core::worktree::safe_checkout(
-            repo.head_id()?.detach(),
-            tree_to_checkout_to_avoid_ref_update.detach(),
-            &repo,
-            but_core::worktree::checkout::Options {
-                uncommitted_changes: UncommitedWorktreeChanges::KeepAndAbortOnConflict,
-                skip_head_update: false,
-                ..Default::default()
-            },
-        )?;
-    } else {
-        let (mut outcome, conflict_kind) =
-            but_workspace::legacy::merge_worktree_with_workspace(ctx, &repo)?;
-
-        if outcome.has_unresolved_conflicts(conflict_kind) {
-            return Err(anyhow!("Conflicts while going back to gitbutler/workspace"))
-                .context(Marker::ProjectConflict);
+        {
+            let repo = ctx.repo.get()?;
+            let workspace_commit_to_checkout =
+                but_workspace::legacy::remerged_workspace_commit_v2(ctx)?;
+            let tree_to_checkout_to_avoid_ref_update =
+                repo.find_commit(workspace_commit_to_checkout)?.tree_id()?;
+            but_core::worktree::safe_checkout(
+                repo.head_id()?.detach(),
+                tree_to_checkout_to_avoid_ref_update.detach(),
+                &repo,
+                but_core::worktree::checkout::Options {
+                    uncommitted_changes: UncommitedWorktreeChanges::KeepAndAbortOnConflict,
+                    skip_head_update: false,
+                    ..Default::default()
+                },
+            )?;
         }
+    } else {
+        let final_tree_id = {
+            let repo = ctx.repo.get()?;
+            let (mut outcome, conflict_kind) =
+                but_workspace::legacy::merge_worktree_with_workspace(ctx, &repo)?;
 
-        let final_tree_id = outcome.tree.write()?.detach();
+            if outcome.has_unresolved_conflicts(conflict_kind) {
+                return Err(anyhow!("Conflicts while going back to gitbutler/workspace"))
+                    .context(Marker::ProjectConflict);
+            }
+
+            outcome.tree.write()?.detach()
+        };
 
         #[expect(deprecated, reason = "checkout/materialization boundary")]
         let git2_repo = &*ctx.git2_repo.get()?;
@@ -177,14 +187,13 @@ fn go_back_to_integration(ctx: &Context, default_target: &Target) -> Result<Base
             .context("failed to checkout tree")?;
     }
 
-    let meta = ctx.meta()?;
-    let base = target_to_base_branch(&repo, &ctx.legacy_project, &meta)?;
     update_workspace_commit(ctx, false)?;
-    Ok(base)
+    get_base_branch_data(ctx, perm)
 }
 
 pub(crate) fn set_base_branch(
     ctx: &Context,
+    perm: &RepoShared,
     target_branch_ref: &RemoteRefname,
 ) -> Result<BaseBranch> {
     let repo = ctx.repo.get()?;
@@ -193,7 +202,7 @@ pub(crate) fn set_base_branch(
     if let Ok(target) = default_target(ctx)
         && target.branch.eq(target_branch_ref)
     {
-        return go_back_to_integration(ctx, &target);
+        return go_back_to_integration(ctx, perm, &target);
     }
 
     // lookup a branch by name
@@ -303,9 +312,7 @@ pub(crate) fn set_base_branch(
 
     crate::integration::update_workspace_commit_with_vb_state(&vb_state, ctx, true)?;
 
-    let new_meta = ctx.meta()?;
-    let base = target_to_base_branch(&repo, &ctx.legacy_project, &new_meta)?;
-    Ok(base)
+    get_base_branch_data(ctx, perm)
 }
 
 pub(crate) fn set_target_push_remote(ctx: &Context, push_remote_name: &str) -> Result<()> {
@@ -342,6 +349,7 @@ fn set_exclude_decoration(ctx: &Context) -> Result<()> {
 pub(crate) fn target_to_base_branch(
     repo: &gix::Repository,
     project: &Project,
+    graph: &but_graph::Graph,
     meta: &impl RefMetadata,
 ) -> Result<BaseBranch> {
     // This function is presuming a workspace ref name.
@@ -365,32 +373,12 @@ pub(crate) fn target_to_base_branch(
         .context("failed to get fork point")?;
     let target_sha_ahead_of_ref = !target_sha_not_ref.is_empty();
 
-    // Compute the lowest merge base across all workspace stacks and the target.
-    // Read the workspace ref directly rather than HEAD, since HEAD may not point
-    // at the workspace commit in all code paths.
-    let lowest_merge_base = {
-        let heads: Vec<_> = repo
-            .find_reference(WORKSPACE_REF_NAME)?
-            .peel_to_commit()?
-            .parent_ids()
-            .map(|id| id.detach())
-            .collect();
-        if heads.is_empty() {
-            // No workspace commit parents — fall back to stored target SHA.
-            Some(target_sha)
-        } else {
-            let base = repo
-                .merge_base_octopus([heads.as_slice(), &[target_ref_commit]].concat())
-                .context("failed to compute octopus merge-base for workspace stacks")?;
-            Some(base.object()?.id().detach())
-        }
-    };
-
-    // Commits on the target branch between its tip and the lowest merge base.
-    let upstream_commit_ids = lowest_merge_base
-        .map(|lb| first_parent_commit_ids_until(repo, target_ref_commit, lb))
-        .transpose()
-        .context("failed to get upstream commits")?
+    // The longest list of updstream commit ids.
+    let upstream_commit_ids = graph
+        .upstream_commits(repo, target_ref.as_ref())?
+        .into_iter()
+        .map(|h| h.upstream_commits)
+        .max_by_key(|us| us.len())
         .unwrap_or_default();
 
     let upstream_commits = upstream_commit_ids

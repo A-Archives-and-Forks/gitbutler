@@ -1139,7 +1139,10 @@ fn find_stack_id_by_branch_name(ctx: &Context, branch_name: &str) -> anyhow::Res
 
 /// Update PR/MR target branches to match the current stack structure.
 async fn update_review_targets_for_stacks(ctx: &Context) -> anyhow::Result<()> {
-    let base_branch = gitbutler_branch_actions::base::get_base_branch_data(ctx)?;
+    let base_branch = {
+        let guard = ctx.shared_worktree_access();
+        gitbutler_branch_actions::base::get_base_branch_data(ctx, guard.read_permission())?
+    };
     let stacks = but_api::legacy::workspace::stacks(
         ctx,
         Some(but_workspace::legacy::StacksFilter::InWorkspace),
