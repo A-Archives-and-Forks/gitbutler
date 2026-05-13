@@ -83,17 +83,10 @@ impl BaseBranch {
 
 #[instrument(skip(ctx), err(Debug))]
 pub fn get_base_branch_data(ctx: &Context) -> Result<BaseBranch> {
-    let target = default_target(ctx)?;
     let repo = ctx.repo.get()?;
-    let base = target_to_base_branch(&repo, &ctx.legacy_project, &target)?;
+    let meta = ctx.meta()?;
+    let base = target_to_base_branch(&repo, &ctx.legacy_project, &meta)?;
     Ok(base)
-}
-
-#[instrument(skip(ctx), err(Debug))]
-pub fn get_base_branch_remote_url(ctx: &Context) -> Result<String> {
-    let target = default_target(ctx)?;
-    let repo = ctx.repo.get()?;
-    remote_url_of_target_to_base_branch(&repo, &target)
 }
 
 /// Restore the default target metadata if it is missing in the currently configured storage
@@ -184,7 +177,8 @@ fn go_back_to_integration(ctx: &Context, default_target: &Target) -> Result<Base
             .context("failed to checkout tree")?;
     }
 
-    let base = target_to_base_branch(&repo, &ctx.legacy_project, default_target)?;
+    let meta = ctx.meta()?;
+    let base = target_to_base_branch(&repo, &ctx.legacy_project, &meta)?;
     update_workspace_commit(ctx, false)?;
     Ok(base)
 }
@@ -309,7 +303,8 @@ pub(crate) fn set_base_branch(
 
     crate::integration::update_workspace_commit_with_vb_state(&vb_state, ctx, true)?;
 
-    let base = target_to_base_branch(&repo, &ctx.legacy_project, &target)?;
+    let new_meta = ctx.meta()?;
+    let base = target_to_base_branch(&repo, &ctx.legacy_project, &new_meta)?;
     Ok(base)
 }
 
@@ -347,18 +342,26 @@ fn set_exclude_decoration(ctx: &Context) -> Result<()> {
 pub(crate) fn target_to_base_branch(
     repo: &gix::Repository,
     project: &Project,
-    target: &Target,
+    meta: &impl RefMetadata,
 ) -> Result<BaseBranch> {
-    let target_ref_commit = repo
-        .find_reference(&target.branch.to_string())?
-        .peel_to_commit()?
-        .id;
+    // This function is presuming a workspace ref name.
+    let ws_meta = meta.workspace(WORKSPACE_REF_NAME.try_into()?)?;
+    let target_ref = ws_meta
+        .target_ref
+        .as_ref()
+        .context("target_to_base_branch require a defined target_ref")
+        .context(Code::DefaultTargetNotFound)?;
+    let target_sha = ws_meta
+        .target_commit_id
+        .context("target_to_base_branch require a defined target_commit_id")?;
+
+    let target_ref_commit = repo.find_reference(target_ref)?.peel_to_commit()?.id;
 
     // The old integrate_upstream function cares about whether the target sha
     // is ahead of the target ref.
     //
     // The old function provided some options for how to resolve this.
-    let target_sha_not_ref = first_parent_commit_ids_until(repo, target.sha, target_ref_commit)
+    let target_sha_not_ref = first_parent_commit_ids_until(repo, target_sha, target_ref_commit)
         .context("failed to get fork point")?;
     let target_sha_ahead_of_ref = !target_sha_not_ref.is_empty();
 
@@ -374,7 +377,7 @@ pub(crate) fn target_to_base_branch(
             .collect();
         if heads.is_empty() {
             // No workspace commit parents — fall back to stored target SHA.
-            Some(target.sha)
+            Some(target_sha)
         } else {
             let base = repo
                 .merge_base_octopus([heads.as_slice(), &[target_ref_commit]].concat())
@@ -401,7 +404,7 @@ pub(crate) fn target_to_base_branch(
     let behind = upstream_commits.len();
 
     // get some recent commits
-    let recent_commits = first_parent_commit_ids_with_limit(repo, target.sha, 20)
+    let recent_commits = first_parent_commit_ids_with_limit(repo, target_sha, 20)
         .context("failed to get recent commits")?
         .iter()
         .map(|id| {
@@ -413,27 +416,19 @@ pub(crate) fn target_to_base_branch(
     // we assume that only local commits can be conflicted
     let conflicted = recent_commits.iter().any(|commit| commit.conflicted);
 
-    // there has got to be a better way to do this.
-    let push_remote_url = match target.push_remote_name {
-        Some(ref name) => repo
-            .find_remote(name.as_str())
-            .ok()
-            .and_then(|remote| {
-                remote
-                    .url(gix::remote::Direction::Push)
-                    .or_else(|| remote.url(gix::remote::Direction::Fetch))
-                    .map(|url| url.to_bstring().to_string())
-            })
-            .unwrap_or_else(|| target.remote_url.clone()),
-        None => target.remote_url.clone(),
-    };
+    let push_remote_url = ws_meta.push_remote_url(repo)?;
+    let remote_url = ws_meta.remote_url_with_fallback(repo)?;
 
-    let remote_url = remote_url_of_target_to_base_branch(repo, target)?;
-
-    let branch_name = target.branch.fullname();
-    let remote_name = target.branch.remote().to_string();
-    let push_remote_name = target
-        .push_remote_name
+    let branch_name = target_ref.shorten().to_string();
+    let remote_name = repo
+        .find_reference(target_ref)?
+        .remote_name(gix::remote::Direction::Push)
+        .context("Failed to get current remote name")?
+        .to_owned()
+        .as_bstr()
+        .to_string();
+    let push_remote_name = ws_meta
+        .push_remote
         .clone()
         .unwrap_or_else(|| remote_name.clone());
     let short_name = BaseBranch::compute_short_name(&branch_name, &remote_name);
@@ -443,7 +438,7 @@ pub(crate) fn target_to_base_branch(
         remote_url,
         push_remote_name,
         push_remote_url,
-        base_sha: target.sha,
+        base_sha: target_sha,
         current_sha: target_ref_commit,
         behind,
         upstream_commits,
@@ -458,27 +453,6 @@ pub(crate) fn target_to_base_branch(
         short_name,
     };
     Ok(base)
-}
-
-fn remote_url_of_target_to_base_branch(repo: &gix::Repository, target: &Target) -> Result<String> {
-    // Fallback to the remote URL of the branch if the target remote URL is empty
-    let remote_url = if target.remote_url.is_empty() {
-        let remote = repo.find_remote(target.branch.remote()).context(format!(
-            "failed to find remote for branch {}",
-            target.branch.fullname()
-        ))?;
-        remote
-            .url(gix::remote::Direction::Fetch)
-            .map(|url| url.to_bstring().to_string())
-            .context(format!(
-                "failed to get remote url for {}",
-                target.branch.fullname()
-            ))?
-    } else {
-        target.remote_url.clone()
-    };
-
-    Ok(remote_url)
 }
 
 fn default_target(ctx: &Context) -> Result<Target> {

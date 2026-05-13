@@ -861,6 +861,7 @@ fn apply_multiple_segments_of_stack_in_order_merge_if_needed() -> anyhow::Result
                 },
             ],
             target_ref: "refs/remotes/origin/main",
+            remote_url: "should not be needed and when it is extract it from `repo`",
             target_commit_id: Sha1(3183e43ff482a2c4c8ff531d595453b64f58d90b),
             push_remote: None,
         },
@@ -1487,6 +1488,7 @@ fn apply_with_conflicts_shows_exact_conflict_info() -> anyhow::Result<()> {
             },
         ],
         target_ref: "refs/remotes/origin/main",
+        remote_url: "should not be needed and when it is extract it from `repo`",
         target_commit_id: Sha1(85efbe4d5a663bff0ed8fb5fbc38a72be0592f55),
         push_remote: None,
     }

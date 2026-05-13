@@ -46,15 +46,16 @@ mod workspace {
         assert!(!ws.remove_segment(c_ref));
 
         // Everything should be removed.
-        insta::assert_debug_snapshot!(ws, @r"
+        insta::assert_debug_snapshot!(ws, @r#"
         Workspace {
             ref_info: RefInfo { created_at: None, updated_at: None },
             stacks: [],
             target_ref: None,
+            remote_url: "",
             target_commit_id: None,
             push_remote: None,
         }
-        ");
+        "#);
     }
 
     #[test]
@@ -120,6 +121,7 @@ mod workspace {
                 },
             ],
             target_ref: None,
+            remote_url: "",
             target_commit_id: None,
             push_remote: None,
         }
@@ -130,15 +132,16 @@ mod workspace {
         assert!(ws.remove_segment(c_ref));
 
         // Everything should be removed.
-        insta::assert_debug_snapshot!(ws, @r"
+        insta::assert_debug_snapshot!(ws, @r#"
         Workspace {
             ref_info: RefInfo { created_at: None, updated_at: None },
             stacks: [],
             target_ref: None,
+            remote_url: "",
             target_commit_id: None,
             push_remote: None,
         }
-        ");
+        "#);
     }
 
     fn r(name: &str) -> &gix::refs::FullNameRef {
