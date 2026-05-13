@@ -28,35 +28,3 @@
 	width: 1px;
 	background-color: var(--border-2);
 }
-
-.shortcutsBarContainer {
-	display: flex;
-	column-gap: 12px;
-	row-gap: 4px;
-	flex-wrap: wrap;
-	align-items: baseline;
-	padding: 4px var(--panel-padding);
-	border-top: 1px solid var(--border-2);
-	color: var(--text-2);
-}
-
-.shortcutsBarScope {
-	color: var(--text-1);
-	font-weight: 600;
-}
-
-.shortcutsBarItem {
-	display: flex;
-	column-gap: 4px;
-	align-items: baseline;
-}
-
-.shortcutsBarName {
-	text-transform: lowercase;
-}
-
-.shortcutsBarKeys {
-	color: var(--text-1);
-	font-size: 14px;
-	font-family: inherit;
-}

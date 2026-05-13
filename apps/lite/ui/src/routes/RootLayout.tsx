@@ -2,7 +2,7 @@ import { listProjectsQueryOptions } from "#ui/api/queries.ts";
 import { CommandFnContext, CommandFn, useCommand } from "#ui/commands/manager.ts";
 import { CommandRegistrationId } from "#ui/commands/state.ts";
 import { lastOpenedProjectKey } from "#ui/projects/last-opened.ts";
-import { ShortcutsBarElementContext, TopBarActionsElementContext } from "#ui/portals.tsx";
+import { TopBarActionsElementContext } from "#ui/portals.tsx";
 import { PickerDialog } from "#ui/ui/PickerDialog/PickerDialog.tsx";
 import { ShortcutButton } from "#ui/components/ShortcutButton.tsx";
 import uiStyles from "#ui/ui/ui.module.css";
@@ -32,7 +32,6 @@ const ProjectSelect: FC = () => {
 			enabled: projects.length > 0,
 			group: "Global",
 			commandPalette: { label: "Select project" },
-			shortcutsBar: { label: "Project" },
 			hotkeys: [{ hotkey: "Mod+Shift+P" }],
 		},
 	);
@@ -91,7 +90,6 @@ const TopBar: FC<{
 
 export const RootLayout: FC = () => {
 	const [topBarActionsElement, setTopBarActionsElement] = useState<HTMLDivElement | null>(null);
-	const [shortcutsBarElement, setShortcutsBarElement] = useState<HTMLElement | null>(null);
 	const cmdMap = useRef<Map<CommandRegistrationId, CommandFn>>(new Map());
 
 	return (
@@ -99,15 +97,12 @@ export const RootLayout: FC = () => {
 			{/* oxlint-disable-next-line react-hooks-js/refs: Only accessed imperatively. */}
 			<CommandFnContext value={cmdMap.current}>
 				<TopBarActionsElementContext.Provider value={topBarActionsElement}>
-					<ShortcutsBarElementContext.Provider value={shortcutsBarElement}>
-						<main className={styles.layout}>
-							<TopBar setTopBarActionsElement={setTopBarActionsElement} />
-							<section className={styles.content}>
-								<Outlet />
-							</section>
-							<footer ref={setShortcutsBarElement} className={styles.shortcutsBarFooter} />
-						</main>
-					</ShortcutsBarElementContext.Provider>
+					<main className={styles.layout}>
+						<TopBar setTopBarActionsElement={setTopBarActionsElement} />
+						<section className={styles.content}>
+							<Outlet />
+						</section>
+					</main>
 				</TopBarActionsElementContext.Provider>
 			</CommandFnContext>
 		</HotkeysProvider>

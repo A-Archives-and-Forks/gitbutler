@@ -107,14 +107,12 @@ export const useNavigationIndexHotkeys = ({
 	useCommand(selectPreviousItem, {
 		group,
 		enabled: focusedPanel === panel,
-		shortcutsBar: { label: "Up" },
 		hotkeys: [{ hotkey: "ArrowUp" }, { hotkey: "K" }],
 	});
 
 	useCommand(selectNextItem, {
 		group,
 		enabled: focusedPanel === panel,
-		shortcutsBar: { label: "Down" },
 		hotkeys: [{ hotkey: "ArrowDown" }, { hotkey: "J" }],
 	});
 
@@ -161,7 +159,6 @@ export const useNavigationIndexHotkeys = ({
 		group,
 		enabled: focusedPanel === panel && outlineMode._tag === "Default",
 		commandPalette: { label: "Move" },
-		shortcutsBar: { label: "Move" },
 		hotkeys: [{ hotkey: "M" }],
 	});
 
@@ -169,7 +166,6 @@ export const useNavigationIndexHotkeys = ({
 		group,
 		enabled: focusedPanel === panel && outlineMode._tag === "Default",
 		commandPalette: { label: "Cut" },
-		shortcutsBar: { label: "Cut" },
 		hotkeys: [{ hotkey: "Mod+X", ignoreInputs: true }, { hotkey: "R" }],
 	});
 
@@ -177,7 +173,6 @@ export const useNavigationIndexHotkeys = ({
 		group,
 		enabled: focusedPanel === panel && outlineMode._tag === "Default",
 		commandPalette: { label: "Commit" },
-		shortcutsBar: { label: "Commit" },
 		hotkeys: [{ hotkey: "C" }],
 	});
 };

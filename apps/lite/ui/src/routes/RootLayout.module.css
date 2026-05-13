@@ -3,7 +3,6 @@
 	grid-template:
 		"topBar" auto
 		"content" minmax(0, 1fr)
-		"shortcutsBar" auto
 		/ minmax(0, 1fr);
 	height: 100dvh;
 }
@@ -28,8 +27,4 @@
 	grid-area: content;
 	flex-direction: column;
 	overflow: auto;
-}
-
-.shortcutsBarFooter {
-	grid-area: shortcutsBar;
 }
