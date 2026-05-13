@@ -22,6 +22,7 @@ fn find_git_merge_base_handles_duplicate_queue_entries_and_redundant_bases() -> 
 
     // Independent branches under the same merge should converge at main.
     assert_eq!(graph.find_git_merge_base(a, c), Some(main));
+    assert_eq!(graph.find_merge_base_octopus([a, c, merged]), Some(main));
 
     insta::assert_snapshot!(graph_tree(&graph), @"
 

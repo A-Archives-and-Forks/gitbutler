@@ -127,6 +127,24 @@ impl Graph {
         result.first().copied()
     }
 
+    /// Compute an order-dependent octopus merge-base from multiple `segments`.
+    ///
+    /// The first segment becomes the initial candidate. Each following segment is
+    /// folded into that candidate by computing their pairwise
+    /// [`Self::find_git_merge_base()`]. If a pair does not share history, the
+    /// previous candidate is kept and folding continues.
+    ///
+    /// Returns `None` if `segments` is empty, or if no merge-base could be found.
+    /// If `segments` has one element, it returns that.
+    pub fn find_merge_base_octopus(
+        &self,
+        segments: impl IntoIterator<Item = SegmentIndex>,
+    ) -> Option<SegmentIndex> {
+        segments
+            .into_iter()
+            .reduce(|a, b| self.find_git_merge_base(a, b).unwrap_or(a))
+    }
+
     /// Paint segments reachable from `first` with SEGMENT1 and from `second` with SEGMENT2.
     /// When a segment has both flags, it's a potential merge-base.
     /// Returns all potential merge-bases with their generation numbers.

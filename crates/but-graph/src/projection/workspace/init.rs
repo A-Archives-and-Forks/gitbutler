@@ -145,10 +145,11 @@ impl Graph {
                 {
                     None
                 } else {
-                    self.inner
-                        .neighbors_directed(ws_tip_segment.id, Direction::Outgoing)
-                        .reduce(|a, b| self.find_git_merge_base(a, b).unwrap_or(a))
-                        .and_then(|base| self[base].commits.first().map(|c| (c.id, base)))
+                    self.find_merge_base_octopus(
+                        self.inner
+                            .neighbors_directed(ws_tip_segment.id, Direction::Outgoing),
+                    )
+                    .and_then(|base| self[base].commits.first().map(|c| (c.id, base)))
                 }
             })
         } else {
@@ -406,9 +407,7 @@ impl Graph {
             .chain(target_commit.map(|t| t.segment_index))
             .chain(additional);
 
-        let base = all_segments
-            .inspect(|_| count += 1)
-            .reduce(|a, b| self.find_git_merge_base(a, b).unwrap_or(a))?;
+        let base = self.find_merge_base_octopus(all_segments.inspect(|_| count += 1))?;
 
         if count < 2 || base == actual_tip {
             match tip {
