@@ -209,6 +209,7 @@ mod api;
 /// Produce a graph from a Git repository.
 pub mod init;
 pub mod projection;
+mod utils;
 
 mod statistics;
 pub use statistics::Statistics;

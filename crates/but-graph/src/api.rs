@@ -15,7 +15,7 @@ use petgraph::{
 use crate::{
     Commit, CommitFlags, CommitIndex, Edge, EntryPoint, EntryPointCommit, Graph, Segment,
     SegmentFlags, SegmentIndex, SegmentRelation, StopCondition, init::PetGraph,
-    projection::commit::is_managed_workspace_by_message,
+    projection::commit::is_managed_workspace_by_message, utils::SegmentTable,
 };
 
 /// Mutation
@@ -127,7 +127,7 @@ impl Graph {
             return Some(a);
         }
 
-        let mut flags = SegmentFlagTable::new(self);
+        let mut flags = SegmentTable::new(self.inner.node_bound(), SegmentFlags::empty());
         let bases = self.paint_down_to_common(a, b, &mut flags);
 
         if bases.is_empty() {
@@ -214,7 +214,7 @@ impl Graph {
         &self,
         first: SegmentIndex,
         second: SegmentIndex,
-        flags: &mut SegmentFlagTable,
+        flags: &mut SegmentTable<SegmentFlags>,
     ) -> Vec<(SegmentIndex, usize)> {
         // Priority queue ordered by generation (higher generation = closer to root = lower priority).
         // We use Reverse because BinaryHeap is a max-heap and we want segments with *lower* generation
@@ -280,7 +280,7 @@ impl Graph {
     fn remove_redundant(
         &self,
         segments: &[(SegmentIndex, usize)],
-        flags: &mut SegmentFlagTable,
+        flags: &mut SegmentTable<SegmentFlags>,
     ) -> Vec<SegmentIndex> {
         if segments.is_empty() {
             return Vec::new();
@@ -390,38 +390,6 @@ impl Graph {
                 (!flags.get(*sidx).contains(SegmentFlags::STALE)).then_some(*sidx)
             })
             .collect()
-    }
-}
-
-struct SegmentFlagTable {
-    flags: Vec<SegmentFlags>,
-    touched: Vec<SegmentIndex>,
-}
-
-impl SegmentFlagTable {
-    fn new(graph: &Graph) -> Self {
-        SegmentFlagTable {
-            flags: vec![SegmentFlags::empty(); graph.inner.node_bound()],
-            touched: Vec::new(),
-        }
-    }
-
-    fn clear(&mut self) {
-        for sidx in self.touched.drain(..) {
-            self.flags[sidx.index()] = SegmentFlags::empty();
-        }
-    }
-
-    fn get(&self, sidx: SegmentIndex) -> SegmentFlags {
-        self.flags[sidx.index()]
-    }
-
-    fn get_mut(&mut self, sidx: SegmentIndex) -> &mut SegmentFlags {
-        let index = sidx.index();
-        if self.flags[index].is_empty() {
-            self.touched.push(sidx);
-        }
-        &mut self.flags[index]
     }
 }
 
@@ -700,13 +668,14 @@ impl Graph {
     ) {
         let mut next = VecDeque::new();
         next.push_back(start);
-        let mut seen = BTreeSet::new();
+        let mut seen = SegmentTable::new(self.inner.node_bound(), false);
+        seen.set(start, true);
         while let Some(next_sidx) = next.pop_front() {
             if !visit_and_prune(&self[next_sidx]) {
                 next.extend(
                     self.inner
                         .neighbors_directed(next_sidx, direction)
-                        .filter(|n| seen.insert(*n)),
+                        .filter(|n| seen.set_if_empty(*n, true)),
                 )
             }
         }
@@ -723,13 +692,14 @@ impl Graph {
     ) {
         let mut next = VecDeque::new();
         next.push_back(start);
-        let mut seen = BTreeSet::new();
+        let mut seen = SegmentTable::new(self.inner.node_bound(), false);
+        seen.set(start, true);
         while let Some(next_sidx) = next.pop_front() {
             if start == next_sidx || !visit_and_prune(&self[next_sidx]) {
                 next.extend(
                     self.inner
                         .neighbors_directed(next_sidx, direction)
-                        .filter(|n| seen.insert(*n)),
+                        .filter(|n| seen.set_if_empty(*n, true)),
                 )
             }
         }
