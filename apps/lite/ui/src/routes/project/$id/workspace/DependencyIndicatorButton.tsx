@@ -5,7 +5,7 @@ import { useAppDispatch } from "#ui/store.ts";
 import { classes } from "#ui/ui/classes.ts";
 import uiStyles from "#ui/ui/ui.module.css";
 import { Tooltip, useRender } from "@base-ui/react";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Array, pipe } from "effect";
 import { FC, useState } from "react";
 import styles from "./DependencyIndicatorButton.module.css";
@@ -19,9 +19,11 @@ export const DependencyIndicatorButton: FC<
 	// We use a controlled tooltip as a workaround for https://github.com/mui/base-ui/issues/4499.
 	const [isTooltipOpen, setIsTooltipOpen] = useState(false);
 	const dispatch = useAppDispatch();
-	const { data: headInfo } = useSuspenseQuery(headInfoQueryOptions(projectId));
+	const { data: headInfo } = useQuery(headInfoQueryOptions(projectId));
 	// TODO: expensive
-	const branchNameByCommitId = getBranchNameByCommitId(headInfo);
+	const branchNameByCommitId = headInfo
+		? getBranchNameByCommitId(headInfo)
+		: new Map<string, string>();
 	const branchNames = pipe(
 		commitIds,
 		Array.flatMapNullable((commitId) => branchNameByCommitId.get(commitId)),

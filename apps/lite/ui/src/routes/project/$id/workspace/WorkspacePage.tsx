@@ -147,7 +147,7 @@ const BranchPicker: FC<{
 	onSelectBranch: (branch: BranchOperand) => void;
 }> = ({ open, onOpenChange, onSelectBranch }) => {
 	const { id: projectId } = useParams({ from: "/project/$id/workspace" });
-	const { data: headInfo } = useSuspenseQuery(headInfoQueryOptions(projectId));
+	const { data: headInfo } = useQuery(headInfoQueryOptions(projectId));
 	const selectBranch = (option: BranchPickerOption) => {
 		onOpenChange(false);
 		onSelectBranch(option.branch);
@@ -165,7 +165,7 @@ const BranchPicker: FC<{
 			items={[
 				{
 					value: "Branches",
-					items: headInfo.stacks.flatMap(stackToBranchPickerOptions),
+					items: headInfo?.stacks.flatMap(stackToBranchPickerOptions) ?? [],
 				},
 			]}
 			open={open}

@@ -72,7 +72,7 @@ import {
 	WorkspaceState,
 } from "@gitbutler/but-sdk";
 import { formatForDisplay } from "@tanstack/react-hotkeys";
-import { useMutation, useQueries, useSuspenseQuery } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { Match } from "effect";
 
@@ -121,7 +121,7 @@ const useDryRunCommit = (commitId: string) => {
 	return findCommit({ headInfo: dryRunWorkspace.headInfo, commitId: dryRunCommitId });
 };
 
-const sections = (headInfo: RefInfo): NonEmptyArray<Section> => {
+const sections = (headInfo: RefInfo | undefined): NonEmptyArray<Section> => {
 	const changesSection: Section = {
 		section: changesSectionOperand,
 		children: [],
@@ -149,7 +149,7 @@ const sections = (headInfo: RefInfo): NonEmptyArray<Section> => {
 	return [
 		changesSection,
 
-		...headInfo.stacks.flatMap((stack) => {
+		...(headInfo?.stacks.flatMap((stack) => {
 			// oxlint-disable-next-line typescript/no-non-null-assertion -- [ref:stack-id-required]
 			const stackId = stack.id!;
 			const stackOperandSection: Section = {
@@ -163,7 +163,7 @@ const sections = (headInfo: RefInfo): NonEmptyArray<Section> => {
 					return section ? [section] : [];
 				}),
 			];
-		}),
+		}) ?? []),
 
 		baseCommitSection,
 	];
@@ -176,7 +176,7 @@ const useNavigationIndex = ({
 	projectId: string;
 	absorptionTargetKeys: ReadonlySet<string>;
 }) => {
-	const { data: headInfo } = useSuspenseQuery(headInfoQueryOptions(projectId));
+	const { data: headInfo } = useQuery(headInfoQueryOptions(projectId));
 
 	const dispatch = useAppDispatch();
 
@@ -304,7 +304,7 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 	const dryRunOperationQuery = useDryRunOperation({ projectId, operation: dryRunOperation });
 	const dryRunWorkspace = dryRunOperationQuery.data?.workspace ?? null;
 
-	const { data: headInfo } = useSuspenseQuery(headInfoQueryOptions(projectId));
+	const { data: headInfo } = useQuery(headInfoQueryOptions(projectId));
 
 	const openBranchPicker = () => {
 		dispatch(projectActions.openBranchPicker({ projectId }));
@@ -334,14 +334,17 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 						</div>
 
 						<div className={styles.scroller}>
-							{headInfo.stacks.map((stack) => (
+							{headInfo?.stacks.map((stack) => (
 								<StackC key={stack.id} projectId={projectId} stack={stack} />
 							))}
 
-							<BaseCommit projectId={projectId} commitId={getCommonBaseCommitId(headInfo)} />
+							<BaseCommit
+								projectId={projectId}
+								commitId={headInfo ? getCommonBaseCommitId(headInfo) : undefined}
+							/>
 						</div>
 
-						{operationSource && (
+						{operationSource && headInfo && (
 							<div className={styles.operationSourcePreview}>
 								<OperationSourceLabel headInfo={headInfo} source={operationSource} />
 								{outlineMode._tag === "Absorb" && absorptionPlanQuery?.isPending && (
@@ -1017,7 +1020,7 @@ const Changes: FC<{
 		},
 	});
 
-	const { data: worktreeChanges } = useSuspenseQuery(changesInWorktreeQueryOptions(projectId));
+	const { data: worktreeChanges } = useQuery(changesInWorktreeQueryOptions(projectId));
 
 	const operand = changesSectionOperand;
 	const commitTextareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -1026,23 +1029,24 @@ const Changes: FC<{
 
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
-	const { data: headInfo } = useSuspenseQuery(headInfoQueryOptions(projectId));
-	const branchComboboxItems = headInfo.stacks.flatMap((stack): Array<CommitBranchComboboxItem> => {
-		// oxlint-disable-next-line typescript/no-non-null-assertion -- [ref:stack-id-required]
-		const stackId = stack.id!;
-		return stack.segments.flatMap((segment): Array<CommitBranchComboboxItem> => {
-			const refName = segment.refName;
-			if (!refName) return [];
+	const { data: headInfo } = useQuery(headInfoQueryOptions(projectId));
+	const branchComboboxItems =
+		headInfo?.stacks.flatMap((stack): Array<CommitBranchComboboxItem> => {
+			// oxlint-disable-next-line typescript/no-non-null-assertion -- [ref:stack-id-required]
+			const stackId = stack.id!;
+			return stack.segments.flatMap((segment): Array<CommitBranchComboboxItem> => {
+				const refName = segment.refName;
+				if (!refName) return [];
 
-			return [
-				{
-					id: JSON.stringify([stackId, refName.fullNameBytes]),
-					label: refName.displayName,
-					branch: { stackId, branchRef: refName.fullNameBytes },
-				},
-			];
-		});
-	});
+				return [
+					{
+						id: JSON.stringify([stackId, refName.fullNameBytes]),
+						label: refName.displayName,
+						branch: { stackId, branchRef: refName.fullNameBytes },
+					},
+				];
+			});
+		}) ?? [];
 
 	const [branchId, setBranchId] = useState<string | null>(null);
 	const branch = branchComboboxItems.find((item) => item.id === branchId) ?? branchComboboxItems[0];
@@ -1137,11 +1141,11 @@ const Changes: FC<{
 		<TreeItem
 			projectId={projectId}
 			operand={operand}
-			aria-label={`Changes (${worktreeChanges.changes.length})`}
+			aria-label={`Changes (${worktreeChanges?.changes.length ?? 0})`}
 			className={classes(workspaceItemRowStyles.section, styles.changesSection)}
 			render={<OperandC projectId={projectId} operand={operand} />}
 		>
-			<ChangesSectionRow changes={worktreeChanges.changes} projectId={projectId} />
+			<ChangesSectionRow changes={worktreeChanges?.changes ?? []} projectId={projectId} />
 
 			<textarea
 				ref={commitTextareaRef}

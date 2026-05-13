@@ -10,7 +10,7 @@ import { draggable } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { centerUnderPointer } from "@atlaskit/pragmatic-drag-and-drop/element/center-under-pointer";
 import { setCustomNativeDragPreview } from "@atlaskit/pragmatic-drag-and-drop/element/set-custom-native-drag-preview";
 import { mergeProps, useRender } from "@base-ui/react";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Match } from "effect";
 import { FC, type ReactNode, useEffect, useEffectEvent, useRef } from "react";
 import { createRoot } from "react-dom/client";
@@ -35,7 +35,7 @@ export const OperationSourceC: FC<
 		source: Operand;
 	} & useRender.ComponentProps<"div">
 > = ({ projectId, selectionScope, source, render, ...props }) => {
-	const { data: headInfo } = useSuspenseQuery(headInfoQueryOptions(projectId));
+	const { data: headInfo } = useQuery(headInfoQueryOptions(projectId));
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
 	const dispatch = useAppDispatch();
@@ -46,6 +46,7 @@ export const OperationSourceC: FC<
 				nativeSetDragImage,
 				getOffset: centerUnderPointer,
 				render: ({ container }) => {
+					if (!headInfo) return;
 					const root = createRoot(container);
 					root.render(
 						<DragPreview>
