@@ -14,7 +14,7 @@ impl AppCacheHandle {
     }
 
     /// Create a new instance at `path`.
-    #[instrument(name = "AppCacheHandle::new_at_path", level = "debug", skip(path))]
+    #[instrument(name = "AppCacheHandle::new_at_path", level = "trace", skip(path))]
     pub fn new_at_path(path: impl Into<PathBuf>) -> Self {
         let path = path.into();
         let (conn, path) = crate::cache::open_with_migrations_infallible(
@@ -58,7 +58,7 @@ impl CacheHandle {
     }
 
     /// Create a new instance at `path`.
-    #[instrument(name = "CacheHandle::new_at_path", level = "debug", skip(path))]
+    #[instrument(name = "CacheHandle::new_at_path", level = "trace", skip(path))]
     pub fn new_at_path(path: impl Into<PathBuf>) -> Self {
         let path = path.into();
         let (conn, path) = crate::cache::open_with_migrations_infallible(

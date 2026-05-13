@@ -48,7 +48,7 @@ impl Graph {
     /// Typically, that's a previous location of the target segment.
     #[instrument(
         name = "Graph::into_workspace",
-        level = "debug",
+        level = "trace",
         skip(self),
         err(Debug)
     )]

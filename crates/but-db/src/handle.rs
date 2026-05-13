@@ -28,7 +28,7 @@ impl DbHandle {
     /// A new instance connecting to the project database at the given `path`.
     #[instrument(
         name = "DbHandle::new_at_path",
-        level = "debug",
+        level = "trace",
         skip(path),
         err(Debug)
     )]
