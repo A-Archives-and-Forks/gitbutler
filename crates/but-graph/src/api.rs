@@ -233,12 +233,22 @@ impl Graph {
 
         let mut out = Vec::new();
 
-        // Process the priority queue until exhausted, skipping stale entries on pop.
-        while let Some((Reverse(generation), segment_id)) = queue.pop() {
+        // Keep processing while there are potentially useful entries.
+        //
+        // Stale entries still need to propagate their stale marker to their
+        // parents if other non-stale queue entries remain. Once everything left
+        // in the queue is stale, no better merge-base can be found.
+        while queue.iter().any(|(_, segment_id)| {
+            !flags
+                .get(segment_id)
+                .copied()
+                .unwrap_or_default()
+                .contains(SegmentFlags::STALE)
+        }) {
+            let Some((Reverse(generation), segment_id)) = queue.pop() else {
+                break;
+            };
             let segment_flags = flags.get(&segment_id).copied().unwrap_or_default();
-            if segment_flags.contains(SegmentFlags::STALE) {
-                continue;
-            }
 
             let mut flags_without_result = segment_flags
                 & (SegmentFlags::SEGMENT1 | SegmentFlags::SEGMENT2 | SegmentFlags::STALE);
