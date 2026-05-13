@@ -5,7 +5,7 @@ export type PanelsState = {
 };
 
 export const createInitialState = (): PanelsState => ({
-	visiblePanels: [...orderedPanels],
+	visiblePanels: orderedPanels.filter((panel) => panel !== "files"),
 });
 
 export const initialState: PanelsState = createInitialState();
