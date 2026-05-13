@@ -80,9 +80,10 @@ pub fn pr_template(
             ctx.workdir_or_fail()?.join(relative_path),
         ));
     }
-    ctx.read_file_from_workspace(&relative_path)?
+    Ok(ctx
+        .read_file_from_workspace(&relative_path)?
         .content
-        .context("PR template was not valid UTF-8")
+        .unwrap_or_default())
 }
 
 /// Information about the project's review template.
@@ -132,7 +133,7 @@ pub fn review_template(ctx: &Context) -> Result<Option<ReviewTemplateInfo>> {
             let content = ctx
                 .read_file_from_workspace(&path)?
                 .content
-                .context("PR template was not valid UTF-8")?;
+                .unwrap_or_default();
 
             Ok(Some(ReviewTemplateInfo {
                 path: template_path,
