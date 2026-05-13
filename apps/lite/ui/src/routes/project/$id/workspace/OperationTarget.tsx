@@ -24,46 +24,12 @@ import { useMutation } from "@tanstack/react-query";
 type DropTargetParams = Parameters<typeof dropTargetForElements>[0];
 type GetDataArgs = Parameters<NonNullable<DropTargetParams["getData"]>>[0];
 
-type DropData = {
-	operationType?: OperationType;
-};
-
-const parseDropData = (data: unknown): DropData | null => {
-	if (typeof data !== "object" || data === null || !("operationType" in data)) return null;
-	return data as DropData;
-};
-
-const getDropOperationType = ({
-	source,
-	target,
-	input,
-	element,
-}: {
-	source: Operand;
-	target: Operand;
-	input: Parameters<typeof attachInstruction>[1]["input"];
-	element: Parameters<typeof attachInstruction>[1]["element"];
-}): OperationType | null => {
-	const { rub, moveAbove, moveBelow } = getOperations(source, target);
-
-	const instruction = extractInstruction(
-		attachInstruction(
-			{},
-			{
-				input,
-				element,
-				operations: {
-					"reorder-before": moveAbove ? "available" : "not-available",
-					"reorder-after": moveBelow ? "available" : "not-available",
-					combine: rub ? "available" : "not-available",
-				},
-			},
-		),
-	);
+const getOperationTypeFromData = (data: Record<string | symbol, unknown>): OperationType | null => {
+	const instruction = extractInstruction(data);
 	if (!instruction) return null;
 
 	return Match.value(instruction.operation).pipe(
-		Match.withReturnType<OperationType | null>(),
+		Match.withReturnType<OperationType>(),
 		Match.when("combine", () => "rub"),
 		Match.when("reorder-before", () => "moveAbove"),
 		Match.when("reorder-after", () => "moveBelow"),
@@ -76,19 +42,23 @@ const useOperationDropTarget = ({ target, projectId }: { target: Operand; projec
 	const { mutate: runOperation } = useMutation(useRunOperationMutationOptions());
 	const dropRef = useRef<HTMLElement>(null);
 
-	const getData = useEffectEvent(({ input, element, source }: GetDataArgs): DropData => {
+	const getData = useEffectEvent(({ input, element, source }: GetDataArgs) => {
 		const dragData = parseDragData(source.data);
 		if (!dragData) return {};
 
-		const operationType = getDropOperationType({
-			source: dragData.source,
-			target,
-			input,
-			element,
-		});
-		if (operationType === null) return {};
-
-		return { operationType };
+		const { rub, moveAbove, moveBelow } = getOperations(dragData.source, target);
+		return attachInstruction(
+			{},
+			{
+				input,
+				element,
+				operations: {
+					"reorder-before": moveAbove ? "available" : "not-available",
+					"reorder-after": moveBelow ? "available" : "not-available",
+					combine: rub ? "available" : "not-available",
+				},
+			},
+		);
 	});
 
 	useEffect(() => {
@@ -104,13 +74,13 @@ const useOperationDropTarget = ({ target, projectId }: { target: Operand; projec
 
 				if (!isActiveDropTarget) return;
 
-				const dropData = parseDropData(args.self.data);
+				const operationType = getOperationTypeFromData(args.self.data);
 
 				dispatch(
 					projectActions.updatePointerTransfer({
 						projectId,
-						target: dropData ? target : null,
-						operationType: dropData?.operationType ?? null,
+						target: operationType !== null ? target : null,
+						operationType,
 					}),
 				);
 			},
@@ -130,13 +100,13 @@ const useOperationDropTarget = ({ target, projectId }: { target: Operand; projec
 				if (!isActiveDropTarget) return;
 
 				const dragData = parseDragData(args.source.data);
-				const dropData = parseDropData(args.self.data);
+				const operationType = getOperationTypeFromData(args.self.data);
 				const operation =
-					dragData && dropData?.operationType !== undefined
+					dragData && operationType !== null
 						? getOperation({
 								source: dragData.source,
 								target,
-								operationType: dropData.operationType,
+								operationType,
 							})
 						: null;
 
