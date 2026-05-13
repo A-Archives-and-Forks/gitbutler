@@ -1593,7 +1593,8 @@ EOF
 
   # A workspace where the only ref on the branch commits is origin/A (remote).
   # The local branch never existed - only the remote was fetched.
-  # This tests whether a remote-only ref as the first stack segment is pruned.
+  # This tests that a remote-only ref at the top of the stack still produces the
+  # correct workspace output without requiring any special pruning.
   git init remote-ref-as-stack-top
   (cd remote-ref-as-stack-top
     commit init

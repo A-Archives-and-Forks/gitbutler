@@ -6838,7 +6838,7 @@ fn remote_trailing_local_stack() -> anyhow::Result<()> {
         └── ►:2[1]:main <> origin/main →:1:
             └── 🏁·fafd9d0 (⌂|✓|10)
     ");
-    insta::assert_snapshot!(graph_workspace(&graph.into_workspace()?), @"📕🏘️:0:gitbutler/workspace[🌳] <> ✓refs/remotes/origin/main⇣1 on cb7021b");
+    insta::assert_snapshot!(graph_workspace(&graph.into_workspace()?), "this is a weird state as the target is actually disjoint from the workspace - it appears empty now", @"📕🏘️:0:gitbutler/workspace[🌳] <> ✓refs/remotes/origin/main⇣1 on cb7021b");
     Ok(())
 }
 
