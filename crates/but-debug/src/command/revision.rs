@@ -6,6 +6,7 @@ use anyhow::{Context as _, Result, bail, ensure};
 use but_core::ref_metadata::{
     StackId, Workspace, WorkspaceCommitRelation, WorkspaceStack, WorkspaceStackBranch,
 };
+use but_graph::FirstParent;
 use gix::{
     bstr::ByteVec, odb::store::RefreshMode, reference::Category, refs::Target,
     revision::plumbing::Spec,
@@ -54,7 +55,11 @@ fn log(repo: &gix::Repository, meta: &EmptyRefMetadata, log_args: &LogArgs) -> R
 
     let _span = tracing::info_span!("traverse graph").entered();
     let commits = if let Some(excluded) = excluded {
-        graph.find_commit_ids_reachable_from_a_not_b(included, excluded, log_args.first_parent)?
+        graph.find_commit_ids_reachable_from_a_not_b(
+            included,
+            excluded,
+            FirstParent::from(log_args.first_parent),
+        )?
     } else {
         bail!("Need to specify a rev-spec of form `a..b` to indicate an exclusion for now.")
     };

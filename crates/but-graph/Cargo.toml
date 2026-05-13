@@ -23,6 +23,7 @@ bstr.workspace = true
 petgraph.workspace = true
 anyhow.workspace = true
 bitflags.workspace = true
+boolean-enums.workspace = true
 tracing.workspace = true
 itertools.workspace = true
 

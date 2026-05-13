@@ -1347,6 +1347,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "bitflags 2.11.1",
+ "boolean-enums",
  "bstr",
  "but-core",
  "but-graph",

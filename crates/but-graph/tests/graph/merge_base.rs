@@ -1,4 +1,4 @@
-use but_graph::{Graph, Segment, SegmentIndex, SegmentRelation};
+use but_graph::{FirstParent, Graph, Segment, SegmentIndex, SegmentRelation};
 use but_testsupport::{graph_tree, visualize_commit_graph_all};
 
 use crate::init::{read_only_in_memory_scenario, standard_options};
@@ -116,20 +116,22 @@ fn reachable_difference_returns_commits_in_traversal_order() -> anyhow::Result<(
     let merged_id = repo.rev_parse_single("merged")?.detach();
     let a_id = repo.rev_parse_single("A")?.detach();
 
-    let ids = graph.find_commit_ids_reachable_from_a_not_b(merged_id, a_id, false)?;
+    let ids = graph.find_commit_ids_reachable_from_a_not_b(merged_id, a_id, FirstParent::No)?;
     assert_eq!(ids, ids_by_revs(&repo, &["merged", "C", "C^1", "C^2"])?);
-    let first_parent_ids = graph.find_commit_ids_reachable_from_a_not_b(merged_id, a_id, true)?;
+    let first_parent_ids =
+        graph.find_commit_ids_reachable_from_a_not_b(merged_id, a_id, FirstParent::Yes)?;
     assert_eq!(first_parent_ids, ids_by_revs(&repo, &["merged"])?);
 
     let merged = segment_id_by_ref_name(&graph, "refs/heads/merged")?;
     let a = segment_id_by_ref_name(&graph, "refs/heads/A")?;
 
-    let commits = graph.find_segments_reachable_from_a_not_b(merged, a, false);
+    let commits = graph.find_segments_reachable_from_a_not_b(merged, a, FirstParent::No);
     assert_eq!(
         commits.iter().map(|commit| commit.id).collect::<Vec<_>>(),
         ids
     );
-    let first_parent_commits = graph.find_segments_reachable_from_a_not_b(merged, a, true);
+    let first_parent_commits =
+        graph.find_segments_reachable_from_a_not_b(merged, a, FirstParent::Yes);
     assert_eq!(
         first_parent_commits
             .iter()
@@ -139,7 +141,7 @@ fn reachable_difference_returns_commits_in_traversal_order() -> anyhow::Result<(
     );
     assert!(
         graph
-            .find_commit_ids_reachable_from_a_not_b(a_id, a_id, false)?
+            .find_commit_ids_reachable_from_a_not_b(a_id, a_id, FirstParent::No)?
             .is_empty(),
         "self-exclusion means nothing is returned"
     );

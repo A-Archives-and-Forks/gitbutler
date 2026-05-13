@@ -18,6 +18,8 @@ use crate::{
     projection::commit::is_managed_workspace_by_message, utils::SegmentTable,
 };
 
+boolean_enums::gen_boolean_enum!(pub FirstParent);
+
 /// Mutation
 impl Graph {
     /// Insert `segment` to the graph so that it's not connected to any other segment, and return its index.
@@ -163,14 +165,15 @@ impl Graph {
     /// emits each segment's commits in stored tip-to-base order, and lazily paints the
     /// excluded side only as far as needed to prove emitted segments are not hidden.
     ///
-    /// If `first_parent_only` is true, both the included and excluded traversals follow
+    /// If `first_parent` is [`FirstParent::Yes`], both the included and excluded traversals follow
     /// only segment edges with `parent_order == 0`.
     pub fn find_segments_reachable_from_a_not_b(
         &self,
         included: SegmentIndex,
         excluded: SegmentIndex,
-        first_parent_only: bool,
+        first_parent: FirstParent,
     ) -> Vec<&Commit> {
+        let first_parent: bool = first_parent.into();
         let mut flags = SegmentTable::new(self.inner.node_bound(), SegmentFlags::empty());
         let mut queue = BinaryHeap::new();
         let mut sequence = 0;
@@ -194,7 +197,7 @@ impl Graph {
         while let Some((_, _, is_excluded, segment_id)) = queue.pop() {
             if is_excluded {
                 let parent_ids =
-                    self.parent_segments_for_reachable_difference(segment_id, first_parent_only);
+                    self.parent_segments_for_reachable_difference(segment_id, first_parent);
                 for parent_id in parent_ids {
                     self.queue_segment_for_reachable_difference(
                         parent_id,
@@ -223,7 +226,7 @@ impl Graph {
                 Some(max_emitted_generation.map_or(generation, |max| max.max(generation)));
             segments.push(segment_id);
             let parent_ids =
-                self.parent_segments_for_reachable_difference(segment_id, first_parent_only);
+                self.parent_segments_for_reachable_difference(segment_id, first_parent);
             for parent_id in parent_ids {
                 self.queue_segment_for_reachable_difference(
                     parent_id,
@@ -334,17 +337,17 @@ impl Graph {
     ///
     /// This is a convenience wrapper around
     /// [`Self::find_segments_reachable_from_a_not_b()`], taking object ids of commits.
-    /// If `first_parent_only` is true, both traversals follow only first-parent edges.
+    /// If `first_parent` is [`FirstParent::Yes`], both traversals follow only first-parent edges.
     pub fn find_commit_ids_reachable_from_a_not_b(
         &self,
         included: gix::ObjectId,
         excluded: gix::ObjectId,
-        first_parent_only: bool,
+        first_parent: FirstParent,
     ) -> anyhow::Result<Vec<gix::ObjectId>> {
         let included = self.commit_id_to_segment_id(included)?;
         let excluded = self.commit_id_to_segment_id(excluded)?;
         Ok(self
-            .find_segments_reachable_from_a_not_b(included, excluded, first_parent_only)
+            .find_segments_reachable_from_a_not_b(included, excluded, first_parent)
             .into_iter()
             .map(|commit| commit.id)
             .collect())
