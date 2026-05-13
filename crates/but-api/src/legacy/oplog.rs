@@ -261,3 +261,26 @@ pub fn snapshot_diff(
     let diff: Vec<but_core::ui::TreeChange> = diff.into_iter().map(Into::into).collect();
     Ok(diff)
 }
+
+/// Find the final snapshot that a restore snapshot will restore from.
+///
+/// For example if you do a reword and then a series of undos and redos the oplog would look like this:
+///
+/// 9ea77ad REDO
+/// 71c6be6 UNDO
+/// c33acf3 REDO
+/// 3a0c4d1 UNDO
+/// bd1724b REWORD
+///
+/// and `peel_restore_snapshot` will return the snapshot for `bd1724b`.
+///
+/// If the given snapshot is not a restore snapshot then the same snapshot will be returned.
+#[but_api]
+#[instrument(err(Debug))]
+pub fn peel_restore_snapshot(
+    ctx: &but_ctx::Context,
+    sha: gix::ObjectId,
+) -> Result<Option<Snapshot>> {
+    let snapshot = get_snapshot(ctx, sha)?;
+    gitbutler_oplog::peel_restore_snapshot(ctx, &snapshot)
+}

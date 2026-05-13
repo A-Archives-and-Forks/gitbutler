@@ -2622,7 +2622,7 @@ impl App {
 
         let text = {
             let restore_from = if let Ok(Some(snapshot)) =
-                gitbutler_oplog::peel_restore_snapshot(ctx, &target_snapshot)
+                but_api::legacy::oplog::peel_restore_snapshot(ctx, target_snapshot.commit_id)
                 && snapshot.commit_id != target_snapshot.commit_id
                 && snapshot.details.is_some()
             {
