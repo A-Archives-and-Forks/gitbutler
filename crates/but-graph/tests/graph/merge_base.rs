@@ -1,5 +1,5 @@
 use but_graph::{Graph, Segment, SegmentIndex, SegmentRelation};
-use but_testsupport::graph_tree;
+use but_testsupport::{graph_tree, visualize_commit_graph_all};
 
 use crate::init::{read_only_in_memory_scenario, standard_options};
 
@@ -92,6 +92,51 @@ fn relation_between_matches_merge_base_in_redundant_ancestor_case() -> anyhow::R
 }
 
 #[test]
+fn reachable_difference_returns_commits_in_traversal_order() -> anyhow::Result<()> {
+    let (repo, meta) = read_only_in_memory_scenario("four-diamond")?;
+    insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
+    *   8a6c109 (HEAD -> merged) Merge branch 'C' into merged
+    |\  
+    | *   7ed512a (C) Merge branch 'D' into C
+    | |\  
+    | | * ecb1877 (D) D
+    | * | 35ee481 C
+    | |/  
+    * |   62b409a (A) Merge branch 'B' into A
+    |\ \  
+    | * | f16dddf (B) B
+    | |/  
+    * / 592abec A
+    |/  
+    * 965998b (main) base
+    ");
+
+    let graph = Graph::from_head(&repo, &*meta, standard_options())?.validated()?;
+
+    let merged_id = repo.rev_parse_single("merged")?.detach();
+    let a_id = repo.rev_parse_single("A")?.detach();
+
+    let ids = graph.find_commit_ids_from_a_not_b(merged_id, a_id)?;
+    assert_eq!(ids, ids_by_revs(&repo, &["merged", "C", "C^1", "C^2"])?);
+
+    let merged = segment_id_by_ref_name(&graph, "refs/heads/merged")?;
+    let a = segment_id_by_ref_name(&graph, "refs/heads/A")?;
+
+    let commits = graph.find_commits_reachable_from_a_not_b(merged, a);
+    assert_eq!(
+        commits.iter().map(|commit| commit.id).collect::<Vec<_>>(),
+        ids
+    );
+
+    assert!(
+        graph.find_commit_ids_from_a_not_b(a_id, a_id)?.is_empty(),
+        "self-exclusion means nothing is returned"
+    );
+
+    Ok(())
+}
+
+#[test]
 fn relation_between_handles_identity_and_disjoint_segments() -> anyhow::Result<()> {
     let (repo, meta) = read_only_in_memory_scenario("four-diamond")?;
     let mut graph = Graph::from_head(&repo, &*meta, standard_options())?.validated()?;
@@ -157,4 +202,10 @@ fn segment_id_by_ref_name(graph: &Graph, name: &str) -> anyhow::Result<SegmentIn
         .named_segment_by_ref_name(full_name.as_ref())
         .map(|s| s.id)
         .ok_or_else(|| anyhow::anyhow!("missing segment for {name}"))
+}
+
+fn ids_by_revs(repo: &gix::Repository, revs: &[&str]) -> anyhow::Result<Vec<gix::ObjectId>> {
+    revs.iter()
+        .map(|rev| Ok(repo.rev_parse_single(*rev)?.detach()))
+        .collect()
 }

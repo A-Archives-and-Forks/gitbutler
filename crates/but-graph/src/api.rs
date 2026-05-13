@@ -152,6 +152,71 @@ impl Graph {
             .transpose()
     }
 
+    /// Return all commits reachable from `included`, but not reachable from `excluded`.
+    ///
+    /// This is equivalent to the reachable set of `excluded..included`, with segment ids
+    /// instead of rev-specs. The returned commits follow the graph traversal order from
+    /// `included` towards history.
+    ///
+    /// Unlike Git's revision walk, this does not sort pending commits by date or enforce
+    /// global topo-order across segments: it uses FIFO segment traversal and emits each
+    /// segment's commits in their stored tip-to-base order.
+    ///
+    /// It also eagerly marks all segments reachable from `excluded` before walking `included`,
+    /// which can visit more of the excluded side than Git would for small reachable differences.
+    pub fn find_commits_reachable_from_a_not_b(
+        &self,
+        included: SegmentIndex,
+        excluded: SegmentIndex,
+    ) -> Vec<&Commit> {
+        let mut flags = SegmentTable::new(self.inner.node_bound(), SegmentFlags::empty());
+        self.paint_down_to_reachable_eagerly(excluded, SegmentFlags::SEGMENT2, &mut flags);
+
+        let mut queue = VecDeque::new();
+        queue.push_back(included);
+
+        let mut commits = Vec::new();
+        while let Some(segment_id) = queue.pop_front() {
+            let segment_flags = flags.get_mut(segment_id);
+            if segment_flags.contains(SegmentFlags::SEGMENT1) {
+                continue;
+            }
+            segment_flags.insert(SegmentFlags::SEGMENT1);
+
+            if segment_flags.contains(SegmentFlags::SEGMENT2) {
+                continue;
+            }
+
+            let segment = &self[segment_id];
+            commits.extend(segment.commits.iter());
+            queue.extend(
+                self.inner
+                    .edges_directed(segment_id, Direction::Outgoing)
+                    .map(|edge| edge.target()),
+            );
+        }
+
+        commits
+    }
+
+    /// Return all commit ids reachable from `included`, but not reachable from `excluded`.
+    ///
+    /// This is a convenience wrapper around
+    /// [`Self::find_commits_reachable_from_a_not_b()`], taking object ids of commits.
+    pub fn find_commit_ids_from_a_not_b(
+        &self,
+        included: gix::ObjectId,
+        excluded: gix::ObjectId,
+    ) -> anyhow::Result<Vec<gix::ObjectId>> {
+        let included = self.commit_id_to_segment_id(included)?;
+        let excluded = self.commit_id_to_segment_id(excluded)?;
+        Ok(self
+            .find_commits_reachable_from_a_not_b(included, excluded)
+            .into_iter()
+            .map(|commit| commit.id)
+            .collect())
+    }
+
     /// Compute an order-dependent octopus merge-base from multiple `segments`.
     ///
     /// The first segment becomes the initial candidate. Each following segment is
@@ -273,6 +338,31 @@ impl Graph {
         }
 
         out
+    }
+
+    /// Paint every segment reachable from `start` with `flag`.
+    fn paint_down_to_reachable_eagerly(
+        &self,
+        start: SegmentIndex,
+        flag: SegmentFlags,
+        flags: &mut SegmentTable<SegmentFlags>,
+    ) {
+        let mut queue = VecDeque::new();
+        flags.get_mut(start).insert(flag);
+        queue.push_back(start);
+
+        while let Some(segment_id) = queue.pop_front() {
+            for parent_id in self
+                .inner
+                .neighbors_directed(segment_id, Direction::Outgoing)
+            {
+                let parent_flags = flags.get_mut(parent_id);
+                if !parent_flags.contains(flag) {
+                    parent_flags.insert(flag);
+                    queue.push_back(parent_id);
+                }
+            }
+        }
     }
 
     /// Remove all those segments from `segments` if they are in the history of another segment in `segments`.
