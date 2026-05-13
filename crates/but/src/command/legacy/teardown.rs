@@ -59,12 +59,10 @@ pub(crate) fn teardown(
         let ref_name: gix::refs::PartialName = checkout_to
             .clone()
             .try_into()
-            .context(format!("Invalid ref name: {checkout_to}"))?;
+            .with_context(|| format!("Invalid ref name: {checkout_to}"))?;
         let resolved_ref = repo.find_reference(ref_name.as_ref())?;
         if !matches!(resolved_ref.name().category(), Some(Category::LocalBranch)) {
-            anyhow::bail!(format!(
-                "Invalid ref for checkout: '{checkout_to}' is not a local branch"
-            ))
+            anyhow::bail!("Invalid ref for checkout: '{checkout_to}' is not a local branch")
         }
         Some(resolved_ref.name().shorten().to_string())
     } else {
