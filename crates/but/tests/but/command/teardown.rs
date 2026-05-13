@@ -400,3 +400,178 @@ fn json_output_with_dangling_commits() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn teardown_informs_of_checkout_to_when_there_are_no_stacks() -> anyhow::Result<()> {
+    let env = Sandbox::init_scenario_with_target_and_default_settings("one-stack")?;
+    env.setup_metadata(&["A"])?;
+    env.but("unapply A").assert().success();
+
+    env.but("teardown")
+        .assert()
+        .failure()
+        .stderr_eq(str![[r#"
+Error: Failed to teardown GitButler project.
+
+Caused by:
+    Failed to determine checkout target branch. Specify a target branch with `--checkout-to <branch>`.
+
+"#]]);
+
+    Ok(())
+}
+
+#[test]
+fn teardown_checks_out_to_branch_override() -> anyhow::Result<()> {
+    let env = Sandbox::init_scenario_with_target_and_default_settings("one-stack")?;
+    env.setup_metadata(&["A"])?;
+    env.but("unapply A").assert().success();
+
+    env.but("--json teardown")
+        .arg("--checkout-to")
+        .arg("A")
+        .allow_json()
+        .assert()
+        .success()
+        .stderr_eq(str![])
+        .stdout_eq(str![[r#"
+{
+  "snapshotId": "[..]",
+  "checkedOutBranch": "A"
+}
+
+"#]]);
+
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(env.projects_root())
+        .arg("rev-parse")
+        .arg("--abbrev-ref")
+        .arg("HEAD")
+        .output()?;
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "A");
+
+    Ok(())
+}
+
+#[test]
+fn teardown_checks_out_to_branch_override_with_qualified_ref_name() -> anyhow::Result<()> {
+    let env = Sandbox::init_scenario_with_target_and_default_settings("one-stack")?;
+    env.setup_metadata(&["A"])?;
+    env.but("unapply A").assert().success();
+
+    env.but("--json teardown")
+        .arg("--checkout-to")
+        .arg("refs/heads/A")
+        .allow_json()
+        .assert()
+        .success()
+        .stderr_eq(str![])
+        .stdout_eq(str![[r#"
+{
+  "snapshotId": "[..]",
+  "checkedOutBranch": "A"
+}
+
+"#]]);
+
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(env.projects_root())
+        .arg("rev-parse")
+        .arg("--abbrev-ref")
+        .arg("HEAD")
+        .output()?;
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "A");
+
+    Ok(())
+}
+
+#[test]
+fn teardown_checkout_to_handles_missing_branch() -> anyhow::Result<()> {
+    let env = Sandbox::init_scenario_with_target_and_default_settings("one-stack")?;
+    env.setup_metadata(&["A"])?;
+
+    env.but("teardown")
+        .arg("--checkout-to")
+        .arg("no-such-branch")
+        .assert()
+        .failure()
+        .stderr_eq(str![
+            r#"
+Error: Failed to teardown GitButler project.
+
+Caused by:
+    The reference 'no-such-branch' did not exist
+
+"#
+        ]);
+
+    Ok(())
+}
+
+#[test]
+fn teardown_checkout_to_handles_malformed_branch_name() -> anyhow::Result<()> {
+    let env = Sandbox::init_scenario_with_target_and_default_settings("one-stack")?;
+    env.setup_metadata(&["A"])?;
+
+    env.but("teardown")
+        .arg("--checkout-to")
+        .arg("not a branch")
+        .assert()
+        .failure()
+        .stderr_eq(str![
+            r#"
+Error: Failed to teardown GitButler project.
+
+Caused by:
+    0: Invalid ref name: not a branch
+    1: Reference name contains invalid byte: " "
+
+"#
+        ]);
+
+    Ok(())
+}
+
+#[test]
+fn teardown_checkout_to_disallows_non_branch_ref() -> anyhow::Result<()> {
+    let env = Sandbox::init_scenario_with_target_and_default_settings("one-stack")?;
+    env.setup_metadata(&["A"])?;
+
+    env.but("teardown")
+        .arg("--checkout-to")
+        .arg("HEAD")
+        .assert()
+        .failure()
+        .stderr_eq(str![[r#"
+Error: Failed to teardown GitButler project.
+
+Caused by:
+    Invalid ref for checkout: 'HEAD' is not a local branch
+
+"#]]);
+
+    Ok(())
+}
+
+#[test]
+fn teardown_checkout_to_disallows_non_local_branch_ref() -> anyhow::Result<()> {
+    let env = Sandbox::init_scenario_with_target_and_default_settings("one-stack")?;
+    env.setup_metadata(&["A"])?;
+
+    env.but("teardown")
+        .arg("--checkout-to")
+        .arg("origin/main")
+        .assert()
+        .failure()
+        .stderr_eq(str![[r#"
+Error: Failed to teardown GitButler project.
+
+Caused by:
+    Invalid ref for checkout: 'origin/main' is not a local branch
+
+"#]]);
+
+    Ok(())
+}

@@ -166,7 +166,7 @@ impl Subcommands {
             Subcommands::Actions(_)
             | Subcommands::Mcp
             | Subcommands::Setup { .. }
-            | Subcommands::Teardown => Unknown,
+            | Subcommands::Teardown { .. } => Unknown,
             Subcommands::Config(config::Platform { cmd }) => match cmd {
                 Some(config::Subcommands::Forge {
                     cmd: Some(config::ForgeSubcommand::Auth),
