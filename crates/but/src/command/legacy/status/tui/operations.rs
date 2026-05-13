@@ -11,11 +11,13 @@ use but_api::{
         CommitCreateResult, CommitDiscardResult, CommitInsertBlankResult, CommitRewordResult,
     },
     diff::ComputeLineStats,
+    legacy::oplog::RestoreKind,
 };
 use but_core::{DiffSpec, DryRun, diff::CommitDetails, ref_metadata::StackId};
 use but_ctx::Context;
 use but_rebase::graph_rebase::mutate::{InsertSide, RelativeTo};
 use gitbutler_operating_modes::OperatingMode;
+use gitbutler_oplog::entry::Snapshot;
 
 use crate::{
     CliId,
@@ -570,4 +572,27 @@ pub(super) fn remove_branch_legacy(
     branch_name: String,
 ) -> anyhow::Result<()> {
     but_api::legacy::stack::remove_branch(ctx, stack_id, branch_name)
+}
+
+pub(super) fn get_undo_target_snapshot_legacy(ctx: &Context) -> anyhow::Result<Option<Snapshot>> {
+    but_api::legacy::oplog::get_undo_target_snapshot(ctx)
+}
+
+pub(super) fn get_redo_target_snapshot_legacy(ctx: &Context) -> anyhow::Result<Option<Snapshot>> {
+    but_api::legacy::oplog::get_redo_target_snapshot(ctx)
+}
+
+pub(super) fn peel_restore_snapshot_legacy(
+    ctx: &Context,
+    sha: gix::ObjectId,
+) -> anyhow::Result<Option<Snapshot>> {
+    but_api::legacy::oplog::peel_restore_snapshot(ctx, sha)
+}
+
+pub(super) fn restore_snapshot_with_kind_legacy(
+    ctx: &mut Context,
+    restore_kind: RestoreKind,
+    sha: gix::ObjectId,
+) -> anyhow::Result<()> {
+    but_api::legacy::oplog::restore_snapshot_with_kind(ctx, restore_kind, sha)
 }

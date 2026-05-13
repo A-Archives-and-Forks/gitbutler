@@ -2613,8 +2613,8 @@ impl App {
         ctx: &mut Context,
     ) -> anyhow::Result<()> {
         let target_snapshot = match kind {
-            UndoOrRedo::Undo => but_api::legacy::oplog::get_undo_target_snapshot(ctx)?,
-            UndoOrRedo::Redo => but_api::legacy::oplog::get_redo_target_snapshot(ctx)?,
+            UndoOrRedo::Undo => operations::get_undo_target_snapshot_legacy(ctx)?,
+            UndoOrRedo::Redo => operations::get_redo_target_snapshot_legacy(ctx)?,
         };
         let Some(target_snapshot) = target_snapshot else {
             return Ok(());
@@ -2622,7 +2622,7 @@ impl App {
 
         let text = {
             let restore_from = if let Ok(Some(snapshot)) =
-                but_api::legacy::oplog::peel_restore_snapshot(ctx, target_snapshot.commit_id)
+                operations::peel_restore_snapshot_legacy(ctx, target_snapshot.commit_id)
                 && snapshot.commit_id != target_snapshot.commit_id
                 && snapshot.details.is_some()
             {
@@ -2662,7 +2662,7 @@ impl App {
             NonEmpty::new(text),
             self.theme,
             move |ctx, messages| {
-                but_api::legacy::oplog::restore_snapshot_with_kind(
+                operations::restore_snapshot_with_kind_legacy(
                     ctx,
                     match kind {
                         UndoOrRedo::Undo => RestoreKind::RestoreFromSnapshotViaUndo,
