@@ -103,14 +103,8 @@ fn relation_between_handles_identity_and_disjoint_segments() -> anyhow::Result<(
     );
 
     let orphan = graph.insert_segment(Segment {
-        id: SegmentIndex::new(usize::MAX),
         generation: 0,
-        ref_info: None,
-        remote_tracking_ref_name: None,
-        sibling_segment_id: None,
-        remote_tracking_branch_segment_id: None,
-        commits: Vec::new(),
-        metadata: None,
+        ..Default::default()
     });
     assert_eq!(
         graph.relation_between(main, orphan),

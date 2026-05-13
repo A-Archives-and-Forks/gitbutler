@@ -80,10 +80,11 @@ pub fn pr_template(
             ctx.workdir_or_fail()?.join(relative_path),
         ));
     }
-    Ok(ctx
-        .read_file_from_workspace(&relative_path)?
-        .content
-        .unwrap_or_default())
+    let file = ctx.read_file_from_workspace(&relative_path)?;
+    if !file.is_valid_utf8() {
+        anyhow::bail!("PR template must be UTF-8 text or markdown");
+    }
+    Ok(file.content.unwrap_or_default())
 }
 
 /// Information about the project's review template.
@@ -130,10 +131,11 @@ pub fn review_template(ctx: &Context) -> Result<Option<ReviewTemplateInfo>> {
                     ctx.workdir_or_fail()?.join(path),
                 ));
             }
-            let content = ctx
-                .read_file_from_workspace(&path)?
-                .content
-                .unwrap_or_default();
+            let file = ctx.read_file_from_workspace(&path)?;
+            if !file.is_valid_utf8() {
+                anyhow::bail!("PR template must be UTF-8 text or markdown");
+            }
+            let content = file.content.unwrap_or_default();
 
             Ok(Some(ReviewTemplateInfo {
                 path: template_path,

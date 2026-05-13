@@ -31,6 +31,7 @@ pub struct FileInfo {
     pub mime_type: Option<String>,
 }
 
+/// Lifecycle
 impl FileInfo {
     pub fn deleted() -> Self {
         Self::default()
@@ -110,6 +111,18 @@ impl FileInfo {
     fn is_binary(content: &[u8]) -> bool {
         let partial_content = &content[..content.len().min(8000)];
         gix::filter::plumbing::eol::Stats::from_bytes(partial_content).is_binary()
+    }
+}
+
+/// Lifecycle
+impl FileInfo {
+    /// Returns true when a file is represented as UTF-8 text content.
+    ///
+    /// `FileInfo` stores valid text in `content` with no `mime_type`. Binary files either have no
+    /// content, or have base64-encoded content plus a MIME type when the content can be displayed,
+    /// such as images. Missing or deleted files also have no content and are not valid text.
+    pub fn is_valid_utf8(&self) -> bool {
+        self.content.is_some() && self.mime_type.is_none()
     }
 }
 
