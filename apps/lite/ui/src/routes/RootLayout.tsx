@@ -5,9 +5,10 @@ import { lastOpenedProjectKey } from "#ui/projects/last-opened.ts";
 import { TopBarActionsElementContext } from "#ui/portals.tsx";
 import { PickerDialog } from "#ui/ui/PickerDialog/PickerDialog.tsx";
 import { ShortcutButton } from "#ui/components/ShortcutButton.tsx";
+import { Spinner } from "#ui/components/Spinner.tsx";
 import uiStyles from "#ui/ui/ui.module.css";
 import { HotkeysProvider } from "@tanstack/react-hotkeys";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useIsFetching, useSuspenseQuery } from "@tanstack/react-query";
 import { Outlet, useMatch, useNavigate } from "@tanstack/react-router";
 import { FC, useRef, useState } from "react";
 import styles from "./RootLayout.module.css";
@@ -81,12 +82,19 @@ const ProjectSelect: FC = () => {
 
 const TopBar: FC<{
 	setTopBarActionsElement: (element: HTMLDivElement | null) => void;
-}> = ({ setTopBarActionsElement }) => (
-	<header className={styles.topBar}>
-		<ProjectSelect />
-		<div ref={setTopBarActionsElement} className={styles.topBarActions} />
-	</header>
-);
+}> = ({ setTopBarActionsElement }) => {
+	const fetchingCount = useIsFetching();
+
+	return (
+		<header className={styles.topBar}>
+			<ProjectSelect />
+			{fetchingCount > 0 && (
+				<Spinner className={styles.topBarSpinner} aria-label="Loading project data" />
+			)}
+			<div ref={setTopBarActionsElement} className={styles.topBarActions} />
+		</header>
+	);
+};
 
 export const RootLayout: FC = () => {
 	const [topBarActionsElement, setTopBarActionsElement] = useState<HTMLDivElement | null>(null);
