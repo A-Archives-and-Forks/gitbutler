@@ -20,7 +20,7 @@ use crate::{
 };
 
 use super::{
-    App, CURSOR_CONTEXT_ROWS, NOOP,
+    App, CURSOR_CONTEXT_ROWS, Modal, NOOP,
     cursor::is_selectable_in_mode,
     details::DetailsVisibility,
     graph_extension::{ExtensionDirection, extend_connector_spans},
@@ -73,8 +73,12 @@ pub(super) fn render_app(app: &App, frame: &mut Frame) {
     if let Some(details_area) = status_layout.details_area {
         let inner_area = details_block.inner(details_area);
         frame.render_widget(details_block, details_area);
-        app.details
-            .render(app.help.is_some(), app.has_focus, inner_area, frame);
+        app.details.render(
+            matches!(app.modal, Some(Modal::Help { .. })),
+            app.has_focus,
+            inner_area,
+            frame,
+        );
     }
 
     if let Some(debug_area) = debug_area {
@@ -97,16 +101,13 @@ pub(super) fn render_app(app: &App, frame: &mut Frame) {
         frame,
     );
 
-    if let Some(confirm) = &app.confirm {
-        confirm.render(app.has_focus, frame.area(), frame);
-    }
-
-    if let Some(branch_picker) = &app.branch_picker {
-        branch_picker.render(app.has_focus, frame.area(), frame);
-    }
-
-    if let Some(help) = &app.help {
-        help.render(frame.area(), frame);
+    match &app.modal {
+        Some(Modal::Confirm { confirm, .. }) => confirm.render(app.has_focus, frame.area(), frame),
+        Some(Modal::BranchPicker { branch_picker, .. }) => {
+            branch_picker.render(app.has_focus, frame.area(), frame);
+        }
+        Some(Modal::Help { help, .. }) => help.render(frame.area(), frame),
+        None => {}
     }
 }
 
@@ -457,7 +458,7 @@ pub(super) fn render_status_list_item(
 
     line = highlight_line_if(
         line,
-        is_selected && app.help.is_none() && app.has_focus,
+        is_selected && !matches!(app.modal, Some(Modal::Help { .. })) && app.has_focus,
         app.theme,
     );
 

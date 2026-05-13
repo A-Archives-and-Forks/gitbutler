@@ -275,11 +275,15 @@ where
     };
     // poll terminal events
     for event in event_polling.poll(event_poll_timeout)? {
+        let branch_picker = match &app.modal {
+            Some(Modal::BranchPicker { branch_picker, .. }) => Some(&**branch_picker),
+            Some(Modal::Confirm { .. }) | Some(Modal::Help { .. }) | None => None,
+        };
         event_to_messages(
             event,
             app.active_key_binds(),
             &app.mode,
-            app.branch_picker.as_ref(),
+            branch_picker,
             messages,
         );
     }
@@ -403,7 +407,7 @@ struct App {
     updates: u64,
     app_key_binds: AppKeyBinds,
     highlight: Highlights,
-    confirm: Option<Confirm>,
+    modal: Option<Modal>,
     details: Details,
     options: TuiLaunchOptions,
     delayed_messages: Vec<Message>,
@@ -411,20 +415,31 @@ struct App {
     fps: FpsCounter,
     to_be_discarded: Option<Arc<CliId>>,
     status_width_percentage: u16,
-    branch_picker: Option<BranchPicker>,
     theme: &'static Theme,
-    help: Option<Help>,
     has_focus: bool,
     backstack: Backstack,
     previous_reload_caused_by_mutation_timestamp: Option<Instant>,
 }
 
 #[derive(Debug)]
+enum Modal {
+    Confirm {
+        confirm: Confirm,
+        key_binds: KeyBinds,
+    },
+    BranchPicker {
+        branch_picker: Box<BranchPicker>,
+        key_binds: KeyBinds,
+    },
+    Help {
+        help: Help,
+        key_binds: KeyBinds,
+    },
+}
+
+#[derive(Debug)]
 struct AppKeyBinds {
     key_binds: KeyBinds,
-    confirm_key_binds: KeyBinds,
-    branch_picker_key_binds: KeyBinds,
-    help_key_binds: KeyBinds,
     normal_with_marks_key_binds: KeyBinds,
 }
 
@@ -451,9 +466,6 @@ impl App {
 
         let app_key_binds = AppKeyBinds {
             key_binds: default_key_binds(),
-            confirm_key_binds: confirm_key_binds(),
-            branch_picker_key_binds: branch_picker_key_binds(),
-            help_key_binds: help_key_binds(),
             normal_with_marks_key_binds: normal_with_marks_key_binds(),
         };
 
@@ -465,7 +477,6 @@ impl App {
             should_quit: false,
             should_render: true,
             mode: Default::default(),
-            help: None,
             toasts: Default::default(),
             renders: 0,
             updates: 0,
@@ -474,11 +485,10 @@ impl App {
             delayed_messages: Default::default(),
             incoming_out_of_band_messages: Default::default(),
             to_be_discarded: Default::default(),
-            branch_picker: Default::default(),
+            modal: Default::default(),
             backstack: Default::default(),
             previous_reload_caused_by_mutation_timestamp: Default::default(),
             fps: FpsCounter::new(),
-            confirm: None,
             details,
             options,
             status_width_percentage: 50,
@@ -488,18 +498,19 @@ impl App {
     }
 
     fn active_key_binds(&self) -> &KeyBinds {
-        if self.confirm.is_some() {
-            &self.app_key_binds.confirm_key_binds
-        } else if self.branch_picker.is_some() {
-            &self.app_key_binds.branch_picker_key_binds
-        } else if self.help.is_some() {
-            &self.app_key_binds.help_key_binds
-        } else if let Mode::Normal(NormalMode { marks }) = &*self.mode
-            && !marks.is_empty()
-        {
-            &self.app_key_binds.normal_with_marks_key_binds
-        } else {
-            &self.app_key_binds.key_binds
+        match &self.modal {
+            Some(Modal::Confirm { key_binds, .. })
+            | Some(Modal::BranchPicker { key_binds, .. })
+            | Some(Modal::Help { key_binds, .. }) => key_binds,
+            None => {
+                if let Mode::Normal(NormalMode { marks }) = &*self.mode
+                    && !marks.is_empty()
+                {
+                    &self.app_key_binds.normal_with_marks_key_binds
+                } else {
+                    &self.app_key_binds.key_binds
+                }
+            }
         }
     }
 
@@ -713,35 +724,36 @@ impl App {
             Message::ShowToast { kind, text } => {
                 self.toasts.insert(kind, text);
             }
-            Message::Confirm(confirm_message) => {
-                self.confirm = self
-                    .confirm
-                    .take()
-                    .and_then(|confirm| {
-                        confirm
-                            .handle_message(confirm_message, ctx, messages)
-                            .transpose()
-                    })
-                    .transpose()?;
-            }
-            Message::BranchPicker(branch_picker_message) => {
-                self.branch_picker = self
-                    .branch_picker
-                    .take()
-                    .and_then(|branch_picker| {
-                        branch_picker
-                            .handle_message(branch_picker_message, messages)
-                            .transpose()
-                    })
-                    .transpose()?;
-            }
-            Message::Help(help_message) => {
-                self.help = self
-                    .help
-                    .take()
-                    .and_then(|help| help.handle_message(help_message, terminal_area).transpose())
-                    .transpose()?;
-            }
+            Message::Confirm(confirm_message) => match self.modal.take() {
+                Some(Modal::Confirm { confirm, key_binds }) => {
+                    self.modal = confirm
+                        .handle_message(confirm_message, ctx, messages)?
+                        .map(|confirm| Modal::Confirm { confirm, key_binds });
+                }
+                modal => self.modal = modal,
+            },
+            Message::BranchPicker(branch_picker_message) => match self.modal.take() {
+                Some(Modal::BranchPicker {
+                    branch_picker,
+                    key_binds,
+                }) => {
+                    self.modal = branch_picker
+                        .handle_message(branch_picker_message, messages)?
+                        .map(|branch_picker| Modal::BranchPicker {
+                            branch_picker: Box::new(branch_picker),
+                            key_binds,
+                        });
+                }
+                modal => self.modal = modal,
+            },
+            Message::Help(help_message) => match self.modal.take() {
+                Some(Modal::Help { help, key_binds }) => {
+                    self.modal = help
+                        .handle_message(help_message, terminal_area)?
+                        .map(|help| Modal::Help { help, key_binds });
+                }
+                modal => self.modal = modal,
+            },
             Message::Details(details_message) => {
                 let details_viewport = details_viewport(self, terminal_area);
                 self.details
@@ -1397,148 +1409,153 @@ impl App {
             return;
         };
 
-        self.confirm = Some(match &**cli_id {
-            CliId::Unassigned { .. } => {
-                self.to_be_discarded = Some(Arc::clone(cli_id));
-                let drop_to_be_discarded =
-                    message_on_drop::message_on_drop(Message::DropToBeDiscarded, messages);
-                Confirm::new(
-                    NonEmpty::new("Discard unassigned changes?".into()),
-                    self.theme,
-                    move |ctx, messages| {
-                        operations::discard_unassigned_legacy(ctx)?;
-                        messages.push(Message::Reload(
-                            Some(SelectAfterReload::Unassigned),
-                            ReloadCause::Mutation,
-                        ));
-                        drop(drop_to_be_discarded);
-                        Ok(())
-                    },
-                )
-            }
-            CliId::Uncommitted(uncommitted) => {
-                self.to_be_discarded = Some(Arc::clone(cli_id));
-                let uncommitted = uncommitted.clone();
+        self.modal = Some(Modal::Confirm {
+            confirm: match &**cli_id {
+                CliId::Unassigned { .. } => {
+                    self.to_be_discarded = Some(Arc::clone(cli_id));
+                    let drop_to_be_discarded =
+                        message_on_drop::message_on_drop(Message::DropToBeDiscarded, messages);
+                    Confirm::new(
+                        NonEmpty::new("Discard unassigned changes?".into()),
+                        self.theme,
+                        move |ctx, messages| {
+                            operations::discard_unassigned_legacy(ctx)?;
+                            messages.push(Message::Reload(
+                                Some(SelectAfterReload::Unassigned),
+                                ReloadCause::Mutation,
+                            ));
+                            drop(drop_to_be_discarded);
+                            Ok(())
+                        },
+                    )
+                }
+                CliId::Uncommitted(uncommitted) => {
+                    self.to_be_discarded = Some(Arc::clone(cli_id));
+                    let uncommitted = uncommitted.clone();
 
-                let select_after_reload = if uncommitted.is_entire_file
+                    let select_after_reload = if uncommitted.is_entire_file
                     // Discarding a whole file: handle stack-specific cursor fallback.
                     && let Some(stack_id) = uncommitted.hunk_assignments.first().stack_id
                     // If this is the last file on the stack, jump to the stack's top branch.
                     && operations::assigned_file_count_for_stack(ctx, stack_id)
                         .is_ok_and(|count| count == 1)
-                {
-                    self.select_top_branch_for_stack_after_reload(stack_id)
-                        .unwrap_or(SelectAfterReload::Stack(stack_id))
-                } else {
-                    // Discarding only part of a file: select the previous selectable line.
-                    self.cursor.select_previous_cli_id_or_unassigned(
-                        &self.status_lines,
-                        &self.mode,
-                        self.flags.show_files,
+                    {
+                        self.select_top_branch_for_stack_after_reload(stack_id)
+                            .unwrap_or(SelectAfterReload::Stack(stack_id))
+                    } else {
+                        // Discarding only part of a file: select the previous selectable line.
+                        self.cursor.select_previous_cli_id_or_unassigned(
+                            &self.status_lines,
+                            &self.mode,
+                            self.flags.show_files,
+                        )
+                    };
+
+                    let drop_to_be_discarded =
+                        message_on_drop::message_on_drop(Message::DropToBeDiscarded, messages);
+                    Confirm::new(
+                        NonEmpty::new(format!("Discard {}?", uncommitted.describe()).into()),
+                        self.theme,
+                        move |ctx, messages| {
+                            let hunk_assignments = uncommitted
+                                .hunk_assignments
+                                .iter()
+                                .cloned()
+                                .collect::<Vec<_>>();
+                            operations::discard_uncommitted_legacy(ctx, hunk_assignments)?;
+                            messages.push(Message::Reload(
+                                Some(select_after_reload),
+                                ReloadCause::Mutation,
+                            ));
+                            drop(drop_to_be_discarded);
+                            Ok(())
+                        },
                     )
-                };
+                }
+                CliId::Stack { stack_id, .. } => {
+                    self.to_be_discarded = Some(Arc::clone(cli_id));
+                    let stack_id = *stack_id;
+                    let select_after_reload = self
+                        .select_top_branch_for_stack_after_reload(stack_id)
+                        .unwrap_or(SelectAfterReload::Stack(stack_id));
+                    let drop_to_be_discarded =
+                        message_on_drop::message_on_drop(Message::DropToBeDiscarded, messages);
+                    Confirm::new(
+                        NonEmpty::new("Discard staged changes in this stack?".into()),
+                        self.theme,
+                        move |ctx, messages| {
+                            operations::discard_stack(ctx, stack_id)?;
+                            messages.push(Message::Reload(
+                                Some(select_after_reload),
+                                ReloadCause::Mutation,
+                            ));
+                            drop(drop_to_be_discarded);
+                            Ok(())
+                        },
+                    )
+                }
+                CliId::Commit { commit_id, .. } => {
+                    self.to_be_discarded = Some(Arc::clone(cli_id));
+                    let commit_id = *commit_id;
+                    let select_after_reload = self
+                        .cursor
+                        .select_after_discarded_commit(&self.status_lines);
+                    let drop_to_be_discarded =
+                        message_on_drop::message_on_drop(Message::DropToBeDiscarded, messages);
+                    Confirm::new(
+                        NonEmpty::new(
+                            format!("Discard commit {}?", commit_id.to_hex_with_len(7)).into(),
+                        ),
+                        self.theme,
+                        move |ctx, messages| {
+                            let discard_result = operations::commit_discard(ctx, commit_id)?;
+                            let select_after_reload =
+                                select_after_reload.map(|selection| match selection {
+                                    SelectAfterReload::Commit(target_commit_id) => {
+                                        let remapped_target_commit_id = discard_result
+                                            .workspace
+                                            .replaced_commits
+                                            .get(&target_commit_id)
+                                            .copied()
+                                            .unwrap_or(target_commit_id);
+                                        SelectAfterReload::Commit(remapped_target_commit_id)
+                                    }
+                                    other => other,
+                                });
+                            messages
+                                .push(Message::Reload(select_after_reload, ReloadCause::Mutation));
+                            drop(drop_to_be_discarded);
+                            Ok(())
+                        },
+                    )
+                }
+                CliId::Branch { name, stack_id, .. } => {
+                    let Some(stack_id) = *stack_id else {
+                        return;
+                    };
 
-                let drop_to_be_discarded =
-                    message_on_drop::message_on_drop(Message::DropToBeDiscarded, messages);
-                Confirm::new(
-                    NonEmpty::new(format!("Discard {}?", uncommitted.describe()).into()),
-                    self.theme,
-                    move |ctx, messages| {
-                        let hunk_assignments = uncommitted
-                            .hunk_assignments
-                            .iter()
-                            .cloned()
-                            .collect::<Vec<_>>();
-                        operations::discard_uncommitted_legacy(ctx, hunk_assignments)?;
-                        messages.push(Message::Reload(
-                            Some(select_after_reload),
-                            ReloadCause::Mutation,
-                        ));
-                        drop(drop_to_be_discarded);
-                        Ok(())
-                    },
-                )
-            }
-            CliId::Stack { stack_id, .. } => {
-                self.to_be_discarded = Some(Arc::clone(cli_id));
-                let stack_id = *stack_id;
-                let select_after_reload = self
-                    .select_top_branch_for_stack_after_reload(stack_id)
-                    .unwrap_or(SelectAfterReload::Stack(stack_id));
-                let drop_to_be_discarded =
-                    message_on_drop::message_on_drop(Message::DropToBeDiscarded, messages);
-                Confirm::new(
-                    NonEmpty::new("Discard staged changes in this stack?".into()),
-                    self.theme,
-                    move |ctx, messages| {
-                        operations::discard_stack(ctx, stack_id)?;
-                        messages.push(Message::Reload(
-                            Some(select_after_reload),
-                            ReloadCause::Mutation,
-                        ));
-                        drop(drop_to_be_discarded);
-                        Ok(())
-                    },
-                )
-            }
-            CliId::Commit { commit_id, .. } => {
-                self.to_be_discarded = Some(Arc::clone(cli_id));
-                let commit_id = *commit_id;
-                let select_after_reload = self
-                    .cursor
-                    .select_after_discarded_commit(&self.status_lines);
-                let drop_to_be_discarded =
-                    message_on_drop::message_on_drop(Message::DropToBeDiscarded, messages);
-                Confirm::new(
-                    NonEmpty::new(
-                        format!("Discard commit {}?", commit_id.to_hex_with_len(7)).into(),
-                    ),
-                    self.theme,
-                    move |ctx, messages| {
-                        let discard_result = operations::commit_discard(ctx, commit_id)?;
-                        let select_after_reload =
-                            select_after_reload.map(|selection| match selection {
-                                SelectAfterReload::Commit(target_commit_id) => {
-                                    let remapped_target_commit_id = discard_result
-                                        .workspace
-                                        .replaced_commits
-                                        .get(&target_commit_id)
-                                        .copied()
-                                        .unwrap_or(target_commit_id);
-                                    SelectAfterReload::Commit(remapped_target_commit_id)
-                                }
-                                other => other,
-                            });
-                        messages.push(Message::Reload(select_after_reload, ReloadCause::Mutation));
-                        drop(drop_to_be_discarded);
-                        Ok(())
-                    },
-                )
-            }
-            CliId::Branch { name, stack_id, .. } => {
-                let Some(stack_id) = *stack_id else {
-                    return;
-                };
-
-                let name = name.to_owned();
-                self.to_be_discarded = Some(Arc::clone(cli_id));
-                let select_after_reload = self
-                    .cursor
-                    .select_after_discarded_branch(&self.status_lines);
-                let drop_to_be_discarded =
-                    message_on_drop::message_on_drop(Message::DropToBeDiscarded, messages);
-                Confirm::new(
-                    NonEmpty::new(format!("Discard branch {name}?").into()),
-                    self.theme,
-                    move |ctx, messages| {
-                        operations::remove_branch_legacy(ctx, stack_id, name)?;
-                        messages.push(Message::Reload(select_after_reload, ReloadCause::Mutation));
-                        drop(drop_to_be_discarded);
-                        Ok(())
-                    },
-                )
-            }
-            CliId::PathPrefix { .. } | CliId::CommittedFile { .. } => return,
+                    let name = name.to_owned();
+                    self.to_be_discarded = Some(Arc::clone(cli_id));
+                    let select_after_reload = self
+                        .cursor
+                        .select_after_discarded_branch(&self.status_lines);
+                    let drop_to_be_discarded =
+                        message_on_drop::message_on_drop(Message::DropToBeDiscarded, messages);
+                    Confirm::new(
+                        NonEmpty::new(format!("Discard branch {name}?").into()),
+                        self.theme,
+                        move |ctx, messages| {
+                            operations::remove_branch_legacy(ctx, stack_id, name)?;
+                            messages
+                                .push(Message::Reload(select_after_reload, ReloadCause::Mutation));
+                            drop(drop_to_be_discarded);
+                            Ok(())
+                        },
+                    )
+                }
+                CliId::PathPrefix { .. } | CliId::CommittedFile { .. } => return,
+            },
+            key_binds: confirm_key_binds(),
         });
     }
 
@@ -2511,32 +2528,38 @@ impl App {
                     is_selectable_in_mode(unassigned, &self.mode, self.flags.show_files)
                 });
 
-            self.branch_picker = Some(BranchPicker::new(
-                branch_names,
-                self.theme,
-                include_unassigned,
-                |item, messages| {
-                    match item {
-                        branch_picker::Item::Branch(branch_name) => {
-                            messages.push(Message::SelectBranch(branch_name));
+            self.modal = Some(Modal::BranchPicker {
+                branch_picker: Box::new(BranchPicker::new(
+                    branch_names,
+                    self.theme,
+                    include_unassigned,
+                    |item, messages| {
+                        match item {
+                            branch_picker::Item::Branch(branch_name) => {
+                                messages.push(Message::SelectBranch(branch_name));
+                            }
+                            branch_picker::Item::Unassigned => {
+                                messages.push(Message::SelectUnassigned);
+                            }
                         }
-                        branch_picker::Item::Unassigned => {
-                            messages.push(Message::SelectUnassigned);
-                        }
-                    }
-                    Ok(())
-                },
-            ));
+                        Ok(())
+                    },
+                )),
+                key_binds: branch_picker_key_binds(),
+            });
         }
 
         Ok(())
     }
 
     fn handle_toggle_help(&mut self) {
-        if self.help.is_some() {
-            self.help = None;
+        if matches!(self.modal, Some(Modal::Help { .. })) {
+            self.modal = None;
         } else {
-            self.help = Some(Help::new([&self.app_key_binds.key_binds], self.theme));
+            self.modal = Some(Modal::Help {
+                help: Help::new([&self.app_key_binds.key_binds], self.theme),
+                key_binds: help_key_binds(),
+            });
         }
     }
 
@@ -2658,10 +2681,8 @@ impl App {
         };
 
         let commit = target_snapshot.commit_id;
-        self.confirm = Some(Confirm::new(
-            NonEmpty::new(text),
-            self.theme,
-            move |ctx, messages| {
+        self.modal = Some(Modal::Confirm {
+            confirm: Confirm::new(NonEmpty::new(text), self.theme, move |ctx, messages| {
                 operations::restore_snapshot_with_kind_legacy(
                     ctx,
                     match kind {
@@ -2672,8 +2693,9 @@ impl App {
                 )?;
                 messages.push(Message::Reload(None, ReloadCause::Mutation));
                 Ok(())
-            },
-        ));
+            }),
+            key_binds: confirm_key_binds(),
+        });
 
         Ok(())
     }
