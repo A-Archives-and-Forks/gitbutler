@@ -20,6 +20,7 @@ use crate::{
         walk::{RefsById, WorktreeByBranch, disambiguate_refs_by_branch_metadata},
     },
     projection::workspace,
+    utils::SegmentVisitScratch,
 };
 
 pub(super) struct Context<'a> {
@@ -112,18 +113,27 @@ impl Graph {
     /// `parent_order`. Petgraph traverses edges in reverse creation order, so
     /// edges are re-added from last parent to first parent.
     fn rebuild_edges_in_parent_order(&mut self) {
+        let mut outgoing_edges = Vec::with_capacity(2);
         for sidx in self.segments().collect::<Vec<_>>() {
-            let mut outgoing_edges: Vec<_> = self
-                .inner
-                .edges_directed(sidx, Direction::Outgoing)
-                .map(EdgeOwned::from)
-                .collect();
+            let mut edges = self.inner.edges_directed(sidx, Direction::Outgoing);
+            let Some(first_edge) = edges.next() else {
+                continue;
+            };
+            let Some(second_edge) = edges.next() else {
+                continue;
+            };
+
+            outgoing_edges.clear();
+            outgoing_edges.push(EdgeOwned::from(first_edge));
+            outgoing_edges.push(EdgeOwned::from(second_edge));
+            outgoing_edges.extend(edges.map(EdgeOwned::from));
+
             outgoing_edges.sort_by_key(|e| std::cmp::Reverse(e.weight.parent_order));
 
             for edge in &outgoing_edges {
                 self.inner.remove_edge(edge.id);
             }
-            for edge in outgoing_edges {
+            for edge in &outgoing_edges {
                 self.inner.add_edge(edge.source, edge.target, edge.weight);
             }
         }
@@ -910,6 +920,7 @@ impl Graph {
                     .flat_map(|s| s.commits_by_segment.iter().map(|(sidx, _)| *sidx))
             })
             .collect();
+        let mut segment_visit_scratch = SegmentVisitScratch::new(self);
         for &sidx in &unique_ws_segment_ids {
             // The workspace might be stale by now as we delete empty segments.
             // Thus, be careful, and ignore non-existing ones - after all our workspace
@@ -931,25 +942,30 @@ impl Graph {
             }
 
             let mut named_segment_id = None;
-            self.visit_all_segments_excluding_start_until(sidx, Direction::Incoming, |s| {
-                let prune = true;
-                if named_segment_id.is_some()
-                    || s.commits
-                        .first()
-                        .is_some_and(|c| c.flags.contains(CommitFlags::InWorkspace))
-                {
-                    return prune;
-                }
-
-                s.ref_info.as_ref().is_some_and(|ri| {
-                    let is_known_to_workspace =
-                        ws_data.contains_ref(ri.ref_name.as_ref(), AppliedAndUnapplied);
-                    if is_known_to_workspace {
-                        named_segment_id = Some(s.id);
+            segment_visit_scratch.visit_excluding_start_until(
+                self,
+                sidx,
+                Direction::Incoming,
+                |s| {
+                    let prune = true;
+                    if named_segment_id.is_some()
+                        || s.commits
+                            .first()
+                            .is_some_and(|c| c.flags.contains(CommitFlags::InWorkspace))
+                    {
+                        return prune;
                     }
-                    is_known_to_workspace
-                })
-            });
+
+                    s.ref_info.as_ref().is_some_and(|ri| {
+                        let is_known_to_workspace =
+                            ws_data.contains_ref(ri.ref_name.as_ref(), AppliedAndUnapplied);
+                        if is_known_to_workspace {
+                            named_segment_id = Some(s.id);
+                        }
+                        is_known_to_workspace
+                    })
+                },
+            );
             if let Some(named_sid) = named_segment_id
                 && self[sidx].sibling_segment_id.is_none()
             {
@@ -973,7 +989,8 @@ impl Graph {
                         .any(|n| n == named_sid);
                     let named_direct_parent_has_outside_commits = named_is_direct_parent && {
                         let mut has_outside_commits = false;
-                        self.visit_all_segments_including_start_until(
+                        segment_visit_scratch.visit_including_start_until(
+                            self,
                             named_sid,
                             Direction::Outgoing,
                             |segment| {

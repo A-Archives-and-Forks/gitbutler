@@ -394,19 +394,19 @@ fn skip_reason_for_branch(
 fn log_skipped_branch(branch: &StackBranch, skip_reason: SkipBranchReason) {
     match skip_reason {
         SkipBranchReason::Archived => {
-            tracing::debug!(
+            tracing::info!(
                 branch = branch.name(),
                 "skipping archived branch for pushing"
             );
         }
         SkipBranchReason::HeadAtMergeBase => {
-            tracing::debug!(
+            tracing::info!(
                 branch = branch.name(),
                 "nothing to push as head_oid == merge_base"
             );
         }
         SkipBranchReason::Integrated => {
-            tracing::debug!(
+            tracing::info!(
                 branch = branch.name(),
                 "Skipping push for integrated branch"
             );

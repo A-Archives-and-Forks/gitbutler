@@ -1,6 +1,6 @@
 use std::{
     borrow::Cow,
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, HashSet},
 };
 
 use anyhow::bail;
@@ -256,7 +256,7 @@ impl<'repo> OverlayRepo<'repo> {
         prefixes: impl Iterator<Item = &'a str>,
         workspace_ref_names: &[&gix::refs::FullNameRef],
     ) -> anyhow::Result<RefsById> {
-        let mut seen = BTreeSet::new();
+        let mut seen = HashSet::new();
         let mut ref_filter =
             |r: gix::Reference<'_>| -> Option<(gix::ObjectId, gix::refs::FullName)> {
                 if self.dropped_references.contains(r.name()) {

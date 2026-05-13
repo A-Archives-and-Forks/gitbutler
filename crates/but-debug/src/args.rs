@@ -26,6 +26,9 @@ pub struct Args {
 pub enum Subcommands {
     /// Return a segmented graph starting from `HEAD`.
     Graph(GraphArgs),
+    /// Debug revision graph operations.
+    #[clap(visible_alias = "rev")]
+    Revision(RevisionArgs),
 }
 
 /// Arguments for the `graph` debugging subcommand.
@@ -71,9 +74,62 @@ pub struct GraphArgs {
     pub ref_name: Option<String>,
 }
 
+/// Arguments for the `revision` subcommand.
+#[derive(Debug, clap::Args)]
+pub struct RevisionArgs {
+    /// The revision debugging command to run.
+    #[command(subcommand)]
+    pub cmd: RevisionSubcommands,
+}
+
+/// The debugging subcommands supported by `but-debug revision`.
+#[derive(Debug, clap::Subcommand)]
+pub enum RevisionSubcommands {
+    /// Print commits reachable by a rev-spec.
+    Log(LogArgs),
+    /// Compute the octopus merge-base for two or more revisions.
+    #[command(name = "merge-base")]
+    MergeBase(MergeBaseArgs),
+}
+
+/// Graph construction options shared by revision debugging subcommands.
+#[derive(Debug, clap::Args)]
+pub struct RevisionGraphArgs {
+    /// The named reference to use as the workspace target during graph traversal.
+    #[arg(long)]
+    pub target_ref: Option<String>,
+    /// The rev-spec of the extra target to provide for graph traversal.
+    #[arg(long)]
+    pub extra_target: Option<String>,
+}
+
+/// Arguments for the `revision log` debugging subcommand.
+#[derive(Debug, clap::Args)]
+pub struct LogArgs {
+    /// Shared graph construction options.
+    #[command(flatten)]
+    pub graph: RevisionGraphArgs,
+    /// Follow only the first parent when traversing merge commits.
+    #[arg(long)]
+    pub first_parent: bool,
+    /// The rev-spec to log. Exclusive ranges like `main..branch` are supported.
+    pub rev_spec: String,
+}
+
+/// Arguments for the `revision merge-base` debugging subcommand.
+#[derive(Debug, clap::Args)]
+pub struct MergeBaseArgs {
+    /// Shared graph construction options.
+    #[command(flatten)]
+    pub graph: RevisionGraphArgs,
+    /// The rev-specs whose octopus merge-base should be computed.
+    #[arg(required = true, num_args = 2.., value_name = "REV")]
+    pub revisions: Vec<String>,
+}
+
 #[cfg(test)]
 mod tests {
-    use clap::CommandFactory as _;
+    use clap::CommandFactory;
 
     use super::Args;
 

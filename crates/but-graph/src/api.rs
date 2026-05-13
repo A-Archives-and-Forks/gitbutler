@@ -1,6 +1,6 @@
 use std::{
     cmp::Reverse,
-    collections::{BTreeSet, BinaryHeap, HashMap, VecDeque},
+    collections::{BTreeSet, BinaryHeap, VecDeque},
     ops::{Deref, Index, IndexMut},
 };
 
@@ -9,14 +9,16 @@ use petgraph::{
     Direction,
     prelude::EdgeRef,
     stable_graph::EdgeReference,
-    visit::{IntoEdgeReferences, Visitable},
+    visit::{IntoEdgeReferences, NodeIndexable, Visitable},
 };
 
 use crate::{
     Commit, CommitFlags, CommitIndex, Edge, EntryPoint, EntryPointCommit, Graph, Segment,
     SegmentFlags, SegmentIndex, SegmentRelation, StopCondition, init::PetGraph,
-    projection::commit::is_managed_workspace_by_message,
+    projection::commit::is_managed_workspace_by_message, utils::SegmentTable,
 };
+
+boolean_enums::gen_boolean_enum!(pub FirstParent);
 
 /// Mutation
 impl Graph {
@@ -96,12 +98,23 @@ impl Graph {
             return SegmentRelation::Identity;
         }
 
-        match self.find_git_merge_base(a, b) {
+        match self.find_merge_base(a, b) {
             Some(base) if base == a => SegmentRelation::Ancestor,
             Some(base) if base == b => SegmentRelation::Descendant,
             Some(_) => SegmentRelation::Diverged,
             None => SegmentRelation::Disjoint,
         }
+    }
+
+    /// Like [`Self::relation_between()`], but takes object ids of commits.
+    pub fn relation_between_by_commit_id(
+        &self,
+        commit_a: gix::ObjectId,
+        commit_b: gix::ObjectId,
+    ) -> anyhow::Result<SegmentRelation> {
+        let a = self.commit_id_to_segment_id(commit_a)?;
+        let b = self.commit_id_to_segment_id(commit_b)?;
+        Ok(self.relation_between(a, b))
     }
 
     /// Compute the merge-base just like Git would between segments `a` and `b`, but finding all possible merge-bases of a walk,
@@ -111,12 +124,12 @@ impl Graph {
     ///
     /// Returns `None` if there is no merge-base as `a` and `b` don't share history.
     /// If `a == b`, `Some(a)` is returned immediately.
-    pub fn find_git_merge_base(&self, a: SegmentIndex, b: SegmentIndex) -> Option<SegmentIndex> {
+    pub fn find_merge_base(&self, a: SegmentIndex, b: SegmentIndex) -> Option<SegmentIndex> {
         if a == b {
             return Some(a);
         }
 
-        let mut flags: HashMap<SegmentIndex, SegmentFlags> = Default::default();
+        let mut flags = SegmentTable::new(self.inner.node_bound(), SegmentFlags::empty());
         let bases = self.paint_down_to_common(a, b, &mut flags);
 
         if bases.is_empty() {
@@ -127,6 +140,274 @@ impl Graph {
         result.first().copied()
     }
 
+    /// Like [`Self::find_merge_base()`], but takes object ids of commits,
+    /// returning the id of the commit that is the merge-base.
+    pub fn find_merge_base_by_commit_id(
+        &self,
+        commit_a: gix::ObjectId,
+        commit_b: gix::ObjectId,
+    ) -> anyhow::Result<Option<gix::ObjectId>> {
+        let a = self.commit_id_to_segment_id(commit_a)?;
+        let b = self.commit_id_to_segment_id(commit_b)?;
+        self.find_merge_base(a, b)
+            .map(|base| self.commit_id_for_segment(base))
+            .transpose()
+    }
+
+    /// Return all commits reachable from `included`, but not reachable from `excluded`.
+    ///
+    /// This is equivalent to the reachable set of `excluded..included`, with segment ids
+    /// instead of rev-specs. The returned commits follow the graph traversal order from
+    /// `included` towards history.
+    ///
+    /// Unlike Git's revision walk, this does not sort pending commits by date or enforce
+    /// global topo-order across commits. It walks segments by their graph generation,
+    /// emits each segment's commits in stored tip-to-base order, and lazily paints the
+    /// excluded side only as far as needed to prove emitted segments are not hidden.
+    ///
+    /// If `first_parent` is [`FirstParent::Yes`], both the included and excluded traversals follow
+    /// only segment edges with `parent_order == 0`.
+    pub fn find_segments_reachable_from_a_not_b(
+        &self,
+        included: SegmentIndex,
+        excluded: SegmentIndex,
+        first_parent: FirstParent,
+    ) -> Vec<&Commit> {
+        let first_parent: bool = first_parent.into();
+        let mut flags = SegmentTable::new(self.inner.node_bound(), SegmentFlags::empty());
+        let mut queue = BinaryHeap::new();
+        let mut sequence = 0;
+        self.queue_segment_for_reachable_difference(
+            included,
+            false,
+            &mut flags,
+            &mut queue,
+            &mut sequence,
+        );
+        self.queue_segment_for_reachable_difference(
+            excluded,
+            true,
+            &mut flags,
+            &mut queue,
+            &mut sequence,
+        );
+
+        let mut segments = Vec::new();
+        let mut max_emitted_generation = None;
+        while let Some((_, _, is_excluded, segment_id)) = queue.pop() {
+            if is_excluded {
+                let parent_ids =
+                    self.parent_segments_for_reachable_difference(segment_id, first_parent);
+                for parent_id in parent_ids {
+                    self.queue_segment_for_reachable_difference(
+                        parent_id,
+                        true,
+                        &mut flags,
+                        &mut queue,
+                        &mut sequence,
+                    );
+                }
+                if self.excluded_frontier_is_past_emitted_segments(
+                    &queue,
+                    &flags,
+                    max_emitted_generation,
+                ) {
+                    break;
+                }
+                continue;
+            }
+
+            if flags.get(segment_id).contains(SegmentFlags::SEGMENT2) {
+                continue;
+            }
+
+            let generation = self[segment_id].generation;
+            max_emitted_generation =
+                Some(max_emitted_generation.map_or(generation, |max| max.max(generation)));
+            segments.push(segment_id);
+            let parent_ids =
+                self.parent_segments_for_reachable_difference(segment_id, first_parent);
+            for parent_id in parent_ids {
+                self.queue_segment_for_reachable_difference(
+                    parent_id,
+                    false,
+                    &mut flags,
+                    &mut queue,
+                    &mut sequence,
+                );
+            }
+        }
+
+        segments
+            .into_iter()
+            .filter(|segment_id| !flags.get(*segment_id).contains(SegmentFlags::SEGMENT2))
+            .flat_map(|segment_id| self[segment_id].commits.iter())
+            .collect()
+    }
+
+    /// Queue `segment_id` for the reachable-difference walk if this side has not seen it yet.
+    ///
+    /// `SEGMENT1` tracks the included side, `SEGMENT2` tracks the excluded side, and `STALE`
+    /// is reused here as the excluded-side queued/processed bit. Included segments that are
+    /// already known to be excluded are not queued because they cannot contribute to the result.
+    /// Queue keys sort by ascending generation and then insertion order so both frontiers advance
+    /// from tips toward history in a deterministic segment order.
+    fn queue_segment_for_reachable_difference(
+        &self,
+        segment_id: SegmentIndex,
+        is_excluded: bool,
+        flags: &mut SegmentTable<SegmentFlags>,
+        queue: &mut BinaryHeap<(Reverse<usize>, Reverse<usize>, bool, SegmentIndex)>,
+        sequence: &mut usize,
+    ) {
+        let segment_flags = flags.get_mut(segment_id);
+        if is_excluded {
+            segment_flags.insert(SegmentFlags::SEGMENT2);
+            if segment_flags.contains(SegmentFlags::STALE) {
+                return;
+            }
+            segment_flags.insert(SegmentFlags::STALE);
+        } else {
+            if segment_flags.intersects(SegmentFlags::SEGMENT1 | SegmentFlags::SEGMENT2) {
+                return;
+            }
+            segment_flags.insert(SegmentFlags::SEGMENT1);
+        }
+
+        queue.push((
+            Reverse(self[segment_id].generation),
+            Reverse(*sequence),
+            is_excluded,
+            segment_id,
+        ));
+        *sequence += 1;
+    }
+
+    /// Return the parent segments that should be traversed from `segment_id`.
+    ///
+    /// In all-parent mode this returns every outgoing segment edge. In first-parent mode it
+    /// returns only edges whose destination is the source commit's first parent.
+    fn parent_segments_for_reachable_difference(
+        &self,
+        segment_id: SegmentIndex,
+        first_parent_only: bool,
+    ) -> impl Iterator<Item = SegmentIndex> {
+        self.inner
+            .edges_directed(segment_id, Direction::Outgoing)
+            .filter(move |edge| !first_parent_only || edge.weight().parent_order == 0)
+            .map(|edge| edge.target())
+    }
+
+    /// Return `true` once the excluded-side frontier cannot still hide any segment already emitted.
+    ///
+    /// Segment generations are topological: edges point from lower generations toward higher
+    /// generations. After all non-hidden included work has left the queue, an excluded frontier
+    /// whose minimum generation is greater than the maximum emitted generation can only paint
+    /// deeper ancestors, not any emitted segment. At that point the caller may stop walking the
+    /// excluded side and filter the segments that were already marked hidden.
+    fn excluded_frontier_is_past_emitted_segments(
+        &self,
+        queue: &BinaryHeap<(Reverse<usize>, Reverse<usize>, bool, SegmentIndex)>,
+        flags: &SegmentTable<SegmentFlags>,
+        max_emitted_generation: Option<usize>,
+    ) -> bool {
+        if queue.iter().any(|(_, _, is_excluded, segment_id)| {
+            !*is_excluded && !flags.get(*segment_id).contains(SegmentFlags::SEGMENT2)
+        }) {
+            return false;
+        }
+
+        let Some(max_emitted_generation) = max_emitted_generation else {
+            return true;
+        };
+        let Some(min_excluded_generation) = queue
+            .iter()
+            .filter_map(|(_, _, is_excluded, segment_id)| {
+                is_excluded.then_some(self[*segment_id].generation)
+            })
+            .min()
+        else {
+            return true;
+        };
+
+        min_excluded_generation > max_emitted_generation
+    }
+
+    /// Return all commit ids reachable from `included`, but not reachable from `excluded`.
+    ///
+    /// This is a convenience wrapper around
+    /// [`Self::find_segments_reachable_from_a_not_b()`], taking object ids of commits.
+    /// If `first_parent` is [`FirstParent::Yes`], both traversals follow only first-parent edges.
+    pub fn find_commit_ids_reachable_from_a_not_b(
+        &self,
+        included: gix::ObjectId,
+        excluded: gix::ObjectId,
+        first_parent: FirstParent,
+    ) -> anyhow::Result<Vec<gix::ObjectId>> {
+        let included = self.commit_id_to_segment_id(included)?;
+        let excluded = self.commit_id_to_segment_id(excluded)?;
+        Ok(self
+            .find_segments_reachable_from_a_not_b(included, excluded, first_parent)
+            .into_iter()
+            .map(|commit| commit.id)
+            .collect())
+    }
+
+    /// Compute an octopus merge-base from multiple `segments`.
+    ///
+    /// The first segment becomes the initial candidate. Each following segment is
+    /// folded into that candidate by computing their pairwise
+    /// [`Self::find_merge_base()`]. If any pair does not share history, there
+    /// is no merge-base common to all segments.
+    ///
+    /// Returns `None` if `segments` is empty.
+    /// If `segments` has one element, it returns that.
+    pub fn find_merge_base_octopus(
+        &self,
+        segments: impl IntoIterator<Item = SegmentIndex>,
+    ) -> Option<SegmentIndex> {
+        let mut segments = segments.into_iter();
+        let first = segments.next()?;
+        segments.try_fold(first, |base, segment| self.find_merge_base(base, segment))
+    }
+
+    /// Like [`Self::find_merge_base_octopus()`], but works with object ids of `commits`,
+    /// returning the id of the commit that is the merge-base.
+    pub fn find_merge_base_octopus_by_commit_id(
+        &self,
+        commits: impl IntoIterator<Item = gix::ObjectId>,
+    ) -> anyhow::Result<Option<gix::ObjectId>> {
+        let mut segments = Vec::new();
+        for commit_id in commits {
+            segments.push(self.commit_id_to_segment_id(commit_id)?);
+        }
+        self.find_merge_base_octopus(segments)
+            .map(|base| self.commit_id_for_segment(base))
+            .transpose()
+    }
+
+    fn commit_id_for_segment(&self, segment: SegmentIndex) -> anyhow::Result<gix::ObjectId> {
+        self.tip_skip_empty(segment)
+            .map(|commit| commit.id)
+            .with_context(|| {
+                format!("BUG: Segment {segment:?} does not contain a reachable tip commit")
+            })
+    }
+
+    /// Return the id of the segment that owns `commit_id`, or error if it wasn't found.
+    /// That is unexpected as the traversal is supposed to find all commits of interest.
+    pub fn commit_id_to_segment_id(
+        &self,
+        commit_id: gix::ObjectId,
+    ) -> anyhow::Result<SegmentIndex> {
+        self.inner
+            .node_weights()
+            .find_map(|s| s.commits.iter().any(|c| c.id == commit_id).then_some(s.id))
+            .with_context(|| {
+                format!("Commit {commit_id} not found in any segment, it wasn't traversed")
+            })
+    }
+
     /// Paint segments reachable from `first` with SEGMENT1 and from `second` with SEGMENT2.
     /// When a segment has both flags, it's a potential merge-base.
     /// Returns all potential merge-bases with their generation numbers.
@@ -134,7 +415,7 @@ impl Graph {
         &self,
         first: SegmentIndex,
         second: SegmentIndex,
-        flags: &mut HashMap<SegmentIndex, SegmentFlags>,
+        flags: &mut SegmentTable<SegmentFlags>,
     ) -> Vec<(SegmentIndex, usize)> {
         // Priority queue ordered by generation (higher generation = closer to root = lower priority).
         // We use Reverse because BinaryHeap is a max-heap and we want segments with *lower* generation
@@ -142,23 +423,30 @@ impl Graph {
         let mut queue: BinaryHeap<(Reverse<usize>, SegmentIndex)> = BinaryHeap::new();
 
         // Initialize first segment
-        let first_flags = flags.entry(first).or_insert(SegmentFlags::empty());
+        let first_flags = flags.get_mut(first);
         *first_flags |= SegmentFlags::SEGMENT1;
         queue.push((Reverse(self[first].generation), first));
 
         // Initialize second segment
-        let second_flags = flags.entry(second).or_insert(SegmentFlags::empty());
+        let second_flags = flags.get_mut(second);
         *second_flags |= SegmentFlags::SEGMENT2;
         queue.push((Reverse(self[second].generation), second));
 
         let mut out = Vec::new();
 
-        // Process the priority queue until exhausted, skipping stale entries on pop.
-        while let Some((Reverse(generation), segment_id)) = queue.pop() {
-            let segment_flags = flags.get(&segment_id).copied().unwrap_or_default();
-            if segment_flags.contains(SegmentFlags::STALE) {
-                continue;
-            }
+        // Keep processing while there are potentially useful entries.
+        //
+        // Stale entries still need to propagate their stale marker to their
+        // parents if other non-stale queue entries remain. Once everything left
+        // in the queue is stale, no better merge-base can be found.
+        while queue
+            .iter()
+            .any(|(_, segment_id)| !flags.get(*segment_id).contains(SegmentFlags::STALE))
+        {
+            let Some((Reverse(generation), segment_id)) = queue.pop() else {
+                break;
+            };
+            let segment_flags = flags.get(segment_id);
 
             let mut flags_without_result = segment_flags
                 & (SegmentFlags::SEGMENT1 | SegmentFlags::SEGMENT2 | SegmentFlags::STALE);
@@ -166,10 +454,7 @@ impl Graph {
             // If reachable from both sides, it's a merge-base candidate
             if flags_without_result == (SegmentFlags::SEGMENT1 | SegmentFlags::SEGMENT2) {
                 if !segment_flags.contains(SegmentFlags::RESULT) {
-                    flags
-                        .entry(segment_id)
-                        .or_default()
-                        .insert(SegmentFlags::RESULT);
+                    flags.get_mut(segment_id).insert(SegmentFlags::RESULT);
                     out.push((segment_id, generation));
                 }
                 flags_without_result |= SegmentFlags::STALE;
@@ -180,7 +465,7 @@ impl Graph {
                 .inner
                 .neighbors_directed(segment_id, Direction::Outgoing)
             {
-                let parent_flags = flags.entry(parent_id).or_insert(SegmentFlags::empty());
+                let parent_flags = flags.get_mut(parent_id);
                 if (*parent_flags & flags_without_result) != flags_without_result {
                     *parent_flags |= flags_without_result;
                     queue.push((Reverse(self[parent_id].generation), parent_id));
@@ -196,7 +481,7 @@ impl Graph {
     fn remove_redundant(
         &self,
         segments: &[(SegmentIndex, usize)],
-        flags: &mut HashMap<SegmentIndex, SegmentFlags>,
+        flags: &mut SegmentTable<SegmentFlags>,
     ) -> Vec<SegmentIndex> {
         if segments.is_empty() {
             return Vec::new();
@@ -219,10 +504,10 @@ impl Graph {
 
         // Mark all input segments with RESULT and collect their parents for walking
         for (sidx, _) in segments {
-            flags.entry(*sidx).or_default().insert(SegmentFlags::RESULT);
+            flags.get_mut(*sidx).insert(SegmentFlags::RESULT);
 
             for parent_id in self.inner.neighbors_directed(*sidx, Direction::Outgoing) {
-                let parent_flags = flags.entry(parent_id).or_insert(SegmentFlags::empty());
+                let parent_flags = flags.get_mut(parent_id);
                 // Prevent double-addition
                 if !parent_flags.contains(SegmentFlags::STALE) {
                     parent_flags.insert(SegmentFlags::STALE);
@@ -235,9 +520,7 @@ impl Graph {
 
         // Allow walking everything at first (remove STALE from walk_start entries)
         for (sidx, _) in &walk_start {
-            if let Some(f) = flags.get_mut(sidx) {
-                f.remove(SegmentFlags::STALE);
-            }
+            flags.get_mut(*sidx).remove(SegmentFlags::STALE);
         }
 
         let mut count_still_independent = segments.len();
@@ -249,19 +532,14 @@ impl Graph {
             }
 
             stack.clear();
-            flags
-                .entry(segment_id)
-                .or_default()
-                .insert(SegmentFlags::STALE);
+            flags.get_mut(segment_id).insert(SegmentFlags::STALE);
             stack.push((segment_id, segment_gen));
 
             while let Some((current_id, current_gen)) = stack.last().copied() {
-                let current_flags = *flags.get(&current_id).unwrap_or(&SegmentFlags::empty());
+                let current_flags = flags.get(current_id);
 
                 if current_flags.contains(SegmentFlags::RESULT) {
-                    if let Some(f) = flags.get_mut(&current_id) {
-                        f.remove(SegmentFlags::RESULT);
-                    }
+                    flags.get_mut(current_id).remove(SegmentFlags::RESULT);
                     count_still_independent -= 1;
 
                     if count_still_independent <= 1 {
@@ -272,8 +550,8 @@ impl Graph {
                     if current_id == sorted_segments[min_gen_pos].0 {
                         while min_gen_pos < segments.len() - 1
                             && flags
-                                .get(&sorted_segments[min_gen_pos].0)
-                                .is_some_and(|f| f.contains(SegmentFlags::STALE))
+                                .get(sorted_segments[min_gen_pos].0)
+                                .contains(SegmentFlags::STALE)
                         {
                             min_gen_pos += 1;
                         }
@@ -293,7 +571,7 @@ impl Graph {
                     .inner
                     .neighbors_directed(current_id, Direction::Outgoing)
                 {
-                    let parent_flags = flags.entry(parent_id).or_insert(SegmentFlags::empty());
+                    let parent_flags = flags.get_mut(parent_id);
                     if !parent_flags.contains(SegmentFlags::STALE) {
                         parent_flags.insert(SegmentFlags::STALE);
                         stack.push((parent_id, self[parent_id].generation));
@@ -310,10 +588,7 @@ impl Graph {
         segments
             .iter()
             .filter_map(|(sidx, _)| {
-                flags
-                    .get(sidx)
-                    .filter(|f| !f.contains(SegmentFlags::STALE))
-                    .map(|_| *sidx)
+                (!flags.get(*sidx).contains(SegmentFlags::STALE)).then_some(*sidx)
             })
             .collect()
     }
@@ -594,13 +869,14 @@ impl Graph {
     ) {
         let mut next = VecDeque::new();
         next.push_back(start);
-        let mut seen = BTreeSet::new();
+        let mut seen = SegmentTable::new(self.inner.node_bound(), false);
+        seen.set(start, true);
         while let Some(next_sidx) = next.pop_front() {
             if !visit_and_prune(&self[next_sidx]) {
                 next.extend(
                     self.inner
                         .neighbors_directed(next_sidx, direction)
-                        .filter(|n| seen.insert(*n)),
+                        .filter(|n| seen.set_if_empty(*n, true)),
                 )
             }
         }
@@ -617,13 +893,14 @@ impl Graph {
     ) {
         let mut next = VecDeque::new();
         next.push_back(start);
-        let mut seen = BTreeSet::new();
+        let mut seen = SegmentTable::new(self.inner.node_bound(), false);
+        seen.set(start, true);
         while let Some(next_sidx) = next.pop_front() {
             if start == next_sidx || !visit_and_prune(&self[next_sidx]) {
                 next.extend(
                     self.inner
                         .neighbors_directed(next_sidx, direction)
-                        .filter(|n| seen.insert(*n)),
+                        .filter(|n| seen.set_if_empty(*n, true)),
                 )
             }
         }

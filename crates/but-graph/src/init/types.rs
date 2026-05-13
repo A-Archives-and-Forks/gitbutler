@@ -165,6 +165,7 @@ impl Queue {
             inner: Default::default(),
             count: 0,
             max: limit,
+            sorted: false,
         }
     }
 }
@@ -177,6 +178,8 @@ pub struct Queue {
     count: usize,
     /// The maximum number of queuing operations, each representing one commit.
     max: Option<usize>,
+    /// Whether new items must maintain `inner` in traversal order.
+    sorted: bool,
 }
 
 /// Counted queuing
@@ -190,19 +193,37 @@ impl Queue {
     /// propagation bottleneck. This is true Particularly if a commit-graph exists which typically is the case
     /// where this starts to matter, as it speeds up traversal by factor 8 easily.
     pub fn sort(&mut self) {
-        self.inner
-            .make_contiguous()
-            .sort_by(|a, b| a.0.gen_then_time.cmp(&b.0.gen_then_time));
+        if !self.sorted {
+            self.inner
+                .make_contiguous()
+                .sort_by(|a, b| a.0.gen_then_time.cmp(&b.0.gen_then_time));
+            self.sorted = true;
+        }
     }
     #[must_use]
     pub fn push_back_exhausted(&mut self, item: QueueItem) -> bool {
-        self.inner.push_back(item);
+        if self.sorted {
+            self.insert_sorted(item);
+        } else {
+            self.inner.push_back(item);
+        }
         self.is_exhausted_after_increment()
     }
     #[must_use]
     pub fn push_front_exhausted(&mut self, item: QueueItem) -> bool {
-        self.inner.push_front(item);
+        if self.sorted {
+            self.insert_sorted(item);
+        } else {
+            self.inner.push_front(item);
+        }
         self.is_exhausted_after_increment()
+    }
+
+    fn insert_sorted(&mut self, item: QueueItem) {
+        let index = self
+            .inner
+            .partition_point(|existing| existing.0.gen_then_time <= item.0.gen_then_time);
+        self.inner.insert(index, item);
     }
 
     fn is_exhausted_after_increment(&mut self) -> bool {

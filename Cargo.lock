@@ -1227,6 +1227,7 @@ dependencies = [
  "clap",
  "gix 0.83.0 (git+https://github.com/GitoxideLabs/gitoxide?rev=575113dfb10b3ba12eb57f57a81b241e773968bd)",
  "tracing",
+ "tracing-forest",
  "tracing-subscriber",
 ]
 
@@ -1346,6 +1347,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "bitflags 2.11.1",
+ "boolean-enums",
  "bstr",
  "but-core",
  "but-graph",
