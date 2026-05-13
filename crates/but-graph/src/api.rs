@@ -1,6 +1,6 @@
 use std::{
     cmp::Reverse,
-    collections::{BTreeSet, BinaryHeap, HashMap, VecDeque},
+    collections::{BTreeSet, BinaryHeap, VecDeque},
     ops::{Deref, Index, IndexMut},
 };
 
@@ -9,7 +9,7 @@ use petgraph::{
     Direction,
     prelude::EdgeRef,
     stable_graph::EdgeReference,
-    visit::{IntoEdgeReferences, Visitable},
+    visit::{IntoEdgeReferences, NodeIndexable, Visitable},
 };
 
 use crate::{
@@ -127,7 +127,7 @@ impl Graph {
             return Some(a);
         }
 
-        let mut flags: HashMap<SegmentIndex, SegmentFlags> = Default::default();
+        let mut flags = SegmentFlagTable::new(self);
         let bases = self.paint_down_to_common(a, b, &mut flags);
 
         if bases.is_empty() {
@@ -214,7 +214,7 @@ impl Graph {
         &self,
         first: SegmentIndex,
         second: SegmentIndex,
-        flags: &mut HashMap<SegmentIndex, SegmentFlags>,
+        flags: &mut SegmentFlagTable,
     ) -> Vec<(SegmentIndex, usize)> {
         // Priority queue ordered by generation (higher generation = closer to root = lower priority).
         // We use Reverse because BinaryHeap is a max-heap and we want segments with *lower* generation
@@ -222,12 +222,12 @@ impl Graph {
         let mut queue: BinaryHeap<(Reverse<usize>, SegmentIndex)> = BinaryHeap::new();
 
         // Initialize first segment
-        let first_flags = flags.entry(first).or_insert(SegmentFlags::empty());
+        let first_flags = flags.get_mut(first);
         *first_flags |= SegmentFlags::SEGMENT1;
         queue.push((Reverse(self[first].generation), first));
 
         // Initialize second segment
-        let second_flags = flags.entry(second).or_insert(SegmentFlags::empty());
+        let second_flags = flags.get_mut(second);
         *second_flags |= SegmentFlags::SEGMENT2;
         queue.push((Reverse(self[second].generation), second));
 
@@ -238,17 +238,14 @@ impl Graph {
         // Stale entries still need to propagate their stale marker to their
         // parents if other non-stale queue entries remain. Once everything left
         // in the queue is stale, no better merge-base can be found.
-        while queue.iter().any(|(_, segment_id)| {
-            !flags
-                .get(segment_id)
-                .copied()
-                .unwrap_or_default()
-                .contains(SegmentFlags::STALE)
-        }) {
+        while queue
+            .iter()
+            .any(|(_, segment_id)| !flags.get(*segment_id).contains(SegmentFlags::STALE))
+        {
             let Some((Reverse(generation), segment_id)) = queue.pop() else {
                 break;
             };
-            let segment_flags = flags.get(&segment_id).copied().unwrap_or_default();
+            let segment_flags = flags.get(segment_id);
 
             let mut flags_without_result = segment_flags
                 & (SegmentFlags::SEGMENT1 | SegmentFlags::SEGMENT2 | SegmentFlags::STALE);
@@ -256,10 +253,7 @@ impl Graph {
             // If reachable from both sides, it's a merge-base candidate
             if flags_without_result == (SegmentFlags::SEGMENT1 | SegmentFlags::SEGMENT2) {
                 if !segment_flags.contains(SegmentFlags::RESULT) {
-                    flags
-                        .entry(segment_id)
-                        .or_default()
-                        .insert(SegmentFlags::RESULT);
+                    flags.get_mut(segment_id).insert(SegmentFlags::RESULT);
                     out.push((segment_id, generation));
                 }
                 flags_without_result |= SegmentFlags::STALE;
@@ -270,7 +264,7 @@ impl Graph {
                 .inner
                 .neighbors_directed(segment_id, Direction::Outgoing)
             {
-                let parent_flags = flags.entry(parent_id).or_insert(SegmentFlags::empty());
+                let parent_flags = flags.get_mut(parent_id);
                 if (*parent_flags & flags_without_result) != flags_without_result {
                     *parent_flags |= flags_without_result;
                     queue.push((Reverse(self[parent_id].generation), parent_id));
@@ -286,7 +280,7 @@ impl Graph {
     fn remove_redundant(
         &self,
         segments: &[(SegmentIndex, usize)],
-        flags: &mut HashMap<SegmentIndex, SegmentFlags>,
+        flags: &mut SegmentFlagTable,
     ) -> Vec<SegmentIndex> {
         if segments.is_empty() {
             return Vec::new();
@@ -309,10 +303,10 @@ impl Graph {
 
         // Mark all input segments with RESULT and collect their parents for walking
         for (sidx, _) in segments {
-            flags.entry(*sidx).or_default().insert(SegmentFlags::RESULT);
+            flags.get_mut(*sidx).insert(SegmentFlags::RESULT);
 
             for parent_id in self.inner.neighbors_directed(*sidx, Direction::Outgoing) {
-                let parent_flags = flags.entry(parent_id).or_insert(SegmentFlags::empty());
+                let parent_flags = flags.get_mut(parent_id);
                 // Prevent double-addition
                 if !parent_flags.contains(SegmentFlags::STALE) {
                     parent_flags.insert(SegmentFlags::STALE);
@@ -325,9 +319,7 @@ impl Graph {
 
         // Allow walking everything at first (remove STALE from walk_start entries)
         for (sidx, _) in &walk_start {
-            if let Some(f) = flags.get_mut(sidx) {
-                f.remove(SegmentFlags::STALE);
-            }
+            flags.get_mut(*sidx).remove(SegmentFlags::STALE);
         }
 
         let mut count_still_independent = segments.len();
@@ -339,19 +331,14 @@ impl Graph {
             }
 
             stack.clear();
-            flags
-                .entry(segment_id)
-                .or_default()
-                .insert(SegmentFlags::STALE);
+            flags.get_mut(segment_id).insert(SegmentFlags::STALE);
             stack.push((segment_id, segment_gen));
 
             while let Some((current_id, current_gen)) = stack.last().copied() {
-                let current_flags = *flags.get(&current_id).unwrap_or(&SegmentFlags::empty());
+                let current_flags = flags.get(current_id);
 
                 if current_flags.contains(SegmentFlags::RESULT) {
-                    if let Some(f) = flags.get_mut(&current_id) {
-                        f.remove(SegmentFlags::RESULT);
-                    }
+                    flags.get_mut(current_id).remove(SegmentFlags::RESULT);
                     count_still_independent -= 1;
 
                     if count_still_independent <= 1 {
@@ -362,8 +349,8 @@ impl Graph {
                     if current_id == sorted_segments[min_gen_pos].0 {
                         while min_gen_pos < segments.len() - 1
                             && flags
-                                .get(&sorted_segments[min_gen_pos].0)
-                                .is_some_and(|f| f.contains(SegmentFlags::STALE))
+                                .get(sorted_segments[min_gen_pos].0)
+                                .contains(SegmentFlags::STALE)
                         {
                             min_gen_pos += 1;
                         }
@@ -383,7 +370,7 @@ impl Graph {
                     .inner
                     .neighbors_directed(current_id, Direction::Outgoing)
                 {
-                    let parent_flags = flags.entry(parent_id).or_insert(SegmentFlags::empty());
+                    let parent_flags = flags.get_mut(parent_id);
                     if !parent_flags.contains(SegmentFlags::STALE) {
                         parent_flags.insert(SegmentFlags::STALE);
                         stack.push((parent_id, self[parent_id].generation));
@@ -400,12 +387,41 @@ impl Graph {
         segments
             .iter()
             .filter_map(|(sidx, _)| {
-                flags
-                    .get(sidx)
-                    .filter(|f| !f.contains(SegmentFlags::STALE))
-                    .map(|_| *sidx)
+                (!flags.get(*sidx).contains(SegmentFlags::STALE)).then_some(*sidx)
             })
             .collect()
+    }
+}
+
+struct SegmentFlagTable {
+    flags: Vec<SegmentFlags>,
+    touched: Vec<SegmentIndex>,
+}
+
+impl SegmentFlagTable {
+    fn new(graph: &Graph) -> Self {
+        SegmentFlagTable {
+            flags: vec![SegmentFlags::empty(); graph.inner.node_bound()],
+            touched: Vec::new(),
+        }
+    }
+
+    fn clear(&mut self) {
+        for sidx in self.touched.drain(..) {
+            self.flags[sidx.index()] = SegmentFlags::empty();
+        }
+    }
+
+    fn get(&self, sidx: SegmentIndex) -> SegmentFlags {
+        self.flags[sidx.index()]
+    }
+
+    fn get_mut(&mut self, sidx: SegmentIndex) -> &mut SegmentFlags {
+        let index = sidx.index();
+        if self.flags[index].is_empty() {
+            self.touched.push(sidx);
+        }
+        &mut self.flags[index]
     }
 }
 
