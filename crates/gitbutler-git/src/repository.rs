@@ -1,4 +1,8 @@
-use std::{collections::HashMap, path::Path, time::Duration};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use futures::{FutureExt, select};
 use gix::bstr::ByteSlice;
@@ -54,6 +58,24 @@ pub enum RepositoryError<
     AskpassExecutableMismatch,
     #[error("Run `{prefix}cargo build -p gitbutler-git` to get the askpass binary at '{path}'")]
     AskpassExecutableNotFound { path: String, prefix: String },
+    /// The remote configuration could not be read.
+    #[error("failed to read configuration for remote `{remote}`: {source}")]
+    RemoteConfiguration {
+        /// The remote whose configuration could not be read.
+        remote: String,
+        /// The configuration lookup error.
+        #[source]
+        source: gix::remote::find::existing::Error,
+    },
+    /// The repository could not be opened.
+    #[error("failed to open repository at `{}`: {source}", path.display())]
+    RepositoryOpen {
+        /// The repository path that could not be opened.
+        path: PathBuf,
+        /// The repository open error.
+        #[source]
+        source: gix::open::Error,
+    },
 }
 
 /// Higher level errors that can occur when interacting with the CLI.
@@ -375,8 +397,7 @@ where
     }
 }
 
-/// Fetches the given refspec from the given remote in the repository
-/// at the given path.
+/// Fetches from the given remote in the repository using its configured fetch refspecs.
 ///
 /// If `on_prompt` is provided, we override SSH_ASKPASS to point to our custom askpass client to
 /// ferry prompts and responses between the SSH process and this process. This should be used
@@ -386,7 +407,6 @@ pub async fn fetch<P, F, Fut, E>(
     repo_path: P,
     executor: E,
     remote: &str,
-    refspec: RefSpec,
     on_prompt: Option<F>,
 ) -> Result<(), crate::Error<Error<E>>>
 where
@@ -395,12 +415,28 @@ where
     F: FnMut(String) -> Fut,
     Fut: std::future::Future<Output = Option<String>>,
 {
+    let repo_path = repo_path.as_ref();
+    let repo = gix::open(repo_path).map_err(|source| Error::<E>::RepositoryOpen {
+        path: repo_path.to_owned(),
+        source,
+    })?;
+    let refspecs = fetch_refspecs(&repo, remote).map_err(|source| {
+        let remote_not_found =
+            matches!(source, gix::remote::find::existing::Error::NotFound { .. });
+        let source = Error::<E>::RemoteConfiguration {
+            remote: remote.to_owned(),
+            source,
+        };
+        if remote_not_found {
+            crate::Error::NoSuchRemote(remote.to_owned(), source)
+        } else {
+            source.into()
+        }
+    })?;
     let mut args = vec!["fetch", "--quiet"];
 
-    let refspec = refspec.to_string();
-
     args.push(remote);
-    args.push(&refspec);
+    args.extend(refspecs.iter().map(String::as_str));
 
     let (status, stdout, stderr) =
         execute_with_auth_harness(HarnessEnv::Repo(repo_path), &executor, &args, on_prompt).await?;
@@ -431,6 +467,24 @@ where
             })?
         }
     }
+}
+
+fn fetch_refspecs(
+    repo: &gix::Repository,
+    remote: &str,
+) -> Result<Vec<String>, gix::remote::find::existing::Error> {
+    let refspecs: Vec<_> = repo
+        .find_remote(remote)?
+        .refspecs(gix::remote::Direction::Fetch)
+        .iter()
+        .map(|spec| spec.to_ref().to_bstring().to_string())
+        .collect();
+
+    Ok(if refspecs.is_empty() {
+        vec![format!("+refs/heads/*:refs/remotes/{remote}/*")]
+    } else {
+        refspecs
+    })
 }
 
 /// Pushes a refspec to the given remote in the repository at the given path.

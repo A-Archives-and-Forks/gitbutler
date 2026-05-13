@@ -25,7 +25,7 @@ pub struct PushResult {
 /// Higher-level fetch and push helpers implemented for [`Context`].
 #[expect(clippy::too_many_arguments)]
 pub trait GitContextExt {
-    /// Fetch all heads from the given remote.
+    /// Fetch from the given remote using its configured fetch refspecs.
     fn fetch(&self, remote_name: &str, askpass: Option<String>) -> Result<()>;
 
     /// Push the given commit to the provided remote branch.
@@ -56,8 +56,6 @@ pub trait GitContextExt {
 
 impl GitContextExt for Context {
     fn fetch(&self, remote_name: &str, askpass: Option<String>) -> Result<()> {
-        let refspec = format!("+refs/heads/*:refs/remotes/{remote_name}/*");
-
         let on_prompt = if askpass::get_broker().is_some() {
             Some(move |prompt: String| handle_git_prompt_fetch(prompt, askpass.clone()))
         } else {
@@ -71,15 +69,10 @@ impl GitContextExt for Context {
                 but_error::Context::new("failed to initialize async runtime for git fetch")
                     .with_code(Code::Unknown),
             )?;
-            let refspec = crate::RefSpec::parse(&refspec).context(
-                but_error::Context::new(format!("failed to parse git fetch refspec `{refspec}`"))
-                    .with_code(Code::Validation),
-            )?;
             Ok(runtime.block_on(crate::fetch(
                 repo_path,
                 crate::tokio::TokioExecutor,
                 &remote,
-                refspec,
                 on_prompt,
             )))
         })
