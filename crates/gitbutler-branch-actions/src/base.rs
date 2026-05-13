@@ -9,6 +9,7 @@ use but_core::{
 };
 use but_ctx::Context;
 use but_error::{Code, Marker};
+use but_graph::target_ref_relations::FirstParentTraversal;
 use but_oxidize::ObjectIdExt;
 use gitbutler_git::GitContextExt as _;
 use gitbutler_project::{FetchResult, Project};
@@ -375,7 +376,7 @@ pub(crate) fn target_to_base_branch(
 
     // The longest list of updstream commit ids.
     let upstream_commit_ids = graph
-        .upstream_commits(repo, target_ref.as_ref())?
+        .upstream_commits(repo, target_ref.as_ref(), FirstParentTraversal::Yes)?
         .into_iter()
         .map(|h| h.upstream_commits)
         .max_by_key(|us| us.len())

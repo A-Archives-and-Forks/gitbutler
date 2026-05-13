@@ -13,10 +13,7 @@
 //! Whether or not we update a branch has no relevance to the `target.sha`. The
 //! `target.sha` is simply defining what we consider in the workspace.
 
-use std::{backtrace::Backtrace, collections::HashSet};
-
-use anyhow::{Context, Result, bail};
-use petgraph::Direction;
+use anyhow::{Context, Result};
 
 use crate::{Graph, projection::commit::is_managed_workspace_by_message};
 
@@ -27,6 +24,8 @@ pub struct HeadStatus {
     /// The commits that are considered upstream of it.
     pub upstream_commits: Vec<gix::ObjectId>,
 }
+
+boolean_enums::gen_boolean_enum!(pub FirstParentTraversal);
 
 impl Graph {
     /// Lists the commits in the set `target_ref ^[branch in workspace]`.
@@ -51,6 +50,7 @@ impl Graph {
         &self,
         repo: &gix::Repository,
         target_ref: &gix::refs::FullNameRef,
+        first_parent: FirstParentTraversal,
     ) -> Result<Vec<HeadStatus>> {
         let entrypoint = self.entrypoint_commit().context(
             "Upstream commits can only be calculated on a graph that has some entrypoint commit",
@@ -67,72 +67,17 @@ impl Graph {
         let mut out = vec![];
 
         for head in heads {
-            // There are more efficient ways of computing a `A ^B` revset, but
-            // with the workspace being reasonably bounded to about 1000 commits
-            // of history, I'm not too concerend about performance here.
-            let mut negative_commits = HashSet::new();
-            self.traverse_commit_and_parents(head.detach(), |id| {
-                negative_commits.insert(id);
-                false
-            })?;
-
-            let mut positive_commits = vec![];
-            self.traverse_commit_and_parents(target_ref_id, |id| {
-                if negative_commits.contains(&id) {
-                    true
-                } else {
-                    positive_commits.push(id);
-                    false
-                }
-            })?;
+            let mut walk = repo.rev_walk([target_ref_id]).with_hidden([head]);
+            if first_parent == FirstParentTraversal::Yes {
+                walk = walk.first_parent_only();
+            };
 
             out.push(HeadStatus {
                 head: head.detach(),
-                upstream_commits: positive_commits,
+                upstream_commits: walk.all()?.map(|c| Ok(c?.id)).collect::<Result<_>>()?,
             })
         }
 
         Ok(out)
-    }
-}
-
-impl Graph {
-    fn traverse_commit_and_parents(
-        &self,
-        start: gix::ObjectId,
-        mut cb: impl FnMut(gix::ObjectId) -> bool,
-    ) -> Result<()> {
-        let mut sidx = None;
-        for id in self.inner.node_indices() {
-            let mut found = false;
-            for commit in &self[id].commits {
-                if commit.id == start {
-                    found = true;
-                    sidx = Some(id);
-                }
-
-                if found && cb(commit.id) {
-                    return Ok(());
-                }
-            }
-            if found {
-                break;
-            }
-        }
-
-        let Some(sidx) = sidx else {
-            bail!("Failed to find a segment containing commit {start}");
-        };
-        self.visit_all_segments_excluding_start_until(sidx, Direction::Outgoing, |segment| {
-            for commit in &segment.commits {
-                if cb(commit.id) {
-                    return true;
-                }
-            }
-
-            false
-        });
-
-        Ok(())
     }
 }

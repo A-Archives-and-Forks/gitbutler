@@ -4,6 +4,7 @@ use anyhow::{Context as _, Result, bail};
 use bstr::ByteSlice;
 use but_core::{RefMetadata, Reference, RepositoryExt, WORKSPACE_REF_NAME, ref_metadata::StackId};
 use but_ctx::{Context, access::RepoExclusive};
+use but_graph::target_ref_relations::FirstParentTraversal;
 use but_rebase::{RebaseOutput, RebaseStep};
 use but_serde::BStringForFrontend;
 use but_workspace::{legacy::stack_ext::StackDetailsExt, ref_info::Options};
@@ -244,7 +245,7 @@ impl<'a> UpstreamIntegrationContext<'a> {
 
             let upstream_commits = ws
                 .graph
-                .upstream_commits(&repo, target_ref.as_ref())?
+                .upstream_commits(&repo, target_ref.as_ref(), FirstParentTraversal::Yes)?
                 .into_iter()
                 .map(|h| h.upstream_commits)
                 .max_by_key(|us| us.len())
