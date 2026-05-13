@@ -311,12 +311,18 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 					</div>
 
 					{Match.value(outlineMode).pipe(
-						Match.when({ _tag: "Transfer", value: { _tag: "Keyboard" } }, (mode) => (
-							<div className={styles.transferModePreview}>
-								<OperationSourceLabel headInfo={headInfo} source={mode.value.source} />
-							</div>
-						)),
+						Match.when({ _tag: "Absorb" }, (mode) => mode.source),
+						Match.when(
+							{ _tag: "Transfer", value: { _tag: "Keyboard" } },
+							(mode) => mode.value.source,
+						),
 						Match.orElse(() => null),
+						(source) =>
+							source && (
+								<div className={styles.operationSourcePreview}>
+									<OperationSourceLabel headInfo={headInfo} source={source} />
+								</div>
+							),
 					)}
 				</Panel>
 			</DryRunWorkspaceContext>

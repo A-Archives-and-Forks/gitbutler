@@ -3,7 +3,7 @@
 }
 
 [data-panel] {
-	/* `transferModePreview` is relative to this. */
+	/* `operationSourcePreview` is relative to this. */
 	position: relative;
 
 	&:focus {
