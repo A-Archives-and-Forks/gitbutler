@@ -72,7 +72,7 @@ import {
 	WorkspaceState,
 } from "@gitbutler/but-sdk";
 import { formatForDisplay } from "@tanstack/react-hotkeys";
-import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { Match } from "effect";
 
@@ -101,7 +101,7 @@ import {
 import { isNonEmptyArray, NonEmptyArray } from "effect/Array";
 import { defaultOutlineSelection } from "#ui/projects/workspace/state.ts";
 import { ShortcutButton } from "#ui/components/ShortcutButton.tsx";
-import { useResolveDiffSpecs } from "#ui/operations/diff-specs.ts";
+import { resolveDiffSpecs } from "#ui/operations/diff-specs.ts";
 import { rejectedChangesToastOptions } from "#ui/operations/rejectedChangesToastOptions.tsx";
 import { useCommand } from "#ui/commands/manager.ts";
 import { assert } from "#ui/assert.ts";
@@ -1004,6 +1004,7 @@ const Changes: FC<{
 	projectId: string;
 }> = ({ projectId }) => {
 	const toastManager = Toast.useToastManager();
+	const queryClient = useQueryClient();
 
 	const commitCreate = useMutation({
 		...commitCreateMutationOptions,
@@ -1051,14 +1052,14 @@ const Changes: FC<{
 	const [branchId, setBranchId] = useState<string | null>(null);
 	const branch = branchComboboxItems.find((item) => item.id === branchId) ?? branchComboboxItems[0];
 
-	const changes = useResolveDiffSpecs({
-		source: changesSectionOperand,
-		projectId,
-	});
-
-	const commit = () => {
+	const commit = async () => {
 		if (!branch) return;
 
+		const changes = await resolveDiffSpecs({
+			source: changesSectionOperand,
+			projectId,
+			queryClient,
+		});
 		if (!changes) return;
 
 		commitCreate.mutate(
@@ -1130,7 +1131,7 @@ const Changes: FC<{
 		hotkeys: [{ hotkey: "Mod+Shift+B" }],
 	});
 
-	const commitCommand = useCommand(commit, {
+	const commitCommand = useCommand(() => void commit(), {
 		enabled: outlineMode._tag === "Default" && !!branch,
 		group: "Changes",
 		commandPalette: { label: "Commit" },
