@@ -149,7 +149,6 @@ const TransferOperationControls: FC<{
 						<ShortcutButton
 							hotkey="A"
 							hotkeyOptions={{
-								enabled: !!operations.moveAbove,
 								meta: {
 									group: "Operation mode",
 									name: operations.moveAbove
@@ -169,7 +168,6 @@ const TransferOperationControls: FC<{
 						<ShortcutButton
 							hotkey="R"
 							hotkeyOptions={{
-								enabled: !!operations.rub,
 								meta: {
 									group: "Operation mode",
 									name: operations.rub ? `Select ${operationLabel(operations.rub)}` : "Select rub",
@@ -187,7 +185,6 @@ const TransferOperationControls: FC<{
 						<ShortcutButton
 							hotkey="B"
 							hotkeyOptions={{
-								enabled: !!operations.moveBelow,
 								meta: {
 									group: "Operation mode",
 									name: operations.moveBelow
