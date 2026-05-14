@@ -846,16 +846,18 @@ const CommitRow: FC<
 	};
 
 	const menuItems: Array<NativeMenuItem> = [
+		startEditingContextMenuItem,
 		amendCommitContextMenuItem,
 		cutCommitContextMenuItem,
-		startEditingContextMenuItem,
+		{ _tag: "Separator" },
+		setCommitTargetContextMenuItem,
 		{
 			_tag: "Item",
 			label: "Add Empty Commit",
 			submenu: [insertBlankCommitAboveContextMenuItem, insertBlankCommitBelowContextMenuItem],
 		},
+		{ _tag: "Separator" },
 		deleteCommitContextMenuItem,
-		setCommitTargetContextMenuItem,
 	];
 
 	return (
