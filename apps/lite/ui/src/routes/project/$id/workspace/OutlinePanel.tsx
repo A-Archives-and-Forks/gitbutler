@@ -571,6 +571,17 @@ const CommitRow: FC<
 
 			await commitInsertBlankMutationOptions.onSuccess?.(response, input, context, mutation);
 		},
+		onError: (error) => {
+			// oxlint-disable-next-line no-console
+			console.error(error);
+
+			toastManager.add({
+				type: "error",
+				title: "Failed to insert commit",
+				description: errorMessageForToast(error),
+				priority: "high",
+			});
+		},
 	});
 	const commitDiscard = useMutation({
 		...commitDiscardMutationOptions,
@@ -584,6 +595,17 @@ const CommitRow: FC<
 
 			await commitDiscardMutationOptions.onSuccess?.(response, input, context, mutation);
 		},
+		onError: (error) => {
+			// oxlint-disable-next-line no-console
+			console.error(error);
+
+			toastManager.add({
+				type: "error",
+				title: "Failed to discard commit",
+				description: errorMessageForToast(error),
+				priority: "high",
+			});
+		},
 	});
 	const commitReword = useMutation({
 		...commitRewordMutationOptions,
@@ -596,6 +618,17 @@ const CommitRow: FC<
 			);
 
 			await commitRewordMutationOptions.onSuccess?.(response, input, context, mutation);
+		},
+		onError: (error) => {
+			// oxlint-disable-next-line no-console
+			console.error(error);
+
+			toastManager.add({
+				type: "error",
+				title: "Failed to reword commit",
+				description: errorMessageForToast(error),
+				priority: "high",
+			});
 		},
 	});
 
@@ -668,6 +701,8 @@ const CommitRow: FC<
 		focusPanel("outline");
 	};
 
+	const toastManager = Toast.useToastManager();
+
 	const saveNewMessage = (newMessage: string) => {
 		const initialMessage = commit.message.trim();
 		const trimmed = newMessage.trim();
@@ -681,10 +716,16 @@ const CommitRow: FC<
 					message: trimmed,
 					dryRun: false,
 				});
-			} catch {
-				// Use the global mutation error handler (shows toast) instead of React
-				// error boundaries.
-				return;
+			} catch (error) {
+				// oxlint-disable-next-line no-console
+				console.error(error);
+
+				toastManager.add({
+					type: "error",
+					title: "Failed to reword commit",
+					description: errorMessageForToast(error),
+					priority: "high",
+				});
 			}
 		});
 	};
@@ -1328,6 +1369,8 @@ const BranchRow: FC<
 		focusPanel("outline");
 	};
 
+	const toastManager = Toast.useToastManager();
+
 	const saveBranchName = (newBranchName: string) => {
 		const trimmed = newBranchName.trim();
 		if (trimmed === "" || trimmed === branchName) return;
@@ -1340,10 +1383,16 @@ const BranchRow: FC<
 					branchName,
 					newName: trimmed,
 				});
-			} catch {
-				// Use the global mutation error handler (shows toast) instead of React
-				// error boundaries.
-				return;
+			} catch (error) {
+				// oxlint-disable-next-line no-console
+				console.error(error);
+
+				toastManager.add({
+					type: "error",
+					title: "Failed to rename branch",
+					description: errorMessageForToast(error),
+					priority: "high",
+				});
 			}
 		});
 	};
@@ -1432,7 +1481,22 @@ const StackRow: FC<
 	const operand = stackOperand({ stackId });
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
-	const unapplyStack = useMutation(unapplyStackMutationOptions);
+	const toastManager = Toast.useToastManager();
+
+	const unapplyStack = useMutation({
+		...unapplyStackMutationOptions,
+		onError: (error) => {
+			// oxlint-disable-next-line no-console
+			console.error(error);
+
+			toastManager.add({
+				type: "error",
+				title: "Failed to unapply stack",
+				description: errorMessageForToast(error),
+				priority: "high",
+			});
+		},
+	});
 	const unapply = () => {
 		unapplyStack.mutate({ projectId, stackId });
 	};

@@ -21,6 +21,7 @@ import { decodeRefName } from "#ui/api/ref-name.ts";
 import { projectActions } from "#ui/projects/state.ts";
 import { useAppDispatch } from "#ui/store.ts";
 import { useParams } from "@tanstack/react-router";
+import { errorMessageForToast } from "#ui/main.tsx";
 
 /** @public */
 export type CommitAmendOperation = Omit<CommitAmendParams, "dryRun" | "projectId" | "changes"> & {
@@ -358,6 +359,17 @@ export const useRunOperationMutationOptions = () => {
 			}
 
 			await client.invalidateQueries();
+		},
+		onError: (error) => {
+			// oxlint-disable-next-line no-console
+			console.error(error);
+
+			toastManager.add({
+				type: "error",
+				title: "Failed to run operation",
+				description: errorMessageForToast(error),
+				priority: "high",
+			});
 		},
 	});
 };

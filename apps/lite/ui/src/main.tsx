@@ -25,16 +25,6 @@ const queryClient = new ReactQuery.QueryClient({
 			// We don't expect network errors over the Node API.
 			retry: false,
 		},
-		mutations: {
-			onError: (error: unknown) => {
-				toastManager.add({
-					type: "error",
-					title: "Mutation failed",
-					description: errorMessageForToast(error),
-					priority: "high",
-				});
-			},
-		},
 	},
 });
 

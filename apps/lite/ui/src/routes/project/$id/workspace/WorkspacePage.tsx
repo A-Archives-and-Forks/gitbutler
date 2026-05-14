@@ -43,6 +43,8 @@ import { DetailsPanel } from "./DetailsPanel.tsx";
 import styles from "./WorkspacePage.module.css";
 import { OutlinePanel } from "#ui/routes/project/$id/workspace/OutlinePanel.tsx";
 import { classes } from "#ui/ui/classes.ts";
+import { Toast } from "@base-ui/react";
+import { errorMessageForToast } from "#ui/main.tsx";
 
 type CommandPaletteItem = {
 	group: CommandGroup;
@@ -220,7 +222,21 @@ const ApplyBranchPicker: FC<{
 		listBranchesQueryOptions({ projectId, filter: { local: null, applied: false } }),
 	);
 	const items = (branchesQuery.data ?? []).flatMap(branchListingToApplyBranchPickerOptions);
-	const applyBranch = useMutation(applyBranchMutationOptions);
+	const toastManager = Toast.useToastManager();
+	const applyBranch = useMutation({
+		...applyBranchMutationOptions,
+		onError: (error) => {
+			// oxlint-disable-next-line no-console
+			console.error(error);
+
+			toastManager.add({
+				type: "error",
+				title: "Failed to apply branch",
+				description: errorMessageForToast(error),
+				priority: "high",
+			});
+		},
+	});
 	const statusLabel =
 		items.length === 0
 			? branchesQuery.isPending
