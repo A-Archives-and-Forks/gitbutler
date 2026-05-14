@@ -1,17 +1,13 @@
 import styles from "./Keys.module.css";
-import {
-	formatForDisplay,
-	formatHotkeySequence,
-	Hotkey,
-	HotkeySequence,
-} from "@tanstack/react-hotkeys";
+import { formatForDisplay, formatHotkeySequence, HotkeySequence } from "@tanstack/react-hotkeys";
 import { FC } from "react";
 
 type Props = {
-	hotkey: Hotkey | HotkeySequence;
+	// We can't use the `Hotkey` type because it causes type errors in Storybook. 🤷‍♂️
+	hotkey: string | HotkeySequence;
 };
 
-const formatKeys = (hotkey: Hotkey | HotkeySequence): string =>
+const formatKeys = (hotkey: string | HotkeySequence): string =>
 	typeof hotkey === "string" ? formatForDisplay(hotkey) : formatHotkeySequence(hotkey);
 
 export const Keys: FC<Props> = ({ hotkey }) => (
