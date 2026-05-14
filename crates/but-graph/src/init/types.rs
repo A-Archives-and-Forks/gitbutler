@@ -231,11 +231,6 @@ impl Queue {
         self.max.is_some_and(|l| self.count >= l)
     }
 
-    /// Return `true` if `id` is on the queue.
-    pub fn is_queued(&self, id: gix::ObjectId) -> bool {
-        self.inner.iter().any(|(info, _, _, _)| info.id == id)
-    }
-
     /// Add `goal` as additional goal to `id` or panic if `id` was not found.
     pub fn add_goal_to(&mut self, id: gix::ObjectId, goal: CommitFlags) {
         let limit = self
