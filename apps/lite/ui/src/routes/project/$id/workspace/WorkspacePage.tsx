@@ -297,10 +297,7 @@ const TopBarActions: FC = () => {
 				className={uiStyles.button}
 				hotkey="F"
 				hotkeyOptions={{
-					meta: {
-						group: "Files",
-						name: isPanelVisible(panelsState, "files") ? "Close files" : "Open files",
-					},
+					meta: { group: "Files", name: "Toggle files" },
 				}}
 				aria-pressed={isPanelVisible(panelsState, "files")}
 				onClick={toggleFiles}
@@ -311,10 +308,7 @@ const TopBarActions: FC = () => {
 				className={uiStyles.button}
 				hotkey="D"
 				hotkeyOptions={{
-					meta: {
-						group: "Details",
-						name: isPanelVisible(panelsState, "details") ? "Close details" : "Open details",
-					},
+					meta: { group: "Details", name: "Toggle details" },
 				}}
 				aria-pressed={isPanelVisible(panelsState, "details")}
 				onClick={toggleDetails}
