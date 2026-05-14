@@ -1303,6 +1303,11 @@ const Changes: FC<{
 	} = useCommitTargetCombobox(projectId);
 	const isAltHeld = useKeyHold("Alt");
 	const isAmendMode = isAltHeld;
+	const hotkeys = {
+		selectCommitBranch: "Mod+Shift+B",
+		commit: "Mod+Enter",
+		amendCommit: "Mod+Alt+Enter",
+	} satisfies Record<string, RegisterableHotkey>;
 	const isCommitOrAmendPending = commitCreate.isPending || commitAmend.isPending;
 	const canCommit =
 		outlineMode._tag === "Default" && commitTarget !== null && !isCommitOrAmendPending;
@@ -1353,14 +1358,14 @@ const Changes: FC<{
 			_tag: "Item",
 			label: "Commit",
 			enabled: canCommit,
-			accelerator: toElectronAccelerator("Mod+Enter"),
+			accelerator: toElectronAccelerator(hotkeys.commit),
 			onSelect: () => commitCreate.mutate(),
 		},
 		{
 			_tag: "Item",
 			label: "Amend Commit",
 			enabled: canAmend,
-			accelerator: toElectronAccelerator("Mod+Alt+Enter"),
+			accelerator: toElectronAccelerator(hotkeys.amendCommit),
 			onSelect: () => commitAmend.mutate(),
 		},
 	];
@@ -1437,7 +1442,7 @@ const Changes: FC<{
 						aria-label="Select branch"
 						render={
 							<ShortcutButton
-								hotkey="Mod+Shift+B"
+								hotkey={hotkeys.selectCommitBranch}
 								hotkeyOptions={{
 									meta: { group: "Changes", name: "Select commit branch" },
 								}}
@@ -1455,7 +1460,7 @@ const Changes: FC<{
 
 				<div className={styles.commitActionControls}>
 					<ShortcutButton
-						hotkey={isAmendMode ? "Mod+Alt+Enter" : "Mod+Enter"}
+						hotkey={isAmendMode ? hotkeys.amendCommit : hotkeys.commit}
 						hotkeyOptions={{
 							meta: { group: "Changes", name: isAmendMode ? "Amend" : "Commit" },
 						}}
