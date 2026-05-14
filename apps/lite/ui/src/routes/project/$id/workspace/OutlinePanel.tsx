@@ -802,20 +802,20 @@ const CommitRow: FC<
 
 	const amendCommitContextMenuItem: NativeMenuItem = {
 		_tag: "Item",
-		label: "Amend commit",
+		label: "Amend Commit",
 		enabled: true,
 		accelerator: toElectronAccelerator(hotkeys.amend),
 		onSelect: amendCommit,
 	};
 	const cutCommitContextMenuItem: NativeMenuItem = {
 		_tag: "Item",
-		label: "Cut commit",
+		label: "Cut Commit",
 		enabled: true,
 		onSelect: cutCommit,
 	};
 	const startEditingContextMenuItem: NativeMenuItem = {
 		_tag: "Item",
-		label: "Reword commit",
+		label: "Reword Commit",
 		enabled: !isCommitMessagePending,
 		accelerator: toElectronAccelerator(hotkeys.reword),
 		onSelect: startEditing,
@@ -834,13 +834,13 @@ const CommitRow: FC<
 	};
 	const deleteCommitContextMenuItem: NativeMenuItem = {
 		_tag: "Item",
-		label: "Delete commit",
+		label: "Delete Commit",
 		enabled: !commitDiscard.isPending,
 		onSelect: deleteCommit,
 	};
 	const setCommitTargetContextMenuItem: NativeMenuItem = {
 		_tag: "Item",
-		label: "Compose commit here",
+		label: "Compose Commit Here",
 		accelerator: toElectronAccelerator(hotkeys.composeCommitHere),
 		onSelect: composeCommitHere,
 	};
@@ -851,7 +851,7 @@ const CommitRow: FC<
 		startEditingContextMenuItem,
 		{
 			_tag: "Item",
-			label: "Add empty commit",
+			label: "Add Empty Commit",
 			submenu: [insertBlankCommitAboveContextMenuItem, insertBlankCommitBelowContextMenuItem],
 		},
 		deleteCommitContextMenuItem,
@@ -1634,14 +1634,14 @@ const BranchRow: FC<
 
 	const startEditingContextMenuItem: NativeMenuItem = {
 		_tag: "Item",
-		label: "Rename branch",
+		label: "Rename Branch",
 		enabled: !isRenamePending,
 		accelerator: toElectronAccelerator(hotkeys.rename),
 		onSelect: startEditing,
 	};
 	const setCommitTargetContextMenuItem: NativeMenuItem = {
 		_tag: "Item",
-		label: "Compose commit here",
+		label: "Compose Commit Here",
 		accelerator: toElectronAccelerator(hotkeys.composeCommitHere),
 		onSelect: composeCommitHere,
 	};
@@ -1749,14 +1749,14 @@ const StackRow: FC<
 
 	const unapplyContextMenuItem: NativeMenuItem = {
 		_tag: "Item",
-		label: "Unapply stack",
+		label: "Unapply Stack",
 		enabled: !unapplyStack.isPending,
 		onSelect: unapply,
 	};
 
 	const menuItems: Array<NativeMenuItem> = [
-		{ _tag: "Item", label: "Move up", enabled: false },
-		{ _tag: "Item", label: "Move down", enabled: false },
+		{ _tag: "Item", label: "Move Up", enabled: false },
+		{ _tag: "Item", label: "Move Down", enabled: false },
 		{ _tag: "Separator" },
 		unapplyContextMenuItem,
 	];
