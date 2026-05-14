@@ -1052,35 +1052,39 @@ const Changes: FC<{
 	const [branchId, setBranchId] = useState<string | null>(null);
 	const branch = branchComboboxItems.find((item) => item.id === branchId) ?? branchComboboxItems[0];
 
-	const commit = async () => {
-		if (!branch) return;
+	const [commitCreatePending, startCommitCreateTransition] = useTransition();
 
-		const changes = await resolveDiffSpecs({
-			source: changesSectionOperand,
-			projectId,
-			queryClient,
-		});
-		if (!changes) return;
+	const commit = () => {
+		startCommitCreateTransition(async () => {
+			if (!branch) return;
 
-		await commitCreate.mutateAsync(
-			{
+			const changes = await resolveDiffSpecs({
+				source: changesSectionOperand,
 				projectId,
-				relativeTo: {
-					type: "referenceBytes",
-					subject: branch.branch.branchRef,
+				queryClient,
+			});
+			if (!changes) return;
+
+			await commitCreate.mutateAsync(
+				{
+					projectId,
+					relativeTo: {
+						type: "referenceBytes",
+						subject: branch.branch.branchRef,
+					},
+					side: "below",
+					changes,
+					message: commitTextareaRef.current?.value ?? "",
+					dryRun: false,
 				},
-				side: "below",
-				changes,
-				message: commitTextareaRef.current?.value ?? "",
-				dryRun: false,
-			},
-			{
-				onSuccess: (response) => {
-					if (response.newCommit !== null && commitTextareaRef.current)
-						commitTextareaRef.current.value = "";
+				{
+					onSuccess: (response) => {
+						if (response.newCommit !== null && commitTextareaRef.current)
+							commitTextareaRef.current.value = "";
+					},
 				},
-			},
-		);
+			);
+		});
 	};
 
 	const [open, setOpen] = useState(false);
@@ -1131,7 +1135,7 @@ const Changes: FC<{
 	});
 
 	const commitCommand = useCommand(commit, {
-		enabled: outlineMode._tag === "Default" && !!branch,
+		enabled: outlineMode._tag === "Default" && !!branch && !commitCreatePending,
 		group: "Changes",
 		commandPalette: { label: "Commit" },
 		hotkeys: [{ hotkey: "Mod+Enter" }],
@@ -1199,7 +1203,7 @@ const Changes: FC<{
 					hotkeys={commitCommand.hotkeys}
 					className={classes(uiStyles.button, styles.changesSectionCommitButton)}
 					type="submit"
-					disabled={outlineMode._tag !== "Default" || !branch}
+					disabled={outlineMode._tag !== "Default" || !branch || commitCreatePending}
 				>
 					Commit
 				</ShortcutButton>
