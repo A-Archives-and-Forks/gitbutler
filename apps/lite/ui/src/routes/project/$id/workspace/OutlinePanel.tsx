@@ -1,12 +1,5 @@
 import uiStyles from "#ui/ui/ui.module.css";
 import {
-	commitDiscardMutationOptions,
-	commitInsertBlankMutationOptions,
-	commitRewordMutationOptions,
-	unapplyStackMutationOptions,
-	updateBranchNameMutationOptions,
-} from "#ui/api/mutations.ts";
-import {
 	absorptionPlanQueryOptions,
 	changesInWorktreeQueryOptions,
 	headInfoQueryOptions,
@@ -560,8 +553,8 @@ const CommitRow: FC<
 	const { hasConflicts } = dryRunCommit ? dryRunCommit : commitWithOptimisticMessage;
 
 	const commitInsertBlank = useMutation({
-		...commitInsertBlankMutationOptions,
-		onSuccess: async (response, input, context, mutation) => {
+		mutationFn: window.lite.commitInsertBlank,
+		onSuccess: async (response, input, _context, mutation) => {
 			dispatch(
 				projectActions.addReplacedCommits({
 					projectId: input.projectId,
@@ -569,7 +562,7 @@ const CommitRow: FC<
 				}),
 			);
 
-			await commitInsertBlankMutationOptions.onSuccess?.(response, input, context, mutation);
+			await mutation.client.invalidateQueries();
 		},
 		onError: (error) => {
 			// oxlint-disable-next-line no-console
@@ -584,8 +577,8 @@ const CommitRow: FC<
 		},
 	});
 	const commitDiscard = useMutation({
-		...commitDiscardMutationOptions,
-		onSuccess: async (response, input, context, mutation) => {
+		mutationFn: window.lite.commitDiscard,
+		onSuccess: async (response, input, _context, mutation) => {
 			dispatch(
 				projectActions.addReplacedCommits({
 					projectId: input.projectId,
@@ -593,7 +586,7 @@ const CommitRow: FC<
 				}),
 			);
 
-			await commitDiscardMutationOptions.onSuccess?.(response, input, context, mutation);
+			await mutation.client.invalidateQueries();
 		},
 		onError: (error) => {
 			// oxlint-disable-next-line no-console
@@ -608,8 +601,8 @@ const CommitRow: FC<
 		},
 	});
 	const commitReword = useMutation({
-		...commitRewordMutationOptions,
-		onSuccess: async (response, input, context, mutation) => {
+		mutationFn: window.lite.commitReword,
+		onSuccess: async (response, input, _context, mutation) => {
 			dispatch(
 				projectActions.addReplacedCommits({
 					projectId: input.projectId,
@@ -617,7 +610,7 @@ const CommitRow: FC<
 				}),
 			);
 
-			await commitRewordMutationOptions.onSuccess?.(response, input, context, mutation);
+			await mutation.client.invalidateQueries();
 		},
 		onError: (error) => {
 			// oxlint-disable-next-line no-console
@@ -1342,9 +1335,9 @@ const BranchRow: FC<
 	const [isRenamePending, startRenameTransition] = useTransition();
 
 	const updateBranchName = useMutation({
-		...updateBranchNameMutationOptions,
-		onSuccess: async (response, input, context, mutation) => {
-			await updateBranchNameMutationOptions.onSuccess?.(response, input, context, mutation);
+		mutationFn: window.lite.updateBranchName,
+		onSuccess: async (_response, input, _context, mutation) => {
+			await mutation.client.invalidateQueries();
 
 			const newSelection = branchOperand({
 				stackId,
@@ -1484,7 +1477,10 @@ const StackRow: FC<
 	const toastManager = Toast.useToastManager();
 
 	const unapplyStack = useMutation({
-		...unapplyStackMutationOptions,
+		mutationFn: window.lite.unapplyStack,
+		onSuccess: async (_data, _input, _ctx, { client }) => {
+			await client.invalidateQueries();
+		},
 		onError: (error) => {
 			// oxlint-disable-next-line no-console
 			console.error(error);

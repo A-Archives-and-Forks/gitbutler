@@ -1,6 +1,5 @@
 import uiStyles from "#ui/ui/ui.module.css";
 import { FilesPanel } from "./FilesPanel.tsx";
-import { applyBranchMutationOptions } from "#ui/api/mutations.ts";
 import {
 	headInfoQueryOptions,
 	listBranchesQueryOptions,
@@ -224,7 +223,10 @@ const ApplyBranchPicker: FC<{
 	const items = (branchesQuery.data ?? []).flatMap(branchListingToApplyBranchPickerOptions);
 	const toastManager = Toast.useToastManager();
 	const applyBranch = useMutation({
-		...applyBranchMutationOptions,
+		mutationFn: window.lite.apply,
+		onSuccess: async (_data, _input, _ctx, { client }) => {
+			await client.invalidateQueries();
+		},
 		onError: (error) => {
 			// oxlint-disable-next-line no-console
 			console.error(error);
