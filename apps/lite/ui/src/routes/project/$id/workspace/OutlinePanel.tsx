@@ -1143,7 +1143,13 @@ const Changes: FC<{
 			operand={operand}
 			aria-label={`Changes (${worktreeChanges?.changes.length ?? 0})`}
 			className={classes(workspaceItemRowStyles.section, styles.changesSection)}
-			render={<OperandC projectId={projectId} operand={operand} />}
+			render={
+				<OperandC
+					projectId={projectId}
+					operand={operand}
+					render={<form action={commitCommand.commandFn} />}
+				/>
+			}
 		>
 			<ChangesSectionRow changes={worktreeChanges?.changes ?? []} projectId={projectId} />
 
@@ -1192,7 +1198,7 @@ const Changes: FC<{
 				<ShortcutButton
 					hotkeys={commitCommand.hotkeys}
 					className={classes(uiStyles.button, styles.changesSectionCommitButton)}
-					onClick={commitCommand.commandFn}
+					type="submit"
 					disabled={outlineMode._tag !== "Default" || !branch}
 				>
 					Commit
