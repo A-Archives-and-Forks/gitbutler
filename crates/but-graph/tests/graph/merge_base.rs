@@ -1,4 +1,4 @@
-use but_graph::{FirstParent, Graph, Segment, SegmentIndex, SegmentRelation};
+use but_graph::{FirstParent, Graph, Segment, SegmentIndex, SegmentRelation, init::Tip};
 use but_testsupport::{graph_tree, visualize_commit_graph_all};
 
 use crate::init::{read_only_in_memory_scenario, standard_options};
@@ -144,6 +144,61 @@ fn reachable_difference_returns_commits_in_traversal_order() -> anyhow::Result<(
             .find_commit_ids_reachable_from_a_not_b(a_id, a_id, FirstParent::No)?
             .is_empty(),
         "self-exclusion means nothing is returned"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn explicit_traversal_tips_include_unnamed_revisions() -> anyhow::Result<()> {
+    let (repo, meta) = read_only_in_memory_scenario("four-diamond")?;
+    let merged_id = repo.rev_parse_single("merged")?.detach();
+    let a_id = repo.rev_parse_single("A")?.detach();
+    let c_id = repo.rev_parse_single("C")?.detach();
+    let main_id = repo.rev_parse_single("main")?.detach();
+
+    let graph = Graph::from_commit_traversal_tips(
+        &repo,
+        [
+            Tip::entrypoint(merged_id, None),
+            Tip::reachable(a_id, None),
+            Tip::reachable(c_id, None),
+        ],
+        &*meta,
+        standard_options(),
+    )?
+    .validated()?;
+
+    insta::assert_snapshot!(graph_tree(&graph), @"
+
+    └── 👉►:0[0]:merged[🌳]
+        └── ·8a6c109 (⌂|1)
+            ├── ►:1[1]:A
+            │   └── ·62b409a (⌂|1)
+            │       ├── ►:3[2]:anon:
+            │       │   └── ·592abec (⌂|1)
+            │       │       └── ►:7[3]:main
+            │       │           └── 🏁·965998b (⌂|1)
+            │       └── ►:4[2]:B
+            │           └── ·f16dddf (⌂|1)
+            │               └── →:7: (main)
+            └── ►:2[1]:C
+                └── ·7ed512a (⌂|1)
+                    ├── ►:5[2]:anon:
+                    │   └── ·35ee481 (⌂|1)
+                    │       └── →:7: (main)
+                    └── ►:6[2]:D
+                        └── ·ecb1877 (⌂|1)
+                            └── →:7: (main)
+    ");
+
+    assert_eq!(
+        graph.find_commit_ids_reachable_from_a_not_b(merged_id, a_id, FirstParent::No)?,
+        ids_by_revs(&repo, &["merged", "C", "C^1", "C^2"])?
+    );
+    assert_eq!(
+        graph.find_merge_base_octopus_by_commit_id([a_id, c_id, merged_id])?,
+        Some(main_id)
     );
 
     Ok(())

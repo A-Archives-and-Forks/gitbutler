@@ -3,11 +3,9 @@
 use std::io::{self, Write as _};
 
 use anyhow::{Context as _, Result, bail, ensure};
-use but_core::ref_metadata::{
-    StackId, Workspace, WorkspaceCommitRelation, WorkspaceStack, WorkspaceStackBranch,
-};
 use but_graph::FirstParent;
-use gix::{odb::store::RefreshMode, reference::Category, refs::Target, revision::plumbing::Spec};
+use but_graph::init::Tip;
+use gix::{odb::store::RefreshMode, reference::Category, revision::plumbing::Spec};
 
 use crate::{
     args::{Args, LogArgs, MergeBaseArgs, RevisionArgs, RevisionGraphArgs, RevisionSubcommands},
@@ -52,11 +50,11 @@ fn log(
     let mut graph_commits = vec![included];
     graph_commits.extend(excluded);
 
-    let graph_args = resolve_graph_args(repo, &log_args.graph)?;
+    let graph_tips = args_to_tips(repo, &log_args.graph)?;
     let graph = {
         let _span =
             tracing::info_span!("build graph", commit_count = graph_commits.len()).entered();
-        graph_for_revisions(repo, meta, &graph_commits, graph_args)?
+        graph_for_revisions(repo, meta, &graph_commits, graph_tips)?
     };
 
     let _span = tracing::info_span!("traverse graph").entered();
@@ -101,10 +99,10 @@ fn merge_base(
             .collect::<Result<Vec<_>>>()?
     };
 
-    let graph_args = resolve_graph_args(repo, &merge_base_args.graph)?;
+    let graph_tips = args_to_tips(repo, &merge_base_args.graph)?;
     let graph = {
         let _span = tracing::info_span!("build graph", commit_count = commits.len()).entered();
-        graph_for_revisions(repo, meta, &commits, graph_args)?
+        graph_for_revisions(repo, meta, &commits, graph_tips)?
     };
 
     let segments = {
@@ -148,17 +146,14 @@ fn merge_base(
     Ok(())
 }
 
-struct GraphArgs {
-    target_ref: Option<gix::refs::FullName>,
-    extra_target: Option<gix::ObjectId>,
-}
+fn args_to_tips(repo: &gix::Repository, graph_args: &RevisionGraphArgs) -> Result<Vec<Tip>> {
+    let mut tips = Vec::new();
 
-fn resolve_graph_args(repo: &gix::Repository, graph_args: &RevisionGraphArgs) -> Result<GraphArgs> {
-    let target_ref = graph_args
+    if let Some(tip) = graph_args
         .target_ref
         .as_deref()
         .map(|target_ref| {
-            let reference = repo
+            let mut reference = repo
                 .find_reference(target_ref)
                 .with_context(|| format!("Failed to find target ref '{target_ref}'"))?;
             let name = reference.name().to_owned();
@@ -166,31 +161,35 @@ fn resolve_graph_args(repo: &gix::Repository, graph_args: &RevisionGraphArgs) ->
                 name.category() == Some(Category::RemoteBranch),
                 "Target ref '{name}' resolved from '{target_ref}' is not a remote-tracking branch; use --extra-target for arbitrary revisions"
             );
-            Ok(name)
+            let id = reference.peel_to_id()?.detach();
+            Ok(Tip::integrated(id, Some(name)))
         })
-        .transpose()?;
+        .transpose()?
+    {
+        tips.push(tip);
+    }
 
-    let extra_target = graph_args
+    if let Some(tip) = graph_args
         .extra_target
         .as_deref()
         .map(|rev| {
             repo.rev_parse_single(rev)
-                .map(|id| id.detach())
+                .map(|id| Tip::integrated(id.detach(), None))
                 .with_context(|| format!("Failed to resolve extra target '{rev}'"))
         })
-        .transpose()?;
+        .transpose()?
+    {
+        tips.push(tip);
+    }
 
-    Ok(GraphArgs {
-        target_ref,
-        extra_target,
-    })
+    Ok(tips)
 }
 
 fn graph_for_revisions(
     repo: &gix::Repository,
     meta: &EmptyRefMetadata,
     commits: &[gix::ObjectId],
-    graph_args: GraphArgs,
+    graph_tips: Vec<Tip>,
 ) -> Result<but_graph::Graph> {
     let first = *commits
         .first()
@@ -198,59 +197,17 @@ fn graph_for_revisions(
     let options = but_graph::init::Options {
         collect_tags: false,
         commits_limit_hint: None,
-        extra_target_commit_id: graph_args.extra_target,
         ..Default::default()
     };
-    let mut graph = but_graph::Graph::default();
-    graph.options = options;
+    let tips = std::iter::once(Tip::entrypoint(first, None))
+        .chain(
+            commits
+                .iter()
+                .copied()
+                .skip(1)
+                .map(|id| Tip::reachable(id, None)),
+        )
+        .chain(graph_tips);
 
-    let workspace_ref_name = synthetic_ref_name("workspace")?;
-    let input_ref_names = (0..commits.len())
-        .map(|idx| synthetic_ref_name(&format!("input-{idx}")))
-        .collect::<Result<Vec<_>>>()?;
-
-    let refs = std::iter::once(gix::refs::Reference {
-        name: workspace_ref_name.clone(),
-        target: Target::Object(first),
-        peeled: Some(first),
-    })
-    .chain(
-        input_ref_names
-            .iter()
-            .cloned()
-            .zip(commits.iter().copied())
-            .map(|(name, id)| gix::refs::Reference {
-                name,
-                target: Target::Object(id),
-                peeled: Some(id),
-            }),
-    );
-    let workspace = Workspace {
-        stacks: input_ref_names
-            .iter()
-            .enumerate()
-            .map(|(idx, ref_name)| WorkspaceStack {
-                id: StackId::from_number_for_testing(1000 + idx as u128),
-                branches: vec![WorkspaceStackBranch {
-                    ref_name: ref_name.clone(),
-                    archived: false,
-                }],
-                workspacecommit_relation: WorkspaceCommitRelation::Merged,
-            })
-            .collect(),
-        target_ref: graph_args.target_ref,
-        ..Default::default()
-    };
-    let overlay = but_graph::init::Overlay::default()
-        .with_entrypoint(first, Some(workspace_ref_name.clone()))
-        .with_references(refs)
-        .with_workspace_metadata_override(Some((workspace_ref_name, workspace)));
-
-    graph.redo_traversal_with_overlay(repo, meta, overlay)
-}
-
-fn synthetic_ref_name(suffix: &str) -> Result<gix::refs::FullName> {
-    format!("refs/heads/but-debug/revision/{suffix}")
-        .try_into()
-        .with_context(|| format!("BUG: invalid synthetic ref suffix '{suffix}'"))
+    but_graph::Graph::from_commit_traversal_tips(repo, tips, meta, options)
 }
