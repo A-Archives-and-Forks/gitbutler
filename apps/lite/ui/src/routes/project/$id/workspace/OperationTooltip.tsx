@@ -120,7 +120,7 @@ const TransferOperationControls: FC<{
 				ignoreInputs: true,
 				meta: {
 					group: "Operation mode",
-					name: operation ? operationLabel(operation) : "Confirm",
+					name: "Confirm",
 				},
 			},
 		},
@@ -204,12 +204,7 @@ const TransferOperationControls: FC<{
 			<ShortcutButton
 				className={uiStyles.button}
 				hotkey="Enter"
-				hotkeyOptions={{
-					meta: {
-						group: "Operation mode",
-						name: operation ? operationLabel(operation) : "Confirm",
-					},
-				}}
+				hotkeyOptions={{ meta: { group: "Operation mode", name: "Confirm" } }}
 				onClick={run}
 				disabled={!operation}
 			>
