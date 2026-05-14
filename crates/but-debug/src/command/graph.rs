@@ -2,7 +2,7 @@
 
 use std::io;
 
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 use gix::odb::store::RefreshMode;
 
 use crate::{
@@ -29,6 +29,17 @@ pub(crate) fn run(
     out: &mut dyn io::Write,
     err: &mut dyn io::Write,
 ) -> Result<()> {
+    if uses_context_discovery(graph_args) {
+        let ctx = but_ctx::Context::discover(&args.current_dir).with_context(|| {
+            format!(
+                "Could not open GitButler context at '{}'",
+                args.current_dir.display()
+            )
+        })?;
+        let (_guard, _repo, workspace, _db) = ctx.workspace_and_db()?;
+        return emit_workspace(&workspace, graph_args, out, err);
+    }
+
     let mut repo = setup::repo_from_args(args)?;
     repo.objects.refresh = RefreshMode::Never;
     let meta = EmptyRefMetadata;
@@ -70,15 +81,24 @@ pub(crate) fn run(
         }
     }?;
 
-    let errors = graph.validation_errors();
+    let workspace = graph.into_workspace()?;
+    emit_workspace(&workspace, graph_args, out, err)
+}
+
+fn emit_workspace(
+    workspace: &but_graph::projection::Workspace,
+    graph_args: &GraphArgs,
+    out: &mut dyn io::Write,
+    err: &mut dyn io::Write,
+) -> Result<()> {
+    let errors = workspace.graph.validation_errors();
     if !errors.is_empty() {
         writeln!(err, "VALIDATION FAILED: {errors:?}")?;
     }
     if graph_args.stats {
-        writeln!(err, "{:#?}", graph.statistics())?;
+        writeln!(err, "{:#?}", workspace.graph.statistics())?;
     }
 
-    let workspace = graph.into_workspace()?;
     if graph_args.no_debug_workspace {
         writeln!(
             err,
@@ -114,6 +134,22 @@ pub(crate) fn run(
     }
 
     Ok(())
+}
+
+/// Return `true` when the command can use the workspace graph from
+/// `but_ctx::Context` because nothing special is specified.
+///
+/// Context discovery loads the same workspace graph used by the application,
+/// including metadata-backed target handling. The manual repository path below
+/// is still needed when any debug traversal knob is set, because those options
+/// must be passed directly into `but_graph::Graph::from_*`.
+fn uses_context_discovery(graph_args: &GraphArgs) -> bool {
+    graph_args.extra_target.is_none()
+        && !graph_args.no_post
+        && graph_args.hard_limit.is_none()
+        && graph_args.limit == Some(Some(300))
+        && graph_args.limit_extension.is_empty()
+        && graph_args.ref_name.is_none()
 }
 
 /// Determine which graph output mode should be used.

@@ -100,7 +100,7 @@ pub struct DiagnosticsDumpArgs {
 #[derive(Debug, clap::Args)]
 pub struct DiagnosticsCaptureArgs {
     /// Maximum seconds to wait for `dot -Tsvg`; 0 disables the timeout.
-    #[arg(long = "dot-timeout", value_name = "SECONDS", default_value_t = 10)]
+    #[arg(long = "dot-timeout", value_name = "SECONDS", default_value_t = 30)]
     pub dot_timeout_seconds: u32,
 }
 
