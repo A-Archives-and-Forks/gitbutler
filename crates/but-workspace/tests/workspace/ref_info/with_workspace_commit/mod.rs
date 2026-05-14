@@ -98,7 +98,7 @@ fn remote_ahead_fast_forwardable() -> anyhow::Result<()> {
             },
         ),
         extra_target: Some(
-            NodeIndex(1),
+            NodeIndex(2),
         ),
         lower_bound: Some(
             NodeIndex(2),
@@ -171,7 +171,7 @@ fn remote_ahead_fast_forwardable() -> anyhow::Result<()> {
             },
         ),
         extra_target: Some(
-            NodeIndex(2),
+            NodeIndex(3),
         ),
         lower_bound: Some(
             NodeIndex(3),
@@ -248,7 +248,7 @@ fn remote_ahead_fast_forwardable() -> anyhow::Result<()> {
             },
         ),
         extra_target: Some(
-            NodeIndex(2),
+            NodeIndex(3),
         ),
         lower_bound: Some(
             NodeIndex(3),
@@ -350,7 +350,7 @@ fn two_dependent_branches_rebased_with_remotes() -> anyhow::Result<()> {
             },
         ),
         extra_target: Some(
-            NodeIndex(1),
+            NodeIndex(2),
         ),
         lower_bound: Some(
             NodeIndex(2),
@@ -535,7 +535,7 @@ fn two_dependent_branches_rebased_explicit_remote_in_extra_segment() -> anyhow::
             },
         ),
         extra_target: Some(
-            NodeIndex(1),
+            NodeIndex(2),
         ),
         lower_bound: Some(
             NodeIndex(2),
@@ -737,7 +737,7 @@ fn two_dependent_branches_first_merged_no_ff_second_merged_on_remote_into_base_b
             },
         ),
         extra_target: Some(
-            NodeIndex(1),
+            NodeIndex(2),
         ),
         lower_bound: Some(
             NodeIndex(4),
@@ -1103,7 +1103,7 @@ fn target_ahead_remote_rewritten() -> anyhow::Result<()> {
             },
         ),
         extra_target: Some(
-            NodeIndex(2),
+            NodeIndex(3),
         ),
         lower_bound: Some(
             NodeIndex(3),
@@ -1239,7 +1239,7 @@ fn single_commit_but_two_branches_one_in_ws_commit() -> anyhow::Result<()> {
             },
         ),
         extra_target: Some(
-            NodeIndex(1),
+            NodeIndex(2),
         ),
         lower_bound: Some(
             NodeIndex(2),
@@ -1403,7 +1403,7 @@ fn single_commit_but_two_branches_one_in_ws_commit_with_virtual_segments() -> an
             },
         ),
         extra_target: Some(
-            NodeIndex(2),
+            NodeIndex(3),
         ),
         lower_bound: Some(
             NodeIndex(3),
@@ -1555,7 +1555,7 @@ fn single_commit_but_two_branches_one_in_ws_commit_with_virtual_segments() -> an
             },
         ),
         extra_target: Some(
-            NodeIndex(2),
+            NodeIndex(3),
         ),
         lower_bound: Some(
             NodeIndex(3),
@@ -1664,7 +1664,7 @@ fn single_commit_but_two_branches_both_in_ws_commit() -> anyhow::Result<()> {
             },
         ),
         extra_target: Some(
-            NodeIndex(1),
+            NodeIndex(2),
         ),
         lower_bound: Some(
             NodeIndex(2),
@@ -1749,7 +1749,7 @@ fn single_commit_pushed_but_two_branches_both_in_ws_commit() -> anyhow::Result<(
             },
         ),
         extra_target: Some(
-            NodeIndex(1),
+            NodeIndex(2),
         ),
         lower_bound: Some(
             NodeIndex(2),
@@ -2261,7 +2261,7 @@ fn two_branches_stacked_with_remotes() -> anyhow::Result<()> {
             },
         ),
         extra_target: Some(
-            NodeIndex(1),
+            NodeIndex(2),
         ),
         lower_bound: Some(
             NodeIndex(2),
@@ -2474,7 +2474,7 @@ fn single_commit_but_two_branches_stack_on_top_of_ws_commit() -> anyhow::Result<
             },
         ),
         extra_target: Some(
-            NodeIndex(1),
+            NodeIndex(2),
         ),
         lower_bound: Some(
             NodeIndex(2),
@@ -2564,7 +2564,7 @@ fn single_commit_but_two_branches_stack_on_top_of_ws_commit() -> anyhow::Result<
             },
         ),
         extra_target: Some(
-            NodeIndex(2),
+            NodeIndex(3),
         ),
         lower_bound: Some(
             NodeIndex(3),
@@ -3156,7 +3156,7 @@ fn multiple_branches_with_shared_segment() -> anyhow::Result<()> {
             },
         ),
         extra_target: Some(
-            NodeIndex(1),
+            NodeIndex(2),
         ),
         lower_bound: Some(
             NodeIndex(2),
@@ -3278,7 +3278,7 @@ fn multiple_branches_with_shared_segment() -> anyhow::Result<()> {
             },
         ),
         extra_target: Some(
-            NodeIndex(2),
+            NodeIndex(3),
         ),
         lower_bound: Some(
             NodeIndex(3),
@@ -3400,7 +3400,7 @@ fn multiple_branches_with_shared_segment() -> anyhow::Result<()> {
             },
         ),
         extra_target: Some(
-            NodeIndex(2),
+            NodeIndex(3),
         ),
         lower_bound: Some(
             NodeIndex(3),
@@ -3523,7 +3523,7 @@ fn multiple_branches_with_shared_segment() -> anyhow::Result<()> {
             },
         ),
         extra_target: Some(
-            NodeIndex(2),
+            NodeIndex(3),
         ),
         lower_bound: Some(
             NodeIndex(3),
@@ -3605,7 +3605,7 @@ fn empty_workspace_with_branch_below() -> anyhow::Result<()> {
             },
         ),
         extra_target: Some(
-            NodeIndex(1),
+            NodeIndex(2),
         ),
         lower_bound: Some(
             NodeIndex(2),
@@ -3722,7 +3722,7 @@ fn empty_workspace_with_branch_below() -> anyhow::Result<()> {
             },
         ),
         extra_target: Some(
-            NodeIndex(1),
+            NodeIndex(2),
         ),
         lower_bound: Some(
             NodeIndex(2),

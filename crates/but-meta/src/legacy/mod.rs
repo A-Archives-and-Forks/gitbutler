@@ -445,10 +445,19 @@ impl VirtualBranchesTomlMetadata {
     ///
     /// Also, set-up a thread for debounced writing.
     pub fn from_path(path: impl Into<PathBuf>) -> anyhow::Result<Self> {
-        let path = path.into();
         Ok(Self {
-            snapshot: Snapshot::from_path(path)?,
+            snapshot: Snapshot::from_path(path.into())?,
             write_on_drop: true,
+        })
+    }
+
+    /// Initialize a store backed by the file at `path`, without writing it back on drop.
+    ///
+    /// This is intended for callers that only need metadata as input for read-only projections.
+    pub fn from_path_read_only(path: impl Into<PathBuf>) -> anyhow::Result<Self> {
+        Ok(Self {
+            snapshot: Snapshot::from_path(path.into())?,
+            write_on_drop: false,
         })
     }
 

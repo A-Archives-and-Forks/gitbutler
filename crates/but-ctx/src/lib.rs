@@ -761,13 +761,13 @@ impl Context {
 
     fn workspace_from_head(&self) -> anyhow::Result<but_graph::projection::Workspace> {
         let repo = self.repo.get()?;
-        let meta = self.meta_inner()?;
+        let meta = self.meta_inner_read_only()?;
         let graph = but_graph::Graph::from_head(&repo, &meta, but_graph::init::Options::limited())?;
         graph.into_workspace()
     }
 
-    fn meta_inner(&self) -> anyhow::Result<but_meta::VirtualBranchesTomlMetadata> {
-        but_meta::VirtualBranchesTomlMetadata::from_path(
+    fn meta_inner_read_only(&self) -> anyhow::Result<but_meta::VirtualBranchesTomlMetadata> {
+        but_meta::VirtualBranchesTomlMetadata::from_path_read_only(
             self.project_data_dir().join("virtual_branches.toml"),
         )
     }
