@@ -23,7 +23,13 @@ export const ShortcutButton: FC<
 				{...props}
 				ref={useMergedRefs(buttonRef, props.ref)}
 				// This is needed to ensure the `disabled` attribute is used.
-				render={<button type="button" disabled={props.disabled} />}
+				render={
+					<button
+						disabled={props.disabled}
+						// oxlint-disable-next-line react/button-has-type -- False positive.
+						type={props.type ?? "button"}
+					/>
+				}
 			/>
 			<Tooltip.Portal>
 				<Tooltip.Positioner sideOffset={8}>
