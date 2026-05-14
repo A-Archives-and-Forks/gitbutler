@@ -653,6 +653,15 @@ but_schemars::register_sdk_type!(StackReference);
 
 /// Takes a list of `branch_names` (the given name, as returned by `BranchListing`) and returns
 /// a list of enriched branch data.
+// TODO(performance): this needs a redesign, around what takes the most time.
+//                    - listing all branches + heads: fast, do it in one call. reftables only helps later.
+//                    - how many commits ahead/behind? Query for a set of branches and use a Graph to accelerate the queries
+//                          - this needs better support for 'free' graph creation, not bound to a workspace.
+//                    - fill in line-changes on a per-branch basis, passing the tip and merge-base to a specialised function
+//                      that just churns out tree-diffs and blob-diffs for the line changes. It itself may spawn a thread like now,
+//                      so a multi-branch version of this might be helpful, depending on what the UI needs. It seems reasonable for it
+//                      to chunk up what's in view and, request ahead/behind information, then pass this to the long-running (but soon cached)
+//                      function compute line diffs.
 pub fn get_branch_listing_details(
     ctx: &Context,
     branch_names: impl IntoIterator<Item = impl TryInto<BranchIdentity>>,
@@ -742,6 +751,7 @@ pub fn get_branch_listing_details(
             })
             .collect();
         let (merge_tx, merge_rx) = std::sync::mpsc::channel();
+        let parent_span = tracing::Span::current();
         let merge_bases = std::thread::Builder::new()
             .name("gitbutler-mergebases".into())
             .spawn({
@@ -750,6 +760,12 @@ pub fn get_branch_listing_details(
                     let repo = repo.to_thread_local().for_tree_diffing()?;
                     let cache = repo.commit_graph_if_enabled()?;
                     let mut graph = repo.revision_graph(cache.as_ref());
+                    let _span = tracing::debug_span!(
+                        parent: &parent_span,
+                        "branch merge-bases and commits",
+                        num_branches = all_other_branch_commit_ids.len(),
+                    )
+                    .entered();
                     for (other_branch_commit_id, branch_head) in all_other_branch_commit_ids {
                         let base = repo
                             .merge_base_with_graph(other_branch_commit_id, branch_head, &mut graph)
@@ -759,23 +775,15 @@ pub fn get_branch_listing_details(
                             Some(base) => {
                                 let mut num_commits = 0;
                                 let mut authors = HashSet::new();
-                                for attempt in 1..=2 {
-                                    let mut revwalk =
-                                        repo.rev_walk(Some(branch_head)).with_boundary(Some(base));
-                                    if attempt == 2 {
-                                        revwalk = revwalk
-                                            .sorting(gix::revision::walk::Sorting::BreadthFirst);
-                                    }
-                                    let revwalk = revwalk.all()?;
-                                    for commit_info in revwalk {
-                                        let commit_info = commit_info?;
-                                        let commit = repo.find_commit(commit_info.id)?;
-                                        authors.insert(commit.author()?.into());
-                                        num_commits += 1;
-                                    }
-                                    if num_commits > 0 {
-                                        break;
-                                    }
+                                let revwalk = repo
+                                    .rev_walk(Some(branch_head))
+                                    .with_hidden(Some(base))
+                                    .all()?;
+                                for commit_info in revwalk {
+                                    let commit_info = commit_info?;
+                                    let commit = repo.find_commit(commit_info.id)?;
+                                    authors.insert(commit.author()?.into());
+                                    num_commits += 1;
                                 }
                                 merge_tx.send(Some((base, authors, num_commits)))
                             }

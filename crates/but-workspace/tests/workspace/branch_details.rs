@@ -278,7 +278,6 @@ mod with_workspace {
                 target_ref: Some(refname(short_name)),
                 target_commit_id: None,
                 push_remote: None,
-                remote_url: "".into(),
             };
             self
         }

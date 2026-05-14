@@ -1,4 +1,7 @@
-use but_graph::{CommitFlags, Graph, StopCondition};
+use but_graph::{
+    CommitFlags, Graph, StopCondition,
+    init::{Tip, TipRole},
+};
 use but_testsupport::{
     gix_testtools::{self, Creation, rust_fixture_writable},
     graph_tree, graph_workspace, visualize_commit_graph_all,
@@ -551,6 +554,104 @@ fn four_diamond() -> anyhow::Result<()> {
 }
 
 #[test]
+fn explicit_traversal_tips_reject_duplicate_commit_ids() -> anyhow::Result<()> {
+    let (repo, meta) = read_only_in_memory_scenario("four-diamond")?;
+    let merged_id = id_by_rev(&repo, "merged").detach();
+    let a_ref = ref_name("refs/heads/A");
+
+    for inputs in [
+        [
+            Tip::entrypoint(merged_id, None),
+            Tip::reachable(merged_id, None),
+        ],
+        [
+            Tip::entrypoint(merged_id, None),
+            Tip::reachable(merged_id, Some(a_ref)),
+        ],
+    ] {
+        let err = Graph::from_commit_traversal_tips(&repo, inputs, &*meta, standard_options())
+            .expect_err("duplicate tips must be rejected");
+
+        assert_eq!(
+            err.to_string(),
+            format!("explicit traversal tips contain duplicate commit id {merged_id}")
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn explicit_traversal_tips_reject_duplicate_ref_names() -> anyhow::Result<()> {
+    let (repo, meta) = read_only_in_memory_scenario("four-diamond")?;
+    let a_id = id_by_rev(&repo, "A").detach();
+    let c_id = id_by_rev(&repo, "C").detach();
+    let a_ref = ref_name("refs/heads/A");
+
+    let err = Graph::from_commit_traversal_tips(
+        &repo,
+        [
+            Tip::entrypoint(a_id, Some(a_ref.clone())),
+            Tip::reachable(c_id, Some(a_ref.clone())),
+        ],
+        &*meta,
+        standard_options(),
+    )
+    .expect_err("duplicate ref names must be rejected");
+
+    assert_eq!(
+        err.to_string(),
+        format!("explicit traversal tips contain duplicate ref name {a_ref}")
+    );
+    Ok(())
+}
+
+#[test]
+fn explicit_traversal_tips_reject_detached_entrypoint_with_ref_name() -> anyhow::Result<()> {
+    let (repo, meta) = read_only_in_memory_scenario("four-diamond")?;
+    let merged_id = id_by_rev(&repo, "merged").detach();
+
+    let err = Graph::from_commit_traversal_tips(
+        &repo,
+        [Tip {
+            id: merged_id,
+            ref_name: Some(ref_name("refs/heads/merged")),
+            role: TipRole::DetachedEntryPoint,
+        }],
+        &*meta,
+        standard_options(),
+    )
+    .expect_err("detached entrypoints must not be named");
+
+    assert_eq!(
+        err.to_string(),
+        "explicit detached entrypoint tip cannot have a ref name"
+    );
+    Ok(())
+}
+
+#[test]
+fn explicit_traversal_tips_reject_ref_names_that_point_elsewhere() -> anyhow::Result<()> {
+    let (repo, meta) = read_only_in_memory_scenario("four-diamond")?;
+    let merged_id = id_by_rev(&repo, "merged").detach();
+    let a_id = id_by_rev(&repo, "A").detach();
+    let a_ref = ref_name("refs/heads/A");
+
+    let err = Graph::from_commit_traversal_tips(
+        &repo,
+        [Tip::entrypoint(merged_id, Some(a_ref.clone()))],
+        &*meta,
+        standard_options(),
+    )
+    .expect_err("ref names must resolve to their tip id");
+
+    assert_eq!(
+        err.to_string(),
+        format!("explicit traversal tip ref {a_ref} points to {a_id}, not {merged_id}")
+    );
+    Ok(())
+}
+
+#[test]
 fn stacked_rebased_remotes() -> anyhow::Result<()> {
     let (repo, meta) = read_only_in_memory_scenario("remote-includes-another-remote")?;
     insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
@@ -1075,3 +1176,7 @@ pub use utils::{
 };
 
 use crate::init::utils::{in_memory_meta, standard_options_with_extra_target};
+
+fn ref_name(name: &str) -> gix::refs::FullName {
+    name.try_into().expect("valid full ref name")
+}

@@ -599,7 +599,6 @@ mod stack_details {
                         },
                     ],
                     target_ref: "refs/remotes/origin/main",
-                    remote_url: "should not be needed and when it is extract it from `repo`",
                     target_commit_id: Sha1(85efbe4d5a663bff0ed8fb5fbc38a72be0592f55),
                     push_remote: None,
                 },
