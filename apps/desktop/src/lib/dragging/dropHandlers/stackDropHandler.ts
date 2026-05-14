@@ -6,10 +6,15 @@ import {
 	type ChangeDropData,
 } from "$lib/dragging/draggables";
 import { BranchDropData } from "$lib/dragging/dropHandlers/branchDropHandler";
+import { CommitDropData } from "$lib/dragging/dropHandlers/commitDropHandler";
+import { parseError } from "$lib/error/parser";
 import { unstackPRs, updateStackPrs } from "$lib/forge/shared/prFooter";
+import { toCommitMovePlacement } from "$lib/stacks/commitMovePlacement";
 import StackMacros from "$lib/stacks/macros";
-import { toMoveBranchWarning } from "$lib/stacks/stack";
+import { getStackName, toMoveBranchWarning } from "$lib/stacks/stack";
+import { withStackBusy } from "$lib/state/uiState.svelte";
 import { ensureValue } from "$lib/utils/validation";
+import { untrack } from "svelte";
 import type { DropResult } from "$lib/dragging/dropResult";
 import type { DropzoneHandler } from "$lib/dragging/handler";
 import type { ForgePrService } from "$lib/forge/interface/forgePrService";
@@ -61,11 +66,18 @@ export class OutsideLaneDzHandler implements DropzoneHandler {
 		return true;
 	}
 
+	private acceptsCommitDropData(data: unknown): data is CommitDropData {
+		if (!(data instanceof CommitDropData)) return false;
+		if (data.allCommits.some((c) => c.hasConflicts)) return false;
+		return true;
+	}
+
 	accepts(data: unknown) {
 		return (
 			this.acceptsChangeDropData(data) ||
 			this.acceptsBranchDropData(data) ||
-			this.acceptsHunkDropData(data)
+			this.acceptsHunkDropData(data) ||
+			this.acceptsCommitDropData(data)
 		);
 	}
 
@@ -192,6 +204,57 @@ export class OutsideLaneDzHandler implements DropzoneHandler {
 		}
 	}
 
+	async ondropCommitData(data: CommitDropData): Promise<DropResult | void> {
+		// Clear the selection from the source lane if any dragged commit was selected.
+		const sourceSelection = untrack(() => this.uiState.lane(data.stackId).selection.current);
+		if (
+			sourceSelection?.commitId &&
+			data.allCommits.some((c) => c.id === sourceSelection.commitId)
+		) {
+			this.uiState.lane(data.stackId).selection.set(undefined);
+		}
+
+		const stack = await this.stackService.newStackMutation({
+			projectId: this.projectId,
+			branch: { name: undefined },
+		});
+
+		const stackId = ensureValue(stack.id);
+		const branchName = getStackName(stack);
+
+		const { relativeTo, side } = toCommitMovePlacement({
+			targetBranchName: branchName,
+			targetCommitId: "top",
+		});
+
+		const commitIds = data.allCommits.map((c) => c.id);
+		let result: DropResult | undefined;
+		await withStackBusy(
+			this.uiState,
+			this.projectId,
+			{ stackIds: [data.stackId, stackId] },
+			async () => {
+				try {
+					await this.stackService.commitMove({
+						projectId: this.projectId,
+						subjectCommitIds: commitIds,
+						relativeTo,
+						side,
+						dryRun: false,
+					});
+				} catch (error) {
+					const { description, message } = parseError(error);
+					result = {
+						type: "warning",
+						title: "Cannot move commits",
+						message: description ?? message,
+					};
+				}
+			},
+		);
+		return result;
+	}
+
 	async ondropBranchData(data: BranchDropData): Promise<DropResult | void> {
 		const beforeAppliedStackCount = (await this.stackService.fetchStacks(this.projectId)).length;
 		const result = await this.stackService.tearOffBranch({
@@ -230,6 +293,10 @@ export class OutsideLaneDzHandler implements DropzoneHandler {
 		if (this.acceptsHunkDropData(data)) {
 			await this.ondropHunkData(data);
 			return;
+		}
+
+		if (this.acceptsCommitDropData(data)) {
+			return await this.ondropCommitData(data);
 		}
 
 		if (this.acceptsBranchDropData(data)) {
