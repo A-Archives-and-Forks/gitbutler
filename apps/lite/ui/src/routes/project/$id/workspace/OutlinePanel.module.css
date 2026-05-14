@@ -7,7 +7,7 @@
 	padding: var(--panel-padding);
 }
 
-.scroller {
+.headInfo {
 	display: flex;
 	row-gap: 24px;
 	flex-grow: 1;

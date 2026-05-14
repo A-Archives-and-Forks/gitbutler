@@ -72,7 +72,7 @@ import {
 	WorkspaceState,
 } from "@gitbutler/but-sdk";
 import { formatForDisplay } from "@tanstack/react-hotkeys";
-import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { Match } from "effect";
 
@@ -101,7 +101,7 @@ import {
 import { isNonEmptyArray, NonEmptyArray } from "effect/Array";
 import { defaultOutlineSelection } from "#ui/projects/workspace/state.ts";
 import { ShortcutButton } from "#ui/components/ShortcutButton.tsx";
-import { useResolveDiffSpecs } from "#ui/operations/diff-specs.ts";
+import { resolveDiffSpecs } from "#ui/operations/diff-specs.ts";
 import { rejectedChangesToastOptions } from "#ui/operations/rejectedChangesToastOptions.tsx";
 import { useCommand } from "#ui/commands/manager.ts";
 import { assert } from "#ui/assert.ts";
@@ -333,7 +333,7 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 							<Changes projectId={projectId} />
 						</div>
 
-						<div className={styles.scroller}>
+						<div className={styles.headInfo}>
 							{headInfo?.stacks.map((stack) => (
 								<StackC key={stack.id} projectId={projectId} stack={stack} />
 							))}
@@ -1004,6 +1004,7 @@ const Changes: FC<{
 	projectId: string;
 }> = ({ projectId }) => {
 	const toastManager = Toast.useToastManager();
+	const queryClient = useQueryClient();
 
 	const commitCreate = useMutation({
 		...commitCreateMutationOptions,
@@ -1051,36 +1052,39 @@ const Changes: FC<{
 	const [branchId, setBranchId] = useState<string | null>(null);
 	const branch = branchComboboxItems.find((item) => item.id === branchId) ?? branchComboboxItems[0];
 
-	const changes = useResolveDiffSpecs({
-		source: changesSectionOperand,
-		projectId,
-	});
+	const [commitCreatePending, startCommitCreateTransition] = useTransition();
 
 	const commit = () => {
-		if (!branch) return;
+		startCommitCreateTransition(async () => {
+			if (!branch) return;
 
-		if (!changes) return;
-
-		commitCreate.mutate(
-			{
+			const changes = await resolveDiffSpecs({
+				source: changesSectionOperand,
 				projectId,
-				relativeTo: {
-					type: "referenceBytes",
-					subject: branch.branch.branchRef,
+				queryClient,
+			});
+			if (!changes) return;
+
+			await commitCreate.mutateAsync(
+				{
+					projectId,
+					relativeTo: {
+						type: "referenceBytes",
+						subject: branch.branch.branchRef,
+					},
+					side: "below",
+					changes,
+					message: commitTextareaRef.current?.value ?? "",
+					dryRun: false,
 				},
-				side: "below",
-				changes,
-				message: commitTextareaRef.current?.value ?? "",
-				dryRun: false,
-			},
-			{
-				onSuccess: (response) => {
-					if (response.newCommit !== null && commitTextareaRef.current)
-						commitTextareaRef.current.value = "";
+				{
+					onSuccess: (response) => {
+						if (response.newCommit !== null && commitTextareaRef.current)
+							commitTextareaRef.current.value = "";
+					},
 				},
-			},
-		);
-		focusPanel("outline");
+			);
+		});
 	};
 
 	const [open, setOpen] = useState(false);
@@ -1131,7 +1135,7 @@ const Changes: FC<{
 	});
 
 	const commitCommand = useCommand(commit, {
-		enabled: outlineMode._tag === "Default" && !!branch,
+		enabled: outlineMode._tag === "Default" && !!branch && !commitCreatePending,
 		group: "Changes",
 		commandPalette: { label: "Commit" },
 		hotkeys: [{ hotkey: "Mod+Enter" }],
@@ -1143,7 +1147,13 @@ const Changes: FC<{
 			operand={operand}
 			aria-label={`Changes (${worktreeChanges?.changes.length ?? 0})`}
 			className={classes(workspaceItemRowStyles.section, styles.changesSection)}
-			render={<OperandC projectId={projectId} operand={operand} />}
+			render={
+				<OperandC
+					projectId={projectId}
+					operand={operand}
+					render={<form action={commitCommand.commandFn} />}
+				/>
+			}
 		>
 			<ChangesSectionRow changes={worktreeChanges?.changes ?? []} projectId={projectId} />
 
@@ -1192,8 +1202,8 @@ const Changes: FC<{
 				<ShortcutButton
 					hotkeys={commitCommand.hotkeys}
 					className={classes(uiStyles.button, styles.changesSectionCommitButton)}
-					onClick={commitCommand.commandFn}
-					disabled={outlineMode._tag !== "Default" || !branch}
+					type="submit"
+					disabled={outlineMode._tag !== "Default" || !branch || commitCreatePending}
 				>
 					Commit
 				</ShortcutButton>

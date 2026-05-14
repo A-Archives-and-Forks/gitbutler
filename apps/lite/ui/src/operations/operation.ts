@@ -452,7 +452,7 @@ export const moveOperation = ({
 	const branchMoveOperation = Match.value({ source, target, side }).pipe(
 		// This should support `relativeTo`:
 		// https://linear.app/gitbutler/issue/GB-1161/refsbranches-should-use-bytes-instead-of-strings
-		// https://linear.app/gitbutler/issue/GB-1199/support-moving-branches-onto-commits
+		// https://linear.app/gitbutler/issue/GB-1199/support-moving-branches-relative-to-commits
 		// https://linear.app/gitbutler/issue/GB-1232/support-moving-branch-before-another-branch
 		Match.when(
 			{
@@ -483,12 +483,14 @@ export const moveOperation = ({
 	if (branchMoveOperation) return branchMoveOperation;
 
 	const relativeTo: RelativeTo | null = Match.value(target).pipe(
-		Match.withReturnType<RelativeTo | null>(),
 		Match.tags({
-			Commit: ({ commitId }) => ({ type: "commit", subject: commitId }),
-			Branch: ({ branchRef }) => ({ type: "referenceBytes", subject: branchRef }),
+			Commit: ({ commitId }): RelativeTo | null => ({ type: "commit", subject: commitId }),
+			Branch: ({ branchRef }): RelativeTo | null => ({
+				type: "referenceBytes",
+				subject: branchRef,
+			}),
 		}),
-		Match.orElse(() => null),
+		Match.orElse((): RelativeTo | null => null),
 	);
 
 	if (!relativeTo) return null;
