@@ -1,9 +1,6 @@
 use std::{
     io,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
+    sync::{Arc, atomic::Ordering},
     time::Duration,
 };
 
@@ -24,10 +21,8 @@ pub(super) struct DumpProgress {
     bytes_written: prodash::tree::Item,
     /// Counter for regular files and symlinks added to the archive.
     files_processed: prodash::tree::Item,
-    /// Set by signal handlers to request a cooperative abort.
-    is_interrupted: Arc<AtomicBool>,
-    /// Signal registrations scoped to this dump operation.
-    _signals: SignalHandlers,
+    /// Signal handler registration scoped to this dump operation.
+    interrupt: Option<gix::interrupt::Deregister>,
 }
 
 impl DumpProgress {
@@ -78,8 +73,14 @@ impl DumpProgress {
             )),
         );
 
-        let abort = Arc::new(AtomicBool::new(false));
-        let signals = SignalHandlers::new(Arc::clone(&abort))?;
+        gix::interrupt::reset();
+        #[allow(unsafe_code)]
+        let interrupt = unsafe {
+            // SAFETY: The callback runs from a signal handler, so it must only
+            // perform signal-safe work. It is intentionally empty; gix updates
+            // its global atomic interrupt flag after invoking it.
+            gix::interrupt::init_handler(1, || {})
+        }?;
 
         Ok(Self {
             _root: root,
@@ -88,8 +89,7 @@ impl DumpProgress {
             bytes_read,
             bytes_written,
             files_processed,
-            is_interrupted: abort,
-            _signals: signals,
+            interrupt: Some(interrupt),
         })
     }
 
@@ -111,14 +111,14 @@ impl DumpProgress {
     }
 
     pub(super) fn check_abort(&self) -> Result<()> {
-        if self.is_interrupted.load(Ordering::SeqCst) {
+        if gix::interrupt::IS_INTERRUPTED.load(Ordering::SeqCst) {
             bail!("Interrupted while creating repository dump");
         }
         Ok(())
     }
 
     fn check_abort_io(&self) -> io::Result<()> {
-        if self.is_interrupted.load(Ordering::SeqCst) {
+        if gix::interrupt::IS_INTERRUPTED.load(Ordering::SeqCst) {
             return Err(io::Error::other(
                 "interrupted while creating repository dump",
             ));
@@ -132,33 +132,8 @@ impl Drop for DumpProgress {
         if let Some(renderer) = self.renderer.take() {
             renderer.shutdown_and_wait();
         }
-    }
-}
-
-/// Registers temporary termination signal handlers for one dump operation.
-struct SignalHandlers {
-    ids: Vec<signal_hook::SigId>,
-}
-
-impl SignalHandlers {
-    fn new(abort: Arc<AtomicBool>) -> io::Result<Self> {
-        let mut ids = Vec::new();
-        for signal in signal_hook::consts::TERM_SIGNALS {
-            ids.push(signal_hook::flag::register_conditional_shutdown(
-                *signal,
-                1,
-                Arc::clone(&abort),
-            )?);
-            ids.push(signal_hook::flag::register(*signal, Arc::clone(&abort))?);
-        }
-        Ok(Self { ids })
-    }
-}
-
-impl Drop for SignalHandlers {
-    fn drop(&mut self) {
-        for id in self.ids.drain(..) {
-            signal_hook::low_level::unregister(id);
+        if let Some(interrupt) = self.interrupt.take() {
+            interrupt.with_reset(true).deregister().ok();
         }
     }
 }
@@ -193,6 +168,10 @@ pub(super) struct ProgressWriter<'progress, W> {
 impl<'progress, W> ProgressWriter<'progress, W> {
     pub(super) fn new(inner: W, progress: &'progress DumpProgress) -> Self {
         Self { inner, progress }
+    }
+
+    pub(super) fn into_inner(self) -> W {
+        self.inner
     }
 }
 

@@ -1,5 +1,5 @@
 //! Debugging utilities exposed as a dedicated CLI.
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 
 use std::{ffi::OsString, io};
 

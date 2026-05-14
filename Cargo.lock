@@ -1223,6 +1223,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "but-core",
+ "but-ctx",
  "but-graph",
  "but-testsupport",
  "clap",
@@ -1230,7 +1231,6 @@ dependencies = [
  "insta",
  "open",
  "prodash",
- "signal-hook 0.4.3",
  "tempfile",
  "termtree",
  "tracing",
@@ -4539,7 +4539,9 @@ dependencies = [
  "gix-worktree-state 0.30.0 (git+https://github.com/GitoxideLabs/gitoxide?rev=575113dfb10b3ba12eb57f57a81b241e773968bd)",
  "gix-worktree-stream 0.32.0 (git+https://github.com/GitoxideLabs/gitoxide?rev=575113dfb10b3ba12eb57f57a81b241e773968bd)",
  "nonempty",
+ "parking_lot",
  "serde",
+ "signal-hook 0.4.3",
  "smallvec",
  "thiserror 2.0.18",
 ]

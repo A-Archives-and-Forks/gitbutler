@@ -3,6 +3,7 @@ use std::{
     ffi::OsString,
     fmt,
     fs::File,
+    io::Read as _,
     path::{Path, PathBuf},
 };
 
@@ -89,6 +90,152 @@ fn git_only_skips_worktree_files() -> anyhow::Result<()> {
     │   └── vb.toml:100644
     └── ... 25 files and 15 directories not shown
 ");
+
+    Ok(())
+}
+
+#[test]
+fn diagnostics_archive_contains_graph_and_workspace_projection() -> anyhow::Result<()> {
+    let fixture = writable_fixture("dump-normal-repo-with-worktree-changes.sh")?;
+    let repo = fixture.path().join("你好 repo");
+    let output_dir = TempDir::new()?;
+    let output = output_dir.path().join("diagnostics.zip");
+
+    let dump_output = run_dump_diagnostics(&repo, &output)?;
+    insta::assert_snapshot!(dump_output.display_for_snapshot(&output), @"
+    stdout:
+    Running: dot -Tsvg [dot path] -o [svg path]
+    Archive at: [output path]
+    stderr:
+    ");
+
+    let mut archive = zip::ZipArchive::new(File::open(&output)?)?;
+    let root = "你好-repo-diagnostics";
+    let mut dot = String::new();
+    archive
+        .by_name(&format!("{root}/graph.dot"))?
+        .read_to_string(&mut dot)?;
+    assert!(
+        dot.contains("digraph"),
+        "graph dot diagnostics should contain a dot graph"
+    );
+
+    let mut workspace = String::new();
+    archive
+        .by_name(&format!("{root}/workspace.ron.txt"))?
+        .read_to_string(&mut workspace)?;
+    assert!(
+        workspace.contains("Workspace("),
+        "workspace diagnostics should contain the debug workspace projection"
+    );
+
+    if let Ok(mut svg) = archive.by_name(&format!("{root}/graph.svg")) {
+        let mut header = String::new();
+        svg.read_to_string(&mut header)?;
+        assert!(
+            header.contains("<svg"),
+            "generated graph svg diagnostics should contain an SVG document"
+        );
+    } else {
+        eprintln!(
+            "The graph.svg wasn't generated within 10 seconds, or 'dot' didn't exist here. Should be fine."
+        )
+    }
+
+    Ok(())
+}
+
+#[test]
+fn repo_dump_with_diagnostics_injects_files_at_dump_root() -> anyhow::Result<()> {
+    let fixture = writable_fixture("dump-normal-repo-with-worktree-changes.sh")?;
+    let repo = fixture.path().join("你好 repo");
+    let output_dir = TempDir::new()?;
+    let output = output_dir.path().join("repo-with-diagnostics.zip");
+
+    let dump_output = run_dump_with_options(&repo, &output, false, true)?;
+    insta::assert_snapshot!(dump_output.display_for_snapshot(&output), @"
+    stdout:
+    Running: dot -Tsvg [dot path] -o [svg path]
+    Archive at: [output path]
+    stderr:
+    ");
+
+    insta::assert_snapshot!(archive_tree(&output)?, "diagnostic files are injected right away", @r"
+你好-repo-dump/
+├── .git/
+│   ├── HEAD:100644
+│   ├── config:100644
+│   ├── gitbutler:40755/
+│   │   └── vb.toml:100644
+│   └── ... 27 files and 16 directories not shown
+├── .gitignore:100644
+├── executable.sh:100755
+├── graph.dot:100644
+├── graph.svg:100644
+├── tracked.ignored:100644
+├── visible.txt:100644
+└── workspace.ron.txt:100644
+");
+
+    Ok(())
+}
+
+#[test]
+fn repo_dump_diagnostics_override_worktree_files() -> anyhow::Result<()> {
+    let fixture = writable_fixture("dump-normal-repo-with-worktree-changes.sh")?;
+    let repo = fixture.path().join("你好 repo");
+    std::fs::write(repo.join("graph.dot"), "worktree graph")?;
+
+    let output_dir = TempDir::new()?;
+    let output = output_dir.path().join("repo-with-diagnostics.zip");
+
+    insta::assert_snapshot!(visualize_disk_tree_skip_dot_git(&repo)?, @"
+    .
+    ├── .git:40755
+    ├── .gitignore:100644
+    ├── executable.sh:100755
+    ├── graph.dot:100644
+    ├── ignored-dir:40755
+    │   └── file.txt:100644
+    ├── ignored.ignored:100644
+    ├── tracked.ignored:100644
+    └── visible.txt:100644
+    ");
+
+    let dump_output = run_dump_with_options(&repo, &output, false, true)?;
+    insta::assert_snapshot!(dump_output.display_for_snapshot(&output), @"
+    stdout:
+    Running: dot -Tsvg [dot path] -o [svg path]
+    Archive at: [output path]
+    stderr:
+    ");
+
+    insta::assert_snapshot!(archive_tree(&output)?, @r"
+你好-repo-dump/
+├── .git/
+│   ├── HEAD:100644
+│   ├── config:100644
+│   ├── gitbutler:40755/
+│   │   └── vb.toml:100644
+│   └── ... 27 files and 16 directories not shown
+├── .gitignore:100644
+├── executable.sh:100755
+├── graph.dot:100644
+├── graph.svg:100644
+├── tracked.ignored:100644
+├── visible.txt:100644
+└── workspace.ron.txt:100644
+");
+
+    let mut archive = zip::ZipArchive::new(File::open(&output)?)?;
+    let mut graph = String::new();
+    archive
+        .by_name("你好-repo-dump/graph.dot")?
+        .read_to_string(&mut graph)?;
+    assert!(
+        graph.contains("digraph"),
+        "diagnostic graph.dot should override the colliding worktree file"
+    );
 
     Ok(())
 }
@@ -289,23 +436,68 @@ impl fmt::Display for DumpOutput {
 
 impl DumpOutput {
     fn display_for_snapshot(&self, output: &Path) -> String {
-        self.to_string()
-            .replace(&output.display().to_string(), "[output path]")
+        let output = self
+            .to_string()
+            .replace(&output.display().to_string(), "[output path]");
+        let mut normalized = String::new();
+        for line in output.lines() {
+            if line.starts_with("Running: dot -Tsvg ") {
+                normalized.push_str("Running: dot -Tsvg [dot path] -o [svg path]\n");
+            } else {
+                normalized.push_str(line);
+                normalized.push('\n');
+            }
+        }
+        normalized
     }
 }
 
 fn run_dump(repo: &Path, output: &Path, git_only: bool) -> anyhow::Result<DumpOutput> {
+    run_dump_with_options(repo, output, git_only, false)
+}
+
+fn run_dump_with_options(
+    repo: &Path,
+    output: &Path,
+    git_only: bool,
+    diagnostics: bool,
+) -> anyhow::Result<DumpOutput> {
     let mut args = vec![
         OsString::from("but-debug"),
         OsString::from("dump"),
+        OsString::from("repo"),
         OsString::from("-C"),
         repo.as_os_str().to_owned(),
         OsString::from("--output"),
         output.as_os_str().to_owned(),
+        OsString::from("--no-open-archive-directory"),
     ];
     if git_only {
         args.push(OsString::from("--git-only"));
     }
+    if !diagnostics {
+        args.push(OsString::from("--no-diagnostics"));
+    }
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    but_debug::handle_args(args.into_iter(), &mut stdout, &mut stderr)?;
+    Ok(DumpOutput {
+        stdout: String::from_utf8(stdout)?,
+        stderr: String::from_utf8(stderr)?,
+    })
+}
+
+fn run_dump_diagnostics(repo: &Path, output: &Path) -> anyhow::Result<DumpOutput> {
+    let args = [
+        OsString::from("but-debug"),
+        OsString::from("dump"),
+        OsString::from("diagnostics"),
+        OsString::from("-C"),
+        repo.as_os_str().to_owned(),
+        OsString::from("--output"),
+        output.as_os_str().to_owned(),
+        OsString::from("--no-open-archive-directory"),
+    ];
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     but_debug::handle_args(args.into_iter(), &mut stdout, &mut stderr)?;

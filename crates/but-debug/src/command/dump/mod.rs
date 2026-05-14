@@ -14,10 +14,11 @@ use gix::{bstr::ByteSlice as _, index};
 use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
 
 use crate::{
-    args::{Args, DumpArgs},
+    args::{Args, DumpArgs, DumpSubcommands, RepoDumpArgs},
     setup,
 };
 
+mod diagnostics;
 mod progress;
 use progress::{DumpProgress, ProgressReader, ProgressWriter};
 
@@ -28,7 +29,22 @@ pub(crate) fn run(
     out: &mut dyn io::Write,
     err: &mut dyn io::Write,
 ) -> Result<()> {
-    let current_dir = std::env::current_dir()?.join(&args.current_dir);
+    match &dump_args.cmd {
+        DumpSubcommands::Repo(repo_args) => run_repo(args, repo_args, out, err),
+        DumpSubcommands::Diagnostics(diagnostics_args) => {
+            diagnostics::run(args, diagnostics_args, out, err)
+        }
+    }
+}
+
+/// Execute the `dump repo` subcommand.
+fn run_repo(
+    args: &Args,
+    repo_args: &RepoDumpArgs,
+    out: &mut dyn io::Write,
+    err: &mut dyn io::Write,
+) -> Result<()> {
+    let current_dir = effective_current_dir(args)?;
     let repo = setup::repo_from_args(args).with_context(|| {
         format!(
             "Could not discover Git repository at '{}'",
@@ -36,58 +52,118 @@ pub(crate) fn run(
         )
     })?;
 
-    let output_path = match &dump_args.output {
+    let output_path = match &repo_args.archive.output {
         Some(path) => current_dir.join(path),
-        None => default_output_path(&repo)?,
+        None => default_output_path(&repo, "dump")?,
     };
-    if let Some(parent) = output_path.parent() {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("Could not create output directory '{}'", parent.display()))?;
-    }
-
+    let diagnostics = if repo_args.no_diagnostics {
+        None
+    } else {
+        Some(diagnostics::capture_from_current_dir(
+            &current_dir,
+            diagnostics::dot_timeout(repo_args.diagnostics.dot_timeout_seconds),
+            out,
+            err,
+        )?)
+    };
     let progress = DumpProgress::new()?;
     let layout = ArchiveLayout::new(&repo)?;
     let output_path = OutputPath::new(output_path);
+    let lock = acquire_archive_lock(&output_path.path, repo.workdir().map(Path::to_owned))?;
+    let output_path = output_path.with_lock_path(lock.lock_path().to_owned());
     std::thread::scope(|scope| -> Result<()> {
         let counter = scope.spawn({
             let progress = &progress;
             let repo = repo.clone().into_sync();
             let output_path = output_path.clone();
-            move || count_archive_input(repo, &output_path, dump_args.git_only, progress)
+            let diagnostics_files = diagnostics
+                .as_ref()
+                .map_or(0, diagnostics::Diagnostics::file_count);
+            move || {
+                count_archive_input(
+                    repo,
+                    &output_path,
+                    repo_args.git_only,
+                    diagnostics_files,
+                    progress,
+                )
+            }
         });
 
-        let file = fs::File::create(&output_path.path)
-            .with_context(|| format!("Could not create '{}'", output_path.path.display()))?;
-        let file = ProgressWriter::new(file, &progress);
+        let file = ProgressWriter::new(lock, &progress);
         let mut archive = ArchiveWriter::new(file, &progress);
-        archive.add_repo(&repo, &layout, &output_path, dump_args.git_only)?;
-        archive.finish(err)?;
+        if let Some(diagnostics) = &diagnostics {
+            archive.add_diagnostics(diagnostics, &layout.worktree_root)?;
+        }
+        archive.add_repo(&repo, &layout, &output_path, repo_args.git_only)?;
+        let file = archive.finish(err)?;
+        let lock = file.into_inner();
 
         let _ = counter
             .join()
             .map_err(|_| anyhow::anyhow!("Archive progress counter thread panicked"))?;
+        persist_archive(lock)?;
         Ok(())
     })?;
 
     writeln!(out, "Archive at: {}", output_path.path.display())?;
-    if dump_args.open_archive_dir {
-        let dir = output_path.path.parent().unwrap_or_else(|| Path::new("."));
+    open_archive_dir_unless_requested(
+        &output_path.path,
+        repo_args.archive.no_open_archive_directory,
+    )?;
+    Ok(())
+}
+
+/// Return the effective current directory selected by `-C`.
+fn effective_current_dir(args: &Args) -> Result<PathBuf> {
+    Ok(std::env::current_dir()?.join(&args.current_dir))
+}
+
+/// Return the default archive path for `repo`, using `suffix` after the repository name.
+fn default_output_path(repo: &gix::Repository, suffix: &str) -> Result<PathBuf> {
+    let base = archive_base_name(repo)?;
+    let root = repo.workdir().unwrap_or_else(|| repo.git_dir());
+    let parent = root.parent().unwrap_or_else(|| Path::new("."));
+    Ok(parent.join(format!("{base}-{suffix}.zip")))
+}
+
+/// Acquire a lock file for writing an archive atomically.
+///
+/// When `boundary_directory` is provided, missing directories below that
+/// boundary may be created for the archive path and removed again if the lock is
+/// rolled back. When it is `None`, the archive's parent directory must already
+/// exist.
+fn acquire_archive_lock(
+    archive_path: &Path,
+    boundary_directory: Option<PathBuf>,
+) -> Result<gix::lock::File> {
+    gix::lock::File::acquire_to_update_resource(
+        archive_path,
+        gix::lock::acquire::Fail::Immediately,
+        boundary_directory,
+    )
+    .with_context(|| format!("Could not lock archive '{}'", archive_path.display()))
+}
+
+/// Atomically move a fully-written archive lock file into its final path.
+fn persist_archive(mut lock: gix::lock::File) -> Result<PathBuf> {
+    let archive_path = lock.resource_path();
+    io::Write::flush(&mut lock)
+        .with_context(|| format!("Could not flush archive '{}'", archive_path.display()))?;
+    lock.commit()
+        .map(|(path, _file)| path)
+        .map_err(|err| err.error)
+        .with_context(|| format!("Could not persist archive '{}'", archive_path.display()))
+}
+
+/// Open the parent directory of `archive_path` unless disabled by the caller.
+fn open_archive_dir_unless_requested(archive_path: &Path, disabled: bool) -> Result<()> {
+    if !disabled {
+        let dir = archive_path.parent().unwrap_or_else(|| Path::new("."));
         open::that(dir)
             .with_context(|| format!("Could not open archive directory '{}'", dir.display()))?;
     }
     Ok(())
-}
-
-/// Return the default output archive path for `repo`.
-fn default_output_path(repo: &gix::Repository) -> Result<PathBuf> {
-    let base = archive_base_name(repo)?;
-    let root = if let Some(workdir) = repo.workdir() {
-        workdir
-    } else {
-        repo.git_dir()
-    };
-    let parent = root.parent().unwrap_or_else(|| Path::new("."));
-    Ok(parent.join(format!("{base}-dump.zip")))
 }
 
 /// Keeps worktree files and Git files under the right top-level paths in the zip.
@@ -216,6 +292,29 @@ impl<'progress, W: io::Write + io::Seek> ArchiveWriter<'progress, W> {
         self.skipped_unarchivable_paths
             .extend(skipped_unarchivable_paths);
         result
+    }
+
+    /// Add generated diagnostics files directly below `archive_root`.
+    fn add_diagnostics(
+        &mut self,
+        diagnostics: &diagnostics::Diagnostics,
+        archive_root: &str,
+    ) -> Result<()> {
+        for (relative_path, contents) in diagnostics.entries() {
+            self.add_generated_file(format!("{archive_root}/{relative_path}"), contents)?;
+        }
+        Ok(())
+    }
+
+    fn add_generated_file(&mut self, entry_name: String, contents: &[u8]) -> Result<()> {
+        self.progress.check_abort()?;
+        if !self.written.insert(entry_name.clone()) {
+            return Ok(());
+        }
+        self.zip.start_file(entry_name, generated_file_options())?;
+        io::Write::write_all(&mut self.zip, contents)?;
+        self.progress.add_file_processed();
+        Ok(())
     }
 
     /// Add `entry` to `self`.
@@ -360,6 +459,7 @@ fn count_archive_input(
     repo: gix::ThreadSafeRepository,
     output_path: &OutputPath,
     git_only: bool,
+    diagnostics_files: usize,
     progress: &DumpProgress,
 ) -> Result<()> {
     let repo: gix::Repository = repo.into();
@@ -377,6 +477,7 @@ fn count_archive_input(
         },
         |_path| {},
     )?;
+    totals.files_processed = totals.files_processed.saturating_add(diagnostics_files);
     progress.set_input_upper_bounds(totals.bytes_read, totals.files_processed);
     Ok(())
 }
@@ -665,6 +766,8 @@ fn entry_name(root: &str, relative: &Path) -> Option<String> {
 struct OutputPath {
     /// The path requested by the caller.
     path: PathBuf,
+    /// Lock file path used while writing the archive.
+    lock_path: Option<PathBuf>,
     /// Canonical form of `path`, when it can be resolved.
     canonical: Option<PathBuf>,
 }
@@ -673,12 +776,26 @@ impl OutputPath {
     /// Create an output path handle for `path`.
     fn new(path: PathBuf) -> Self {
         let canonical = fs::canonicalize(&path).ok();
-        Self { path, canonical }
+        Self {
+            path,
+            lock_path: None,
+            canonical,
+        }
+    }
+
+    /// Track the in-progress lock file so repository traversal can skip it too.
+    ///
+    /// For example, while writing `repo-dump.zip`, the temporary lock file may
+    /// be `repo-dump.zip.lock`.
+    fn with_lock_path(mut self, lock_path: PathBuf) -> Self {
+        self.lock_path = Some(lock_path);
+        self
     }
 
     /// Return true if `path` identifies the output archive path.
     fn is_same(&self, path: &Path) -> bool {
         path == self.path
+            || self.lock_path.as_deref() == Some(path)
             || self.canonical.as_deref().is_some_and(|output_path| {
                 fs::canonicalize(path).ok().as_deref() == Some(output_path)
             })
@@ -712,6 +829,13 @@ fn directory_options() -> SimpleFileOptions {
     SimpleFileOptions::default()
         .compression_method(CompressionMethod::Bzip2)
         .unix_permissions(0o755)
+}
+
+/// Return zip file options for generated diagnostics entries.
+fn generated_file_options() -> SimpleFileOptions {
+    SimpleFileOptions::default()
+        .compression_method(CompressionMethod::Bzip2)
+        .unix_permissions(0o644)
 }
 
 /// Return zip symlink options.
@@ -771,5 +895,54 @@ mod tests {
 
         assert!(!is_git_object_entry("project-dump/.git/config"));
         assert!(!is_git_object_entry("project-dump/objects/file"));
+    }
+
+    #[test]
+    fn archive_lock_rolls_back_until_persisted_and_prevents_double_writes() -> anyhow::Result<()> {
+        use std::io::Write as _;
+
+        let dir = tempfile::tempdir()?;
+        let archive_path = dir.path().join("out.zip");
+        fs::write(&archive_path, b"previous")?;
+
+        let mut lock = acquire_archive_lock(&archive_path, None)?;
+        lock.write_all(b"partial")?;
+        assert!(
+            acquire_archive_lock(&archive_path, None).is_err(),
+            "archive lock should prevent concurrent writers"
+        );
+        drop(lock);
+        assert_eq!(
+            fs::read(&archive_path)?,
+            b"previous",
+            "dropping the lock should keep the previous archive"
+        );
+
+        let nested_archive_path = dir.path().join("new").join("nested").join("out.zip");
+        assert!(
+            acquire_archive_lock(&nested_archive_path, None).is_err(),
+            "without a boundary, the archive parent directory should have to exist"
+        );
+
+        let mut lock = acquire_archive_lock(&nested_archive_path, Some(dir.path().to_owned()))?;
+        lock.write_all(b"partial")?;
+        drop(lock);
+        assert!(
+            !nested_archive_path
+                .parent()
+                .expect("nested archive has a parent")
+                .exists(),
+            "dropping the lock should remove empty parent directories created for it"
+        );
+
+        let mut lock = acquire_archive_lock(&archive_path, None)?;
+        lock.write_all(b"complete")?;
+        persist_archive(lock)?;
+        assert_eq!(
+            fs::read(&archive_path)?,
+            b"complete",
+            "persisting the lock should replace the archive"
+        );
+        Ok(())
     }
 }
