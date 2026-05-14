@@ -56,6 +56,27 @@ fn journey() -> anyhow::Result<()> {
 }
 
 #[test]
+fn read_only_store_does_not_write_on_drop() -> anyhow::Result<()> {
+    let tmp = TempDir::new()?;
+    let writable_toml_path = tmp.path().join("vb.toml");
+    std::fs::copy(vb_fixture("virtual-branches-01"), &writable_toml_path)?;
+    let original = std::fs::read_to_string(&writable_toml_path)?;
+
+    {
+        let mut store = VirtualBranchesTomlMetadata::from_path_read_only(&writable_toml_path)?;
+        store.data_mut().branches.clear();
+        store.set_changed_to_necessitate_write();
+    }
+
+    assert_eq!(
+        std::fs::read_to_string(&writable_toml_path)?,
+        original,
+        "read-only metadata is projection input and must not reconcile or persist on drop"
+    );
+    Ok(())
+}
+
+#[test]
 fn read_only() -> anyhow::Result<()> {
     let (mut store, _tmp) = vb_store_rw("virtual-branches-01")?;
     let ws = store.workspace("refs/heads/gitbutler/workspace".try_into()?)?;
