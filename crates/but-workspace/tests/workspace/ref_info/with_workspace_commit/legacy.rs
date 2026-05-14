@@ -613,6 +613,12 @@ mod stack_details {
                     commits_ahead: 0,
                 },
             ),
+            target_commit: Some(
+                TargetCommit {
+                    commit_id: Sha1(85efbe4d5a663bff0ed8fb5fbc38a72be0592f55),
+                    segment_index: NodeIndex(2),
+                },
+            ),
             extra_target: None,
         }
         "#);

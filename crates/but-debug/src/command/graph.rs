@@ -101,7 +101,7 @@ pub(crate) fn run(
 
     match dot_mode(graph_args) {
         Some(DotMode::Print) => {
-            out.write_all(workspace.graph.dot_graph().as_bytes())?;
+            out.write_all(workspace.graph.dot_graph_pruned().as_bytes())?;
         }
         Some(DotMode::OpenAsSvg) => {
             #[cfg(unix)]

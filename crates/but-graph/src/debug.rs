@@ -1,11 +1,13 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use anyhow::{Context as _, bail};
 use bstr::{BString, ByteSlice, ByteVec};
 use gix::reference::Category;
 use petgraph::{prelude::EdgeRef, stable_graph::EdgeReference};
 
-use crate::{Edge, Graph, Segment, SegmentIndex, SegmentMetadata, StopCondition, init::PetGraph};
+use crate::{
+    CommitFlags, Edge, Graph, Segment, SegmentIndex, SegmentMetadata, StopCondition, init::PetGraph,
+};
 
 /// Debugging
 impl Graph {
@@ -251,7 +253,7 @@ impl Graph {
     /// Note that this may reveal additional debug information when invariants of the graph are violated.
     /// This often is more useful than seeing a hard error, which can be achieved with `Self::validated()`
     pub fn eprint_dot_graph(&self) {
-        let dot = self.dot_graph();
+        let dot = self.dot_graph_pruned();
         eprintln!("{dot}");
     }
 
@@ -279,7 +281,7 @@ impl Graph {
         dot.stdin
             .as_mut()
             .unwrap()
-            .write_all(self.dot_graph().as_bytes())
+            .write_all(self.dot_graph_pruned().as_bytes())
             .ok();
         let mut out = dot.wait_with_output().unwrap();
         out.stdout.extend(out.stderr);
@@ -310,8 +312,23 @@ impl Graph {
             .max()
     }
 
-    /// Produces a dot-version of the graph.
-    pub fn dot_graph(&self) -> String {
+    /// Produces a pruned dot-version of the graph.
+    ///
+    /// This best-effort rendering path prunes very large graphs from the bottom
+    /// before handing them to Graphviz, because complete DOT input can make
+    /// `dot` hang on huge histories. It tries to compute the workspace lower
+    /// bound to preserve workspace-relevant segments and clear stale
+    /// `InWorkspace` flags below that bound, but projection is allowed to fail:
+    /// DOT output is diagnostic-only, so a workspace projection error must not
+    /// prevent rendering the graph.
+    pub fn dot_graph_pruned(&self) -> String {
+        let mut graph = self.clone();
+        graph.prune_for_dot_graph();
+        graph.dot_graph_unpruned()
+    }
+
+    /// Produces a dot-version of the graph without pruning.
+    fn dot_graph_unpruned(&self) -> String {
         const HEX: usize = 7;
         let entrypoint = self.entrypoint_location();
         let max_goals = self.max_goals();
@@ -404,5 +421,78 @@ impl Graph {
         };
         let dot = petgraph::dot::Dot::with_attr_getters(&self.inner, &[], &edge_attrs, &node_attrs);
         format!("{dot:?}")
+    }
+
+    fn prune_for_dot_graph(&mut self) {
+        let lower_bound_segment_id = self
+            .clone()
+            .into_workspace()
+            .ok()
+            .and_then(|workspace| workspace.lower_bound_segment_id);
+        if let Some(lower_bound_segment_id) = lower_bound_segment_id {
+            self.remove_in_workspace_flag_below_lower_bound(lower_bound_segment_id);
+        }
+
+        // It's OK if it takes a while, prefer complete graphs.
+        const LIMIT: usize = 5000;
+        let mut to_remove = self.num_segments().saturating_sub(LIMIT);
+        if to_remove > 0 {
+            tracing::warn!(
+                "Pruning at most {to_remove} nodes from the bottom to assure 'dot' won't hang",
+            );
+            let mut next = VecDeque::new();
+            next.extend(self.base_segments());
+            let mut seen = BTreeSet::new();
+            while let Some(sidx) = next.pop_front() {
+                if to_remove == 0 {
+                    break;
+                }
+                if let Some(s) = self.node_weight(sidx) {
+                    if lower_bound_segment_id.is_some()
+                        && s.non_empty_flags_of_first_commit()
+                            .is_some_and(|flags| flags.contains(CommitFlags::InWorkspace))
+                    {
+                        continue;
+                    }
+                    if s.metadata.is_some()
+                        || s.sibling_segment_id.is_some()
+                        || s.remote_tracking_branch_segment_id.is_some()
+                    {
+                        continue;
+                    }
+                }
+                next.extend(
+                    self.neighbors_directed(sidx, petgraph::Direction::Incoming)
+                        .filter(|n| seen.insert(*n)),
+                );
+                self.remove_node(sidx);
+                to_remove -= 1;
+            }
+            if to_remove != 0 {
+                tracing::warn!(
+                    "{to_remove} extra nodes were kept to keep vital portions of the graph"
+                );
+            }
+            self.set_hard_limit_hit();
+        }
+    }
+
+    fn remove_in_workspace_flag_below_lower_bound(&mut self, lower_bound_segment_id: SegmentIndex) {
+        let mut seen = BTreeSet::from([lower_bound_segment_id]);
+        let mut queue = VecDeque::from([lower_bound_segment_id]);
+        while let Some(sidx) = queue.pop_front() {
+            let below_segments: Vec<_> = self
+                .neighbors_directed(sidx, petgraph::Direction::Outgoing)
+                .filter(|n| seen.insert(*n))
+                .collect();
+            for below_sidx in below_segments {
+                if let Some(segment) = self.node_weight_mut(below_sidx)
+                    && let Some(first_commit) = segment.commits.first_mut()
+                {
+                    first_commit.flags.remove(CommitFlags::InWorkspace);
+                }
+                queue.push_back(below_sidx);
+            }
+        }
     }
 }

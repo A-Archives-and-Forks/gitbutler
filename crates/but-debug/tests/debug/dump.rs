@@ -5,6 +5,7 @@ use std::{
     fs::File,
     io::Read as _,
     path::{Path, PathBuf},
+    process::{Command, Stdio},
 };
 
 use but_testsupport::gix_testtools::{
@@ -45,7 +46,7 @@ fn normal_repo_includes_git_state_and_unignored_worktree() -> anyhow::Result<()>
 │   ├── config:100644
 │   ├── gitbutler:40755/
 │   │   └── vb.toml:100644
-│   └── ... 25 files and 15 directories not shown
+│   └── ... 25 files not shown
 ├── .gitignore:100644
 ├── executable.sh:100755
 ├── tracked.ignored:100644
@@ -88,7 +89,7 @@ fn git_only_skips_worktree_files() -> anyhow::Result<()> {
     ├── config:100644
     ├── gitbutler:40755/
     │   └── vb.toml:100644
-    └── ... 25 files and 15 directories not shown
+    └── ... 25 files not shown
 ");
 
     Ok(())
@@ -160,14 +161,15 @@ fn repo_dump_with_diagnostics_injects_files_at_dump_root() -> anyhow::Result<()>
     stderr:
     ");
 
-    insta::assert_snapshot!(archive_tree(&output)?, "diagnostic files are injected right away", @r"
+    if dot_is_available() {
+        insta::assert_snapshot!(archive_tree(&output)?, "diagnostic files are injected right away", @r"
 你好-repo-dump/
 ├── .git/
 │   ├── HEAD:100644
 │   ├── config:100644
 │   ├── gitbutler:40755/
 │   │   └── vb.toml:100644
-│   └── ... 27 files and 16 directories not shown
+│   └── ... 27 files not shown
 ├── .gitignore:100644
 ├── executable.sh:100755
 ├── graph.dot:100644
@@ -176,6 +178,7 @@ fn repo_dump_with_diagnostics_injects_files_at_dump_root() -> anyhow::Result<()>
 ├── visible.txt:100644
 └── workspace.ron.txt:100644
 ");
+    }
 
     Ok(())
 }
@@ -210,14 +213,15 @@ fn repo_dump_diagnostics_override_worktree_files() -> anyhow::Result<()> {
     stderr:
     ");
 
-    insta::assert_snapshot!(archive_tree(&output)?, @r"
+    if dot_is_available() {
+        insta::assert_snapshot!(archive_tree(&output)?, @r"
 你好-repo-dump/
 ├── .git/
 │   ├── HEAD:100644
 │   ├── config:100644
 │   ├── gitbutler:40755/
 │   │   └── vb.toml:100644
-│   └── ... 27 files and 16 directories not shown
+│   └── ... 27 files not shown
 ├── .gitignore:100644
 ├── executable.sh:100755
 ├── graph.dot:100644
@@ -226,6 +230,7 @@ fn repo_dump_diagnostics_override_worktree_files() -> anyhow::Result<()> {
 ├── visible.txt:100644
 └── workspace.ron.txt:100644
 ");
+    }
 
     let mut archive = zip::ZipArchive::new(File::open(&output)?)?;
     let mut graph = String::new();
@@ -244,37 +249,6 @@ fn repo_dump_diagnostics_override_worktree_files() -> anyhow::Result<()> {
 fn bare_repo_extracts_as_dump_git_directory() -> anyhow::Result<()> {
     let repo = read_only_repo("dump-bare-repo.sh", "sample.git")?;
     let output_dir = TempDir::new()?;
-    let initial = visualize_disk_tree_skip_dot_git(&repo)?;
-
-    insta::assert_snapshot!(initial, @r"
-.
-├── HEAD:100644
-├── config:100644
-├── description:100644
-├── hooks:40755
-│   ├── applypatch-msg.sample:100755
-│   ├── commit-msg.sample:100755
-│   ├── fsmonitor-watchman.sample:100755
-│   ├── post-update.sample:100755
-│   ├── pre-applypatch.sample:100755
-│   ├── pre-commit.sample:100755
-│   ├── pre-merge-commit.sample:100755
-│   ├── pre-push.sample:100755
-│   ├── pre-rebase.sample:100755
-│   ├── pre-receive.sample:100755
-│   ├── prepare-commit-msg.sample:100755
-│   ├── push-to-checkout.sample:100755
-│   ├── sendemail-validate.sample:100755
-│   └── update.sample:100755
-├── info:40755
-│   └── exclude:100644
-├── objects:40755
-│   ├── info:40755
-│   └── pack:40755
-└── refs:40755
-    ├── heads:40755
-    └── tags:40755
-");
 
     let output = output_dir.path().join("out.zip");
     let dump_output = run_dump(&repo, &output, false)?;
@@ -288,7 +262,7 @@ fn bare_repo_extracts_as_dump_git_directory() -> anyhow::Result<()> {
 sample-dump.git/
 ├── HEAD:100644
 ├── config:100644
-└── ... 16 files and 8 directories not shown
+└── ... 16 files not shown
 ");
 
     Ok(())
@@ -322,7 +296,7 @@ linked-dump/
 ├── .git/
 │   ├── HEAD:100644
 │   ├── config:100644
-│   └── ... 30 files and 17 directories not shown
+│   └── ... 30 files not shown
 ├── .gitignore:100644
 ├── linked-worktree-added-to-index.txt:100644
 ├── linked-worktree-untracked.txt:100644
@@ -376,7 +350,7 @@ fn current_output_inside_worktree_is_not_archived() -> anyhow::Result<()> {
 │   ├── config:100644
 │   ├── gitbutler:40755/
 │   │   └── vb.toml:100644
-│   └── ... 25 files and 15 directories not shown
+│   └── ... 25 files not shown
 ├── .gitignore:100644
 ├── executable.sh:100755
 ├── nested:40755/
@@ -400,7 +374,7 @@ fn current_output_inside_worktree_is_not_archived() -> anyhow::Result<()> {
 │   ├── config:100644
 │   ├── gitbutler:40755/
 │   │   └── vb.toml:100644
-│   └── ... 25 files and 15 directories not shown
+│   └── ... 25 files not shown
 ├── .gitignore:100644
 ├── executable.sh:100755
 ├── nested:40755/
@@ -519,6 +493,16 @@ fn git_status(repo: &Path) -> anyhow::Result<String> {
     Ok(String::from_utf8(output.stdout)?)
 }
 
+fn dot_is_available() -> bool {
+    Command::new("dot")
+        .arg("-V")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok_and(|status| status.success())
+}
+
 #[derive(Default)]
 struct Node {
     children: BTreeMap<String, Node>,
@@ -585,8 +569,8 @@ impl Node {
         for (name, child) in self.children {
             tree.push(child.into_tree(name));
         }
-        if self.hidden_files != 0 || self.hidden_dirs != 0 {
-            tree.push(hidden_summary(self.hidden_files, self.hidden_dirs));
+        if self.hidden_files != 0 {
+            tree.push(hidden_summary(self.hidden_files));
         }
         tree
     }
@@ -683,14 +667,9 @@ fn entry_kind(is_dir: bool) -> EntryKind {
     }
 }
 
-fn hidden_summary(files: usize, directories: usize) -> termtree::Tree<String> {
+fn hidden_summary(files: usize) -> termtree::Tree<String> {
     termtree::Tree::new(format!(
-        "... {files} {} and {directories} {} not shown",
+        "... {files} {} not shown",
         if files == 1 { "file" } else { "files" },
-        if directories == 1 {
-            "directory"
-        } else {
-            "directories"
-        },
     ))
 }

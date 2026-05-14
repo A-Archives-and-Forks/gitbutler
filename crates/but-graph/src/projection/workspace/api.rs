@@ -530,6 +530,7 @@ impl std::fmt::Debug for Workspace {
             .field("stacks", &self.stacks)
             .field("metadata", &self.metadata)
             .field("target_ref", &self.target_ref)
+            .field("target_commit", &self.target_commit)
             .field("extra_target", &self.extra_target)
             .finish()
     }
