@@ -105,7 +105,7 @@ import {
 import { isNonEmptyArray, NonEmptyArray } from "effect/Array";
 import { defaultOutlineSelection } from "#ui/projects/workspace/state.ts";
 import { ShortcutButton } from "#ui/components/ShortcutButton.tsx";
-import { resolveDiffSpecs } from "#ui/operations/diff-specs.ts";
+import { createDiffSpec } from "#ui/operations/diff-specs.ts";
 import { rejectedChangesToastOptions } from "#ui/operations/rejectedChangesToastOptions.tsx";
 import { toElectronAccelerator } from "#ui/hotkeys.ts";
 import { assert } from "#ui/assert.ts";
@@ -1011,12 +1011,10 @@ const Changes: FC<{
 		mutationFn: async () => {
 			if (!branch) throw new Error("No branch.");
 
-			const changes = await resolveDiffSpecs({
-				source: changesSectionOperand,
-				projectId,
-				queryClient,
-			});
-			if (!changes) return;
+			const worktreeChanges = await queryClient.fetchQuery(
+				changesInWorktreeQueryOptions(projectId),
+			);
+			const changes = worktreeChanges.changes.map((change) => createDiffSpec(change, []));
 
 			return await window.lite.commitCreate({
 				projectId,
@@ -1033,7 +1031,7 @@ const Changes: FC<{
 		onSuccess: async (response, _input, _ctx, { client }) => {
 			await client.invalidateQueries();
 
-			if (response && response.rejectedChanges.length > 0)
+			if (response.rejectedChanges.length > 0)
 				toastManager.add(
 					rejectedChangesToastOptions({
 						newCommit: response.newCommit,
@@ -1041,7 +1039,7 @@ const Changes: FC<{
 					}),
 				);
 
-			if (response?.newCommit !== null && commitTextareaRef.current)
+			if (response.newCommit !== null && commitTextareaRef.current)
 				commitTextareaRef.current.value = "";
 		},
 		onError: (error) => {

@@ -13,7 +13,7 @@ import {
 } from "@gitbutler/but-sdk";
 import { Match } from "effect";
 
-const createDiffSpec = (change: TreeChange, hunkHeaders: Array<HunkHeader>): DiffSpec => ({
+export const createDiffSpec = (change: TreeChange, hunkHeaders: Array<HunkHeader>): DiffSpec => ({
 	pathBytes: change.pathBytes,
 	previousPathBytes:
 		change.status.type === "Rename" ? change.status.subject.previousPathBytes : null,
