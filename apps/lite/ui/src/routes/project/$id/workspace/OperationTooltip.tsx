@@ -69,7 +69,6 @@ const AbsorbControls: FC<{
 				className={uiStyles.button}
 				hotkey="Enter"
 				hotkeyOptions={{
-					enabled: canAbsorb,
 					meta: { group: "Operation mode", name: "Confirm" },
 				}}
 				onClick={confirm}
@@ -206,7 +205,6 @@ const TransferOperationControls: FC<{
 				className={uiStyles.button}
 				hotkey="Enter"
 				hotkeyOptions={{
-					enabled: !!operation,
 					meta: {
 						group: "Operation mode",
 						name: operation ? operationLabel(operation) : "Confirm",

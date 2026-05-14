@@ -45,7 +45,6 @@ const ProjectSelect: FC = () => {
 				disabled={projects.length === 0}
 				hotkey="Mod+Shift+P"
 				hotkeyOptions={{
-					enabled: projects.length > 0,
 					meta: { group: "Global", name: "Select project" },
 				}}
 				onClick={openProjectPicker}

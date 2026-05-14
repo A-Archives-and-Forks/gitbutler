@@ -1336,7 +1336,6 @@ const Changes: FC<{
 							<ShortcutButton
 								hotkey="Mod+Shift+B"
 								hotkeyOptions={{
-									enabled: outlineMode._tag === "Default",
 									meta: { group: "Changes", name: "Select commit branch" },
 								}}
 							/>
@@ -1354,7 +1353,6 @@ const Changes: FC<{
 				<ShortcutButton
 					hotkey="Mod+Enter"
 					hotkeyOptions={{
-						enabled: outlineMode._tag === "Default" && !!commitTarget && !commitCreate.isPending,
 						meta: { group: "Changes", name: "Commit" },
 					}}
 					className={classes(uiStyles.button, styles.changesSectionCommitButton)}
