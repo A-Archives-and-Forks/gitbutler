@@ -31,10 +31,7 @@ export type CommitCreateOperation = Omit<CommitCreateParams, "dryRun" | "project
 	source: Operand;
 };
 /** @public */
-export type CommitCreateFromCommittedChangesOperation = Omit<
-	CommitInsertBlankParams,
-	"dryRun" | "projectId"
-> &
+export type CommitSplitOperation = Omit<CommitInsertBlankParams, "dryRun" | "projectId"> &
 	Pick<CommitMoveChangesBetweenParams, "sourceCommitId"> & {
 		source: Operand;
 	};
@@ -62,7 +59,7 @@ export type TearOffBranchOperation = Omit<TearOffBranchParams, "dryRun" | "proje
 export type Operation =
 	| ({ _tag: "CommitAmend" } & CommitAmendOperation)
 	| ({ _tag: "CommitCreate" } & CommitCreateOperation)
-	| ({ _tag: "CommitCreateFromCommittedChanges" } & CommitCreateFromCommittedChangesOperation)
+	| ({ _tag: "CommitSplit" } & CommitSplitOperation)
 	| ({ _tag: "CommitMove" } & CommitMoveOperation)
 	| ({ _tag: "CommitMoveChangesBetween" } & CommitMoveChangesBetweenOperation)
 	| ({ _tag: "CommitSquash" } & CommitSquashOperation)
@@ -84,10 +81,8 @@ export const commitCreateOperation = (operation: CommitCreateOperation): Operati
 });
 
 /** @public */
-export const commitCreateFromCommittedChangesOperation = (
-	operation: CommitCreateFromCommittedChangesOperation,
-): Operation => ({
-	_tag: "CommitCreateFromCommittedChanges",
+export const commitSplitOperation = (operation: CommitSplitOperation): Operation => ({
+	_tag: "CommitSplit",
 	...operation,
 });
 
@@ -147,7 +142,7 @@ export const operationLabel = (operation: Operation): string =>
 					Match.when("below", () => "Create commit below"),
 					Match.exhaustive,
 				),
-			CommitCreateFromCommittedChanges: ({ side }) =>
+			CommitSplit: ({ side }) =>
 				Match.value(side).pipe(
 					Match.when("above", () => "Create commit above"),
 					Match.when("below", () => "Create commit below"),
@@ -239,7 +234,7 @@ const runOperation = async ({
 					dryRun,
 				});
 			},
-			CommitCreateFromCommittedChanges: async (operation) => {
+			CommitSplit: async (operation) => {
 				const changes = await resolveChanges(operation.source);
 				if (!changes) return null;
 
@@ -294,7 +289,7 @@ const operationSource = (operation: Operation): Operand | undefined =>
 		Match.tags({
 			CommitAmend: ({ source }) => source,
 			CommitCreate: ({ source }) => source,
-			CommitCreateFromCommittedChanges: ({ source }) => source,
+			CommitSplit: ({ source }) => source,
 			CommitMoveChangesBetween: ({ source }) => source,
 			CommitUncommitChanges: ({ source }) => source,
 		}),
@@ -512,7 +507,7 @@ export const moveOperation = ({
 			}),
 		),
 		Match.when({ sourceFileParent: { _tag: "Commit" } }, ({ source, sourceFileParent }) =>
-			commitCreateFromCommittedChangesOperation({
+			commitSplitOperation({
 				sourceCommitId: sourceFileParent.commitId,
 				relativeTo,
 				side,
