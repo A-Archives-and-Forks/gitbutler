@@ -4,7 +4,7 @@ import {
 	changesInWorktreeQueryOptions,
 	headInfoQueryOptions,
 } from "#ui/api/queries.ts";
-import { findCommit, getCommonBaseCommitId } from "#ui/api/ref-info.ts";
+import { findCommit, getCommonBaseCommitId, resolveRelativeTo } from "#ui/api/ref-info.ts";
 import { encodeRefName } from "#ui/api/ref-name.ts";
 import { commitTitle, shortCommitId } from "#ui/commit.ts";
 import {
@@ -44,7 +44,7 @@ import { OperationSourceLabel } from "#ui/routes/project/$id/workspace/Operation
 import { OperationTarget } from "#ui/routes/project/$id/workspace/OperationTarget.tsx";
 import { useAppDispatch, useAppSelector } from "#ui/store.ts";
 import { classes } from "#ui/ui/classes.ts";
-import { BullseyeIcon, MenuTriggerIcon, PushIcon } from "#ui/ui/icons.tsx";
+import { BullseyeIcon, ChevronDownIcon, MenuTriggerIcon, PushIcon } from "#ui/ui/icons.tsx";
 import {
 	buildNavigationIndex,
 	navigationIndexIncludes,
@@ -58,6 +58,7 @@ import {
 	AbsorptionTarget,
 	BranchReference,
 	Commit,
+	InsertSide,
 	RefInfo,
 	RelativeTo,
 	Segment,
@@ -69,6 +70,7 @@ import {
 	formatForDisplay,
 	useHotkey,
 	useHotkeys,
+	useKeyHold,
 	type RegisterableHotkey,
 } from "@tanstack/react-hotkeys";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -80,6 +82,7 @@ import {
 	createContext,
 	FC,
 	Fragment,
+	SubmitEventHandler,
 	Suspense,
 	use,
 	useEffect,
@@ -800,20 +803,20 @@ const CommitRow: FC<
 
 	const amendCommitContextMenuItem: NativeMenuItem = {
 		_tag: "Item",
-		label: "Amend commit",
+		label: "Amend Commit",
 		enabled: true,
 		accelerator: toElectronAccelerator(hotkeys.amend),
 		onSelect: amendCommit,
 	};
 	const cutCommitContextMenuItem: NativeMenuItem = {
 		_tag: "Item",
-		label: "Cut commit",
+		label: "Cut Commit",
 		enabled: true,
 		onSelect: cutCommit,
 	};
 	const startEditingContextMenuItem: NativeMenuItem = {
 		_tag: "Item",
-		label: "Reword commit",
+		label: "Reword Commit",
 		enabled: !isCommitMessagePending,
 		accelerator: toElectronAccelerator(hotkeys.reword),
 		onSelect: startEditing,
@@ -832,28 +835,30 @@ const CommitRow: FC<
 	};
 	const deleteCommitContextMenuItem: NativeMenuItem = {
 		_tag: "Item",
-		label: "Delete commit",
+		label: "Delete Commit",
 		enabled: !commitDiscard.isPending,
 		onSelect: deleteCommit,
 	};
 	const setCommitTargetContextMenuItem: NativeMenuItem = {
 		_tag: "Item",
-		label: "Compose commit here",
+		label: "Compose Commit Here",
 		accelerator: toElectronAccelerator(hotkeys.composeCommitHere),
 		onSelect: composeCommitHere,
 	};
 
 	const menuItems: Array<NativeMenuItem> = [
+		startEditingContextMenuItem,
 		amendCommitContextMenuItem,
 		cutCommitContextMenuItem,
-		startEditingContextMenuItem,
+		{ _tag: "Separator" },
+		setCommitTargetContextMenuItem,
 		{
 			_tag: "Item",
-			label: "Add empty commit",
+			label: "Add Empty Commit",
 			submenu: [insertBlankCommitAboveContextMenuItem, insertBlankCommitBelowContextMenuItem],
 		},
+		{ _tag: "Separator" },
 		deleteCommitContextMenuItem,
-		setCommitTargetContextMenuItem,
 	];
 
 	return (
@@ -1123,7 +1128,7 @@ const useCommitTargetCombobox = (projectId: string) => {
 	const items = buildCommitTargetComboboxItems({ headInfo, commitTargetState });
 	const selectedItem = selectCommitTargetComboboxItem({ items, commitTargetState });
 
-	return { items, selectedItem };
+	return { headInfo, items, selectedItem };
 };
 
 const CommitTargetComboboxPopup: FC = () => (
@@ -1175,7 +1180,13 @@ const Changes: FC<{
 				projectId,
 				relativeTo: commitTarget.relativeTo,
 				changes,
-				side: "below",
+				side: Match.value(commitTarget.relativeTo).pipe(
+					Match.withReturnType<InsertSide>(),
+					Match.when({ type: "commit" }, () => "above"),
+					Match.when({ type: "reference" }, () => "below"),
+					Match.when({ type: "referenceBytes" }, () => "below"),
+					Match.exhaustive,
+				),
 				message: commitTextareaRef.current?.value ?? "",
 				dryRun: false,
 			});
@@ -1214,6 +1225,68 @@ const Changes: FC<{
 			});
 		},
 	});
+	const commitAmend = useMutation({
+		mutationFn: async () => {
+			if (!commitTarget) throw new Error("No target.");
+
+			const headInfo = await queryClient.fetchQuery(headInfoQueryOptions(projectId));
+
+			const commitId = resolveRelativeTo({
+				headInfo,
+				relativeTo: commitTarget.relativeTo,
+			});
+			if (commitId === null) throw new Error("No commit to amend.");
+
+			const worktreeChanges = await queryClient.fetchQuery(
+				changesInWorktreeQueryOptions(projectId),
+			);
+			const changes = worktreeChanges.changes.map((change) => createDiffSpec(change, []));
+
+			return await window.lite.commitAmend({
+				projectId,
+				commitId,
+				changes,
+				dryRun: false,
+			});
+		},
+		onSuccess: async (response, _input, _ctx, { client }) => {
+			dispatch(
+				projectActions.addReplacedCommits({
+					projectId,
+					replacedCommits: response.workspace.replacedCommits,
+				}),
+			);
+
+			if (commitTarget?.relativeTo.type === "commit" && response.newCommit !== null)
+				dispatch(
+					projectActions.setCommitTarget({
+						projectId,
+						commitTarget: { type: "commit", subject: response.newCommit },
+					}),
+				);
+
+			if (response.rejectedChanges.length > 0)
+				toastManager.add(
+					rejectedChangesToastOptions({
+						newCommit: response.newCommit,
+						rejectedChanges: response.rejectedChanges,
+					}),
+				);
+
+			await client.invalidateQueries();
+		},
+		onError: (error) => {
+			// oxlint-disable-next-line no-console
+			console.error(error);
+
+			toastManager.add({
+				type: "error",
+				title: "Failed to amend commit",
+				description: errorMessageForToast(error),
+				priority: "high",
+			});
+		},
+	});
 
 	const { data: worktreeChanges } = useQuery(changesInWorktreeQueryOptions(projectId));
 
@@ -1223,8 +1296,23 @@ const Changes: FC<{
 
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
-	const { items: branchComboboxItems, selectedItem: commitTarget } =
-		useCommitTargetCombobox(projectId);
+	const {
+		headInfo,
+		items: branchComboboxItems,
+		selectedItem: commitTarget,
+	} = useCommitTargetCombobox(projectId);
+	const isAltHeld = useKeyHold("Alt");
+	const isAmendMode = isAltHeld;
+	const isCommitOrAmendPending = commitCreate.isPending || commitAmend.isPending;
+	const canCommit =
+		outlineMode._tag === "Default" && commitTarget !== null && !isCommitOrAmendPending;
+	const canAmend =
+		canCommit &&
+		worktreeChanges &&
+		worktreeChanges.changes.length > 0 &&
+		headInfo &&
+		resolveRelativeTo({ headInfo, relativeTo: commitTarget.relativeTo }) !== null;
+	const canCommitOrAmend = isAmendMode ? canAmend : canCommit;
 
 	const [open, setOpen] = useState(false);
 
@@ -1250,6 +1338,32 @@ const Changes: FC<{
 		selectChanges();
 		commitTextareaRef.current?.focus();
 	};
+	const submit: SubmitEventHandler = (event) => {
+		event.preventDefault();
+
+		if (isAmendMode) {
+			commitAmend.mutate();
+			return;
+		}
+
+		commitCreate.mutate();
+	};
+	const commitMenuItems: Array<NativeMenuItem> = [
+		{
+			_tag: "Item",
+			label: "Commit",
+			enabled: canCommit,
+			accelerator: toElectronAccelerator("Mod+Enter"),
+			onSelect: () => commitCreate.mutate(),
+		},
+		{
+			_tag: "Item",
+			label: "Amend Commit",
+			enabled: canAmend,
+			accelerator: toElectronAccelerator("Mod+Alt+Enter"),
+			onSelect: () => commitAmend.mutate(),
+		},
+	];
 
 	useHotkeys([
 		{
@@ -1283,18 +1397,7 @@ const Changes: FC<{
 			aria-label={`Changes (${worktreeChanges?.changes.length ?? 0})`}
 			className={classes(workspaceItemRowStyles.section, styles.changesSection)}
 			render={
-				<OperandC
-					projectId={projectId}
-					operand={operand}
-					render={
-						<form
-							onSubmit={(event) => {
-								event.preventDefault();
-								commitCreate.mutate();
-							}}
-						/>
-					}
-				/>
+				<OperandC projectId={projectId} operand={operand} render={<form onSubmit={submit} />} />
 			}
 		>
 			<ChangesSectionRow changes={worktreeChanges?.changes ?? []} projectId={projectId} />
@@ -1304,7 +1407,7 @@ const Changes: FC<{
 				ref={commitTextareaRef}
 				aria-label="Compose commit message"
 				disabled={outlineMode._tag !== "Default"}
-				readOnly={commitCreate.isPending}
+				readOnly={isCommitOrAmendPending}
 				placeholder="Commit message (optional)"
 				className={styles.commitTextarea}
 				onFocus={selectChanges}
@@ -1327,7 +1430,7 @@ const Changes: FC<{
 					itemToStringValue={(x) => relativeToKey(x.relativeTo)}
 					isItemEqualToValue={(a, b) => relativeToEquals(a.relativeTo, b.relativeTo)}
 					autoHighlight
-					disabled={outlineMode._tag !== "Default" || commitCreate.isPending}
+					disabled={outlineMode._tag !== "Default" || isCommitOrAmendPending}
 				>
 					<Combobox.Trigger
 						className={classes(uiStyles.button, styles.commitTargetComboboxTrigger)}
@@ -1336,7 +1439,6 @@ const Changes: FC<{
 							<ShortcutButton
 								hotkey="Mod+Shift+B"
 								hotkeyOptions={{
-									enabled: outlineMode._tag === "Default",
 									meta: { group: "Changes", name: "Select commit branch" },
 								}}
 							/>
@@ -1351,18 +1453,30 @@ const Changes: FC<{
 					</Combobox.Portal>
 				</Combobox.Root>
 
-				<ShortcutButton
-					hotkey="Mod+Enter"
-					hotkeyOptions={{
-						enabled: outlineMode._tag === "Default" && !!commitTarget && !commitCreate.isPending,
-						meta: { group: "Changes", name: "Commit" },
-					}}
-					className={classes(uiStyles.button, styles.changesSectionCommitButton)}
-					type="submit"
-					disabled={outlineMode._tag !== "Default" || !commitTarget || commitCreate.isPending}
-				>
-					Commit
-				</ShortcutButton>
+				<div className={styles.commitActionControls}>
+					<ShortcutButton
+						hotkey={isAmendMode ? "Mod+Alt+Enter" : "Mod+Enter"}
+						hotkeyOptions={{
+							meta: { group: "Changes", name: isAmendMode ? "Amend" : "Commit" },
+						}}
+						className={classes(uiStyles.button, styles.changesSectionCommitButton)}
+						type="submit"
+						disabled={!canCommitOrAmend}
+					>
+						{isAmendMode ? "Amend" : "Commit"}
+					</ShortcutButton>
+					<button
+						type="button"
+						className={classes(uiStyles.button, styles.commitActionMenuButton)}
+						aria-label="Commit options"
+						disabled={outlineMode._tag !== "Default" || isCommitOrAmendPending}
+						onClick={(event) => {
+							void showNativeMenuFromTrigger(event.currentTarget, commitMenuItems);
+						}}
+					>
+						<ChevronDownIcon />
+					</button>
+				</div>
 			</div>
 		</TreeItem>
 	);
@@ -1529,14 +1643,14 @@ const BranchRow: FC<
 
 	const startEditingContextMenuItem: NativeMenuItem = {
 		_tag: "Item",
-		label: "Rename branch",
+		label: "Rename Branch",
 		enabled: !isRenamePending,
 		accelerator: toElectronAccelerator(hotkeys.rename),
 		onSelect: startEditing,
 	};
 	const setCommitTargetContextMenuItem: NativeMenuItem = {
 		_tag: "Item",
-		label: "Compose commit here",
+		label: "Compose Commit Here",
 		accelerator: toElectronAccelerator(hotkeys.composeCommitHere),
 		onSelect: composeCommitHere,
 	};
@@ -1644,14 +1758,14 @@ const StackRow: FC<
 
 	const unapplyContextMenuItem: NativeMenuItem = {
 		_tag: "Item",
-		label: "Unapply stack",
+		label: "Unapply Stack",
 		enabled: !unapplyStack.isPending,
 		onSelect: unapply,
 	};
 
 	const menuItems: Array<NativeMenuItem> = [
-		{ _tag: "Item", label: "Move up", enabled: false },
-		{ _tag: "Item", label: "Move down", enabled: false },
+		{ _tag: "Item", label: "Move Up", enabled: false },
+		{ _tag: "Item", label: "Move Down", enabled: false },
 		{ _tag: "Separator" },
 		unapplyContextMenuItem,
 	];

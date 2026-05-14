@@ -69,7 +69,6 @@ const AbsorbControls: FC<{
 				className={uiStyles.button}
 				hotkey="Enter"
 				hotkeyOptions={{
-					enabled: canAbsorb,
 					meta: { group: "Operation mode", name: "Confirm" },
 				}}
 				onClick={confirm}
@@ -121,7 +120,7 @@ const TransferOperationControls: FC<{
 				ignoreInputs: true,
 				meta: {
 					group: "Operation mode",
-					name: operation ? operationLabel(operation) : "Confirm",
+					name: "Confirm",
 				},
 			},
 		},
@@ -150,7 +149,6 @@ const TransferOperationControls: FC<{
 						<ShortcutButton
 							hotkey="A"
 							hotkeyOptions={{
-								enabled: !!operations.moveAbove,
 								meta: {
 									group: "Operation mode",
 									name: operations.moveAbove
@@ -170,7 +168,6 @@ const TransferOperationControls: FC<{
 						<ShortcutButton
 							hotkey="R"
 							hotkeyOptions={{
-								enabled: !!operations.rub,
 								meta: {
 									group: "Operation mode",
 									name: operations.rub ? `Select ${operationLabel(operations.rub)}` : "Select rub",
@@ -188,7 +185,6 @@ const TransferOperationControls: FC<{
 						<ShortcutButton
 							hotkey="B"
 							hotkeyOptions={{
-								enabled: !!operations.moveBelow,
 								meta: {
 									group: "Operation mode",
 									name: operations.moveBelow
@@ -205,13 +201,7 @@ const TransferOperationControls: FC<{
 			<ShortcutButton
 				className={uiStyles.button}
 				hotkey="Enter"
-				hotkeyOptions={{
-					enabled: !!operation,
-					meta: {
-						group: "Operation mode",
-						name: operation ? operationLabel(operation) : "Confirm",
-					},
-				}}
+				hotkeyOptions={{ meta: { group: "Operation mode", name: "Confirm" } }}
 				onClick={run}
 				disabled={!operation}
 			>

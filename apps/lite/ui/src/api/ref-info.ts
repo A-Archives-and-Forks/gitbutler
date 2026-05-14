@@ -1,4 +1,5 @@
-import { type Commit, type RefInfo, type Segment } from "@gitbutler/but-sdk";
+import { encodeRefName } from "#ui/api/ref-name.ts";
+import { type Commit, type RefInfo, type RelativeTo, type Segment } from "@gitbutler/but-sdk";
 
 export const getCommonBaseCommitId = (headInfo: RefInfo): string | undefined => {
 	const bases = headInfo.stacks
@@ -58,4 +59,26 @@ export const findSegmentByBranchRef = ({
 			if (branchRefsEqual(segment.refName?.fullNameBytes ?? null, branchRef)) return segment;
 
 	return null;
+};
+
+export const resolveRelativeTo = ({
+	headInfo,
+	relativeTo,
+}: {
+	headInfo: RefInfo;
+	relativeTo: RelativeTo;
+}): string | null => {
+	switch (relativeTo.type) {
+		case "commit":
+			return relativeTo.subject;
+		case "referenceBytes":
+			return (
+				findSegmentByBranchRef({ headInfo, branchRef: relativeTo.subject })?.commits[0]?.id ?? null
+			);
+		case "reference":
+			return (
+				findSegmentByBranchRef({ headInfo, branchRef: encodeRefName(relativeTo.subject) })
+					?.commits[0]?.id ?? null
+			);
+	}
 };
