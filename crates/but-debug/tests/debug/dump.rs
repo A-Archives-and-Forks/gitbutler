@@ -384,6 +384,33 @@ fn current_output_inside_worktree_is_not_archived() -> anyhow::Result<()> {
 └── visible.txt:100644
 ");
 
+    std::fs::create_dir_all(repo.join("nested"))?;
+    let denormalized_output = repo.join("nested/../denormalized-dump.zip");
+    let dump_output = run_dump(&repo, &denormalized_output, false)?;
+    insta::assert_snapshot!(dump_output.display_for_snapshot(&denormalized_output), "denormalized dump output", @"
+    stdout:
+    Archive at: [output path]
+    stderr:
+    ");
+
+    insta::assert_snapshot!(archive_tree(&repo.join("denormalized-dump.zip"))?, "the denormalized output path is still skipped", @r"
+你好-repo-dump/
+├── .git/
+│   ├── HEAD:100644
+│   ├── config:100644
+│   ├── gitbutler:40755/
+│   │   └── vb.toml:100644
+│   └── ... 25 files not shown
+├── .gitignore:100644
+├── executable.sh:100755
+├── nested:40755/
+│   └── output:40755/
+│       └── sample-dump.zip:100644
+├── sample-second-dump.zip:100644
+├── tracked.ignored:100644
+└── visible.txt:100644
+");
+
     Ok(())
 }
 

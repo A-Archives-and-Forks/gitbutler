@@ -68,7 +68,7 @@ fn run_repo(
     };
     let progress = DumpProgress::new()?;
     let layout = ArchiveLayout::new(&repo)?;
-    let output_path = OutputPath::new(output_path);
+    let output_path = OutputPath::new(output_path, current_dir.clone());
     let lock = acquire_archive_lock(&output_path.path, repo.workdir().map(Path::to_owned))?;
     let output_path = output_path.with_lock_path(lock.lock_path().to_owned());
     std::thread::scope(|scope| -> Result<()> {
@@ -761,25 +761,31 @@ fn entry_name(root: &str, relative: &Path) -> Option<String> {
     Some(name)
 }
 
-/// Stores the output archive path and its canonical form.
+/// Stores the output archive path and its normalized form.
 #[derive(Clone)]
 struct OutputPath {
     /// The path requested by the caller.
     path: PathBuf,
+    /// The current directory used to resolve relative output paths.
+    current_dir: PathBuf,
     /// Lock file path used while writing the archive.
     lock_path: Option<PathBuf>,
-    /// Canonical form of `path`, when it can be resolved.
-    canonical: Option<PathBuf>,
+    /// Realpath form of `path`, even when only parent directories exist.
+    realpath: Option<PathBuf>,
+    /// Realpath form of the lock file path used while writing.
+    lock_realpath: Option<PathBuf>,
 }
 
 impl OutputPath {
     /// Create an output path handle for `path`.
-    fn new(path: PathBuf) -> Self {
-        let canonical = fs::canonicalize(&path).ok();
+    fn new(path: PathBuf, current_dir: PathBuf) -> Self {
+        let realpath = realpath(&path, &current_dir);
         Self {
             path,
+            current_dir,
             lock_path: None,
-            canonical,
+            realpath,
+            lock_realpath: None,
         }
     }
 
@@ -788,6 +794,7 @@ impl OutputPath {
     /// For example, while writing `repo-dump.zip`, the temporary lock file may
     /// be `repo-dump.zip.lock`.
     fn with_lock_path(mut self, lock_path: PathBuf) -> Self {
+        self.lock_realpath = realpath(&lock_path, &self.current_dir);
         self.lock_path = Some(lock_path);
         self
     }
@@ -796,10 +803,15 @@ impl OutputPath {
     fn is_same(&self, path: &Path) -> bool {
         path == self.path
             || self.lock_path.as_deref() == Some(path)
-            || self.canonical.as_deref().is_some_and(|output_path| {
-                fs::canonicalize(path).ok().as_deref() == Some(output_path)
+            || realpath(path, &self.current_dir).is_some_and(|path| {
+                self.realpath.as_deref() == Some(path.as_path())
+                    || self.lock_realpath.as_deref() == Some(path.as_path())
             })
     }
+}
+
+fn realpath(path: &Path, current_dir: &Path) -> Option<PathBuf> {
+    gix::path::realpath_opts(path, current_dir, gix::path::realpath::MAX_SYMLINKS).ok()
 }
 
 /// Return zip file options for a regular archive entry.

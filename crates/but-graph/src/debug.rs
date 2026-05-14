@@ -322,9 +322,9 @@ impl Graph {
     /// DOT output is diagnostic-only, so a workspace projection error must not
     /// prevent rendering the graph.
     pub fn dot_graph_pruned(&self) -> String {
-        let mut graph = self.clone();
-        graph.prune_for_dot_graph();
-        graph.dot_graph_unpruned()
+        let mut display_graph = self.clone();
+        display_graph.prune_for_dot_graph();
+        display_graph.dot_graph_unpruned()
     }
 
     /// Produces a dot-version of the graph without pruning.
@@ -423,12 +423,12 @@ impl Graph {
         format!("{dot:?}")
     }
 
+    // WARNING: should only be run on a fresh clone as it probably leaves the graph unusable.
     fn prune_for_dot_graph(&mut self) {
         let lower_bound_segment_id = self
-            .clone()
-            .into_workspace()
+            .to_workspace_state(crate::projection::workspace::Downgrade::Allow)
             .ok()
-            .and_then(|workspace| workspace.lower_bound_segment_id);
+            .and_then(|state| state.lower_bound_segment_id);
         if let Some(lower_bound_segment_id) = lower_bound_segment_id {
             self.remove_in_workspace_flag_below_lower_bound(lower_bound_segment_id);
         }
