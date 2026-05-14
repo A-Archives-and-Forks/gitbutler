@@ -1081,7 +1081,6 @@ const Changes: FC<{
 				},
 			},
 		);
-		focusPanel("outline");
 	};
 
 	const [open, setOpen] = useState(false);
