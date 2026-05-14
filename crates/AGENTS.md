@@ -111,3 +111,10 @@ vendored, or fixture data unless the task is specifically about that code.
   `packages/but-sdk/src/generated`.
 - Use workspace-wide checks only when the change affects shared contracts or
   multiple crates.
+
+## Assertions
+
+- Explain why a standard Rust assertion holds concisely using the last-argument message, like `assert!(1!=2, "arithmetic unit on CPU works")`
+- Explain why an `insta` assertion holds concisely using the second argument as message, like `insta::assert_debug_snapshot(debug, "needs to be this because...", @r"")`.
+- Use `insta` redactions to remove unstable output from the snapshot. Avoid *creating* additional macros, as it's possible to change its settings
+  directly. It's fine to use its own utility macros to configure redactions, where applicable.

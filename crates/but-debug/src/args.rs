@@ -14,7 +14,13 @@ pub struct Args {
     #[arg(short = 't', long, action = clap::ArgAction::Count)]
     pub trace: u8,
     /// Run as if `but-debug` was started in `PATH` instead of the current working directory.
-    #[arg(short = 'C', long, default_value = ".", value_name = "PATH")]
+    #[arg(
+        short = 'C',
+        long,
+        default_value = ".",
+        value_name = "PATH",
+        global = true
+    )]
     pub current_dir: PathBuf,
     /// The debugging command to run.
     #[command(subcommand)]
@@ -24,11 +30,78 @@ pub struct Args {
 /// The debugging subcommands supported by `but-debug`.
 #[derive(Debug, clap::Subcommand)]
 pub enum Subcommands {
+    /// Archive a repository for debugging.
+    Dump(DumpArgs),
     /// Return a segmented graph starting from `HEAD`.
     Graph(GraphArgs),
     /// Debug revision graph operations.
     #[clap(visible_alias = "rev")]
     Revision(RevisionArgs),
+}
+
+/// Arguments for the `dump` debugging subcommand.
+#[derive(Debug, clap::Args)]
+pub struct DumpArgs {
+    /// The kind of dump archive to create.
+    #[command(subcommand)]
+    pub cmd: DumpSubcommands,
+}
+
+/// The archive kinds supported by `but-debug dump`.
+#[derive(Debug, clap::Subcommand)]
+pub enum DumpSubcommands {
+    /// Archive a repository for debugging.
+    Repo(RepoDumpArgs),
+    /// Archive graph and workspace diagnostics.
+    #[clap(visible_alias = "diag")]
+    Diagnostics(DiagnosticsDumpArgs),
+}
+
+/// Arguments for the `dump repo` debugging subcommand.
+#[derive(Debug, clap::Args)]
+pub struct RepoDumpArgs {
+    /// Shared archive output options.
+    #[command(flatten)]
+    pub archive: ArchiveOutputArgs,
+    /// Diagnostics capture options.
+    #[command(flatten)]
+    pub diagnostics: DiagnosticsCaptureArgs,
+    /// Include only Git directory state and skip worktree files.
+    #[arg(long)]
+    pub git_only: bool,
+    /// Do not include graph and workspace diagnostics in the archive root.
+    #[arg(long)]
+    pub no_diagnostics: bool,
+}
+
+/// Archive output options shared by dump subcommands.
+#[derive(Debug, clap::Args)]
+pub struct ArchiveOutputArgs {
+    /// Where to write the zip archive.
+    #[arg(long, value_name = "PATH")]
+    pub output: Option<PathBuf>,
+    /// Do not open the directory containing the archive after it is created.
+    #[arg(long = "no-open-archive-directory", visible_alias = "no-open")]
+    pub no_open_archive_directory: bool,
+}
+
+/// Arguments for the `dump diagnostics` debugging subcommand.
+#[derive(Debug, clap::Args)]
+pub struct DiagnosticsDumpArgs {
+    /// Shared archive output options.
+    #[command(flatten)]
+    pub archive: ArchiveOutputArgs,
+    /// Diagnostics capture options.
+    #[command(flatten)]
+    pub diagnostics: DiagnosticsCaptureArgs,
+}
+
+/// Options for graph and workspace diagnostics capture.
+#[derive(Debug, clap::Args)]
+pub struct DiagnosticsCaptureArgs {
+    /// Maximum seconds to wait for `dot -Tsvg`; 0 disables the timeout.
+    #[arg(long = "dot-timeout", value_name = "SECONDS", default_value_t = 30)]
+    pub dot_timeout_seconds: u32,
 }
 
 /// Arguments for the `graph` debugging subcommand.

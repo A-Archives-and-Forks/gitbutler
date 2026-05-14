@@ -213,6 +213,8 @@ gitbutler-workspace = { path = "crates/gitbutler-workspace" }
 rusqlite = { version = "0.39.0", features = ["bundled"] }
 backoff = "0.4.0"
 bstr = "1.12.1"
+# Version must match the one in `tauri plugin updater` to avoid duplication.
+zip = { version = "4", default-features = false, features = ["bzip2"] }
 # Add the `tracing` or `tracing-detail` features to see more of gitoxide in the logs. Useful to see which programs it invokes.
 # When adjusting this, update `gix-testtools` as well!
 gix = { version = "0.83.0", git = "https://github.com/GitoxideLabs/gitoxide", rev = "575113dfb10b3ba12eb57f57a81b241e773968bd", default-features = false, features = [
