@@ -5,35 +5,15 @@ import { routeTree } from "#ui/routeTree.ts";
 import { createRoot } from "react-dom/client";
 import "./global.css";
 import { Toast } from "@base-ui/react";
+import { errorMessageForToast } from "#ui/errors.ts";
 
 const toastManager = Toast.createToastManager();
-
-const errorMessageForToast = (error: unknown): string => {
-	if (error instanceof Error) return error.message;
-	if (typeof error === "string") return error;
-
-	try {
-		return JSON.stringify(error);
-	} catch {
-		return "Unknown error.";
-	}
-};
 
 const queryClient = new ReactQuery.QueryClient({
 	defaultOptions: {
 		queries: {
 			// We don't expect network errors over the Node API.
 			retry: false,
-		},
-		mutations: {
-			onError: (error: unknown) => {
-				toastManager.add({
-					type: "error",
-					title: "Mutation failed",
-					description: errorMessageForToast(error),
-					priority: "high",
-				});
-			},
 		},
 	},
 });
@@ -64,5 +44,14 @@ declare module "@tanstack/react-router" {
 const rootElement = document.getElementById("root");
 if (!rootElement) throw new Error("Root element not found");
 
-const root = createRoot(rootElement);
+const root = createRoot(rootElement, {
+	onUncaughtError: (error: unknown) => {
+		toastManager.add({
+			type: "error",
+			title: "Error",
+			description: errorMessageForToast(error),
+			priority: "high",
+		});
+	},
+});
 root.render(<App queryClient={queryClient} toastManager={toastManager} router={router} />);

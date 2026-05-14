@@ -13,7 +13,7 @@ import {
 } from "@gitbutler/but-sdk";
 import { Match } from "effect";
 
-const createDiffSpec = (change: TreeChange, hunkHeaders: Array<HunkHeader>): DiffSpec => ({
+export const createDiffSpec = (change: TreeChange, hunkHeaders: Array<HunkHeader>): DiffSpec => ({
 	pathBytes: change.pathBytes,
 	previousPathBytes:
 		change.status.type === "Rename" ? change.status.subject.previousPathBytes : null,
@@ -92,12 +92,10 @@ export const resolveDiffSpecs = async ({
 	projectId,
 	queryClient,
 }: {
-	source?: Operand;
+	source: Operand;
 	projectId: string;
 	queryClient: QueryClient;
 }) => {
-	if (!source) return null;
-
 	const fileParent = operandFileParent(source);
 	const commitId = fileParent ? commitIdFromParent(fileParent) : null;
 	const [worktreeChanges, commitDetails] = await Promise.all([

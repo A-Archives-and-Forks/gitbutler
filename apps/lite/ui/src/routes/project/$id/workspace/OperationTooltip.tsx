@@ -9,7 +9,7 @@ import {
 } from "#ui/operations/operation.ts";
 import { ShortcutButton } from "#ui/components/ShortcutButton.tsx";
 import uiStyles from "#ui/ui/ui.module.css";
-import { Tooltip, useRender } from "@base-ui/react";
+import { Toast, Tooltip, useRender } from "@base-ui/react";
 import { Toggle } from "@base-ui/react/toggle";
 import { ToggleGroup } from "@base-ui/react/toggle-group";
 import { FC } from "react";
@@ -22,6 +22,7 @@ import { Match } from "effect";
 import { useHotkeys } from "@tanstack/react-hotkeys";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type AbsorptionTarget } from "@gitbutler/but-sdk";
+import { errorMessageForToast } from "#ui/errors.ts";
 
 const AbsorbControls: FC<{
 	projectId: string;
@@ -32,7 +33,8 @@ const AbsorbControls: FC<{
 	const absorptionPlan = useQuery(absorptionPlanQueryOptions({ projectId, target: sourceTarget }));
 	const canAbsorb =
 		!absorptionPlan.isPending && !!absorptionPlan.data && absorptionPlan.data.length > 0;
-	const { mutate: absorb } = useMutation({
+	const toastManager = Toast.useToastManager();
+	const absorbMutation = useMutation({
 		mutationFn: () => {
 			if (!absorptionPlan.data) return Promise.resolve(0);
 			return window.lite.absorb({ projectId, absorptionPlan: absorptionPlan.data });
@@ -40,12 +42,23 @@ const AbsorbControls: FC<{
 		onSuccess: async () => {
 			await queryClient.invalidateQueries();
 		},
+		onError: (error) => {
+			// oxlint-disable-next-line no-console
+			console.error(error);
+
+			toastManager.add({
+				type: "error",
+				title: "Failed to absorb",
+				description: errorMessageForToast(error),
+				priority: "high",
+			});
+		},
 	});
 
 	const confirm = () => {
 		dispatch(projectActions.exitMode({ projectId }));
 
-		absorb();
+		absorbMutation.mutate();
 	};
 
 	const cancel = () => dispatch(projectActions.cancelMode({ projectId }));

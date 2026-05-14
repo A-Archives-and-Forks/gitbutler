@@ -1,13 +1,5 @@
 import uiStyles from "#ui/ui/ui.module.css";
 import {
-	commitCreateMutationOptions,
-	commitDiscardMutationOptions,
-	commitInsertBlankMutationOptions,
-	commitRewordMutationOptions,
-	unapplyStackMutationOptions,
-	updateBranchNameMutationOptions,
-} from "#ui/api/mutations.ts";
-import {
 	absorptionPlanQueryOptions,
 	changesInWorktreeQueryOptions,
 	headInfoQueryOptions,
@@ -106,11 +98,12 @@ import {
 import { isNonEmptyArray, NonEmptyArray } from "effect/Array";
 import { defaultOutlineSelection } from "#ui/projects/workspace/state.ts";
 import { ShortcutButton } from "#ui/components/ShortcutButton.tsx";
-import { resolveDiffSpecs } from "#ui/operations/diff-specs.ts";
+import { createDiffSpec } from "#ui/operations/diff-specs.ts";
 import { rejectedChangesToastOptions } from "#ui/operations/rejectedChangesToastOptions.tsx";
 import { toElectronAccelerator } from "#ui/hotkeys.ts";
 import { assert } from "#ui/assert.ts";
 import { Spinner } from "#ui/components/Spinner.tsx";
+import { errorMessageForToast } from "#ui/errors.ts";
 
 const NavigationIndexContext = createContext<NavigationIndex | null>(null);
 
@@ -560,8 +553,8 @@ const CommitRow: FC<
 	const { hasConflicts } = dryRunCommit ? dryRunCommit : commitWithOptimisticMessage;
 
 	const commitInsertBlank = useMutation({
-		...commitInsertBlankMutationOptions,
-		onSuccess: async (response, input, context, mutation) => {
+		mutationFn: window.lite.commitInsertBlank,
+		onSuccess: async (response, input, _context, mutation) => {
 			dispatch(
 				projectActions.addReplacedCommits({
 					projectId: input.projectId,
@@ -569,12 +562,23 @@ const CommitRow: FC<
 				}),
 			);
 
-			await commitInsertBlankMutationOptions.onSuccess?.(response, input, context, mutation);
+			await mutation.client.invalidateQueries();
+		},
+		onError: (error) => {
+			// oxlint-disable-next-line no-console
+			console.error(error);
+
+			toastManager.add({
+				type: "error",
+				title: "Failed to insert commit",
+				description: errorMessageForToast(error),
+				priority: "high",
+			});
 		},
 	});
 	const commitDiscard = useMutation({
-		...commitDiscardMutationOptions,
-		onSuccess: async (response, input, context, mutation) => {
+		mutationFn: window.lite.commitDiscard,
+		onSuccess: async (response, input, _context, mutation) => {
 			dispatch(
 				projectActions.addReplacedCommits({
 					projectId: input.projectId,
@@ -582,12 +586,23 @@ const CommitRow: FC<
 				}),
 			);
 
-			await commitDiscardMutationOptions.onSuccess?.(response, input, context, mutation);
+			await mutation.client.invalidateQueries();
+		},
+		onError: (error) => {
+			// oxlint-disable-next-line no-console
+			console.error(error);
+
+			toastManager.add({
+				type: "error",
+				title: "Failed to discard commit",
+				description: errorMessageForToast(error),
+				priority: "high",
+			});
 		},
 	});
 	const commitReword = useMutation({
-		...commitRewordMutationOptions,
-		onSuccess: async (response, input, context, mutation) => {
+		mutationFn: window.lite.commitReword,
+		onSuccess: async (response, input, _context, mutation) => {
 			dispatch(
 				projectActions.addReplacedCommits({
 					projectId: input.projectId,
@@ -595,7 +610,18 @@ const CommitRow: FC<
 				}),
 			);
 
-			await commitRewordMutationOptions.onSuccess?.(response, input, context, mutation);
+			await mutation.client.invalidateQueries();
+		},
+		onError: (error) => {
+			// oxlint-disable-next-line no-console
+			console.error(error);
+
+			toastManager.add({
+				type: "error",
+				title: "Failed to reword commit",
+				description: errorMessageForToast(error),
+				priority: "high",
+			});
 		},
 	});
 
@@ -668,6 +694,8 @@ const CommitRow: FC<
 		focusPanel("outline");
 	};
 
+	const toastManager = Toast.useToastManager();
+
 	const saveNewMessage = (newMessage: string) => {
 		const initialMessage = commit.message.trim();
 		const trimmed = newMessage.trim();
@@ -681,10 +709,16 @@ const CommitRow: FC<
 					message: trimmed,
 					dryRun: false,
 				});
-			} catch {
-				// Use the global mutation error handler (shows toast) instead of React
-				// error boundaries.
-				return;
+			} catch (error) {
+				// oxlint-disable-next-line no-console
+				console.error(error);
+
+				toastManager.add({
+					type: "error",
+					title: "Failed to reword commit",
+					description: errorMessageForToast(error),
+					priority: "high",
+				});
 			}
 		});
 	};
@@ -1008,9 +1042,28 @@ const Changes: FC<{
 	const queryClient = useQueryClient();
 
 	const commitCreate = useMutation({
-		...commitCreateMutationOptions,
-		onSuccess: async (response, input, context, mutation) => {
-			await commitCreateMutationOptions.onSuccess?.(response, input, context, mutation);
+		mutationFn: async () => {
+			if (!branch) throw new Error("No branch.");
+
+			const worktreeChanges = await queryClient.fetchQuery(
+				changesInWorktreeQueryOptions(projectId),
+			);
+			const changes = worktreeChanges.changes.map((change) => createDiffSpec(change, []));
+
+			return await window.lite.commitCreate({
+				projectId,
+				relativeTo: {
+					type: "referenceBytes",
+					subject: branch.branch.branchRef,
+				},
+				changes,
+				side: "below",
+				message: commitTextareaRef.current?.value ?? "",
+				dryRun: false,
+			});
+		},
+		onSuccess: async (response, _input, _ctx, { client }) => {
+			await client.invalidateQueries();
 
 			if (response.rejectedChanges.length > 0)
 				toastManager.add(
@@ -1019,6 +1072,20 @@ const Changes: FC<{
 						rejectedChanges: response.rejectedChanges,
 					}),
 				);
+
+			if (response.newCommit !== null && commitTextareaRef.current)
+				commitTextareaRef.current.value = "";
+		},
+		onError: (error) => {
+			// oxlint-disable-next-line no-console
+			console.error(error);
+
+			toastManager.add({
+				type: "error",
+				title: "Failed to commit",
+				description: errorMessageForToast(error),
+				priority: "high",
+			});
 		},
 	});
 
@@ -1052,47 +1119,6 @@ const Changes: FC<{
 
 	const [branchId, setBranchId] = useState<string | null>(null);
 	const branch = branchComboboxItems.find((item) => item.id === branchId) ?? branchComboboxItems[0];
-
-	const [commitCreatePending, startCommitCreateTransition] = useTransition();
-
-	const commit = () => {
-		startCommitCreateTransition(async () => {
-			if (!branch) return;
-
-			const changes = await resolveDiffSpecs({
-				source: changesSectionOperand,
-				projectId,
-				queryClient,
-			});
-			if (!changes) return;
-
-			try {
-				await commitCreate.mutateAsync(
-					{
-						projectId,
-						relativeTo: {
-							type: "referenceBytes",
-							subject: branch.branch.branchRef,
-						},
-						side: "below",
-						changes,
-						message: commitTextareaRef.current?.value ?? "",
-						dryRun: false,
-					},
-					{
-						onSuccess: (response) => {
-							if (response.newCommit !== null && commitTextareaRef.current)
-								commitTextareaRef.current.value = "";
-						},
-					},
-				);
-			} catch {
-				// Use the global mutation error handler (shows toast) instead of React
-				// error boundaries.
-				return;
-			}
-		});
-	};
 
 	const [open, setOpen] = useState(false);
 
@@ -1146,7 +1172,18 @@ const Changes: FC<{
 			aria-label={`Changes (${worktreeChanges?.changes.length ?? 0})`}
 			className={classes(workspaceItemRowStyles.section, styles.changesSection)}
 			render={
-				<OperandC projectId={projectId} operand={operand} render={<form action={commit} />} />
+				<OperandC
+					projectId={projectId}
+					operand={operand}
+					render={
+						<form
+							onSubmit={(event) => {
+								event.preventDefault();
+								commitCreate.mutate();
+							}}
+						/>
+					}
+				/>
 			}
 		>
 			<ChangesSectionRow changes={worktreeChanges?.changes ?? []} projectId={projectId} />
@@ -1155,7 +1192,7 @@ const Changes: FC<{
 				ref={commitTextareaRef}
 				aria-label="Compose commit message"
 				disabled={outlineMode._tag !== "Default"}
-				readOnly={commitCreatePending}
+				readOnly={commitCreate.isPending}
 				placeholder="Commit message (optional)"
 				className={styles.commitTextarea}
 				onFocus={selectChanges}
@@ -1178,7 +1215,7 @@ const Changes: FC<{
 					itemToStringValue={(x) => x.id}
 					isItemEqualToValue={(a, b) => a.id === b.id}
 					autoHighlight
-					disabled={outlineMode._tag !== "Default" || commitCreatePending}
+					disabled={outlineMode._tag !== "Default" || commitCreate.isPending}
 				>
 					<Combobox.Trigger
 						className={classes(uiStyles.button, styles.commitBranchComboboxTrigger)}
@@ -1205,12 +1242,12 @@ const Changes: FC<{
 				<ShortcutButton
 					hotkey="Mod+Enter"
 					hotkeyOptions={{
-						enabled: outlineMode._tag === "Default" && !!branch && !commitCreatePending,
+						enabled: outlineMode._tag === "Default" && !!branch && !commitCreate.isPending,
 						meta: { group: "Changes", name: "Commit" },
 					}}
 					className={classes(uiStyles.button, styles.changesSectionCommitButton)}
 					type="submit"
-					disabled={outlineMode._tag !== "Default" || !branch || commitCreatePending}
+					disabled={outlineMode._tag !== "Default" || !branch || commitCreate.isPending}
 				>
 					Commit
 				</ShortcutButton>
@@ -1298,9 +1335,9 @@ const BranchRow: FC<
 	const [isRenamePending, startRenameTransition] = useTransition();
 
 	const updateBranchName = useMutation({
-		...updateBranchNameMutationOptions,
-		onSuccess: async (response, input, context, mutation) => {
-			await updateBranchNameMutationOptions.onSuccess?.(response, input, context, mutation);
+		mutationFn: window.lite.updateBranchName,
+		onSuccess: async (_response, input, _context, mutation) => {
+			await mutation.client.invalidateQueries();
 
 			const newSelection = branchOperand({
 				stackId,
@@ -1325,6 +1362,8 @@ const BranchRow: FC<
 		focusPanel("outline");
 	};
 
+	const toastManager = Toast.useToastManager();
+
 	const saveBranchName = (newBranchName: string) => {
 		const trimmed = newBranchName.trim();
 		if (trimmed === "" || trimmed === branchName) return;
@@ -1337,10 +1376,16 @@ const BranchRow: FC<
 					branchName,
 					newName: trimmed,
 				});
-			} catch {
-				// Use the global mutation error handler (shows toast) instead of React
-				// error boundaries.
-				return;
+			} catch (error) {
+				// oxlint-disable-next-line no-console
+				console.error(error);
+
+				toastManager.add({
+					type: "error",
+					title: "Failed to rename branch",
+					description: errorMessageForToast(error),
+					priority: "high",
+				});
 			}
 		});
 	};
@@ -1429,7 +1474,25 @@ const StackRow: FC<
 	const operand = stackOperand({ stackId });
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
-	const unapplyStack = useMutation(unapplyStackMutationOptions);
+	const toastManager = Toast.useToastManager();
+
+	const unapplyStack = useMutation({
+		mutationFn: window.lite.unapplyStack,
+		onSuccess: async (_data, _input, _ctx, { client }) => {
+			await client.invalidateQueries();
+		},
+		onError: (error) => {
+			// oxlint-disable-next-line no-console
+			console.error(error);
+
+			toastManager.add({
+				type: "error",
+				title: "Failed to unapply stack",
+				description: errorMessageForToast(error),
+				priority: "high",
+			});
+		},
+	});
 	const unapply = () => {
 		unapplyStack.mutate({ projectId, stackId });
 	};
