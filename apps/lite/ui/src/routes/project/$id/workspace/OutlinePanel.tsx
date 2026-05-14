@@ -58,6 +58,7 @@ import {
 	AbsorptionTarget,
 	BranchReference,
 	Commit,
+	InsertSide,
 	RefInfo,
 	RelativeTo,
 	Segment,
@@ -1179,7 +1180,13 @@ const Changes: FC<{
 				projectId,
 				relativeTo: commitTarget.relativeTo,
 				changes,
-				side: "below",
+				side: Match.value(commitTarget.relativeTo).pipe(
+					Match.withReturnType<InsertSide>(),
+					Match.when({ type: "commit" }, () => "above"),
+					Match.when({ type: "reference" }, () => "below"),
+					Match.when({ type: "referenceBytes" }, () => "below"),
+					Match.exhaustive,
+				),
 				message: commitTextareaRef.current?.value ?? "",
 				dryRun: false,
 			});
