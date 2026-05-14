@@ -425,6 +425,7 @@ const OperandC: FC<
 	const isSelected = useIsSelected({ projectId, operand });
 	const absorptionTargetKeys = assert(use(AbsorptionTargetKeysContext));
 	const isAbsorptionTarget = absorptionTargetKeys.has(operandIdentityKey(operand));
+	const navigationIndex = assert(use(NavigationIndexContext));
 
 	return useRender({
 		render: (
@@ -434,6 +435,7 @@ const OperandC: FC<
 				source={operand}
 				render={
 					<OperationTarget
+						enabled={navigationIndexIncludes(navigationIndex, operand)}
 						projectId={projectId}
 						target={operand}
 						isSelected={isSelected}
@@ -1153,6 +1155,7 @@ const Changes: FC<{
 				ref={commitTextareaRef}
 				aria-label="Compose commit message"
 				disabled={outlineMode._tag !== "Default"}
+				readOnly={commitCreatePending}
 				placeholder="Commit message (optional)"
 				className={styles.commitTextarea}
 				onFocus={selectChanges}
@@ -1175,7 +1178,7 @@ const Changes: FC<{
 					itemToStringValue={(x) => x.id}
 					isItemEqualToValue={(a, b) => a.id === b.id}
 					autoHighlight
-					disabled={outlineMode._tag !== "Default"}
+					disabled={outlineMode._tag !== "Default" || commitCreatePending}
 				>
 					<Combobox.Trigger
 						className={classes(uiStyles.button, styles.commitBranchComboboxTrigger)}

@@ -23,31 +23,42 @@ import { useMutation } from "@tanstack/react-query";
 
 type DropTargetParams = Parameters<typeof dropTargetForElements>[0];
 type GetDataArgs = Parameters<NonNullable<DropTargetParams["getData"]>>[0];
+type OnDropArgs = Parameters<NonNullable<DropTargetParams["onDrop"]>>[0];
 
-type DropData = {
-	operationType: OperationType;
+type DropData = OnDropArgs["self"]["data"];
+
+const getOperationTypeFromData = (data: DropData): OperationType | null => {
+	const instruction = extractInstruction(data);
+	if (!instruction) return null;
+
+	return Match.value(instruction.operation).pipe(
+		Match.withReturnType<OperationType>(),
+		Match.when("combine", () => "rub"),
+		Match.when("reorder-before", () => "moveAbove"),
+		Match.when("reorder-after", () => "moveBelow"),
+		Match.exhaustive,
+	);
 };
 
-const parseDropData = (data: unknown): DropData | null => {
-	if (typeof data !== "object" || data === null || !("operationType" in data)) return null;
-	return data as DropData;
-};
-
-const getDropOperationType = ({
-	source,
+const useOperationDropTarget = ({
+	enabled,
 	target,
-	input,
-	element,
+	projectId,
 }: {
-	source: Operand;
+	enabled: boolean;
 	target: Operand;
-	input: Parameters<typeof attachInstruction>[1]["input"];
-	element: Parameters<typeof attachInstruction>[1]["element"];
-}): OperationType | null => {
-	const { rub, moveAbove, moveBelow } = getOperations(source, target);
+	projectId: string;
+}) => {
+	const dispatch = useAppDispatch();
+	const { mutate: runOperation } = useMutation(useRunOperationMutationOptions());
+	const dropRef = useRef<HTMLElement>(null);
 
-	const instruction = extractInstruction(
-		attachInstruction(
+	const getData = useEffectEvent(({ input, element, source }: GetDataArgs) => {
+		const dragData = parseDragData(source.data);
+		if (!dragData) return {};
+
+		const { rub, moveAbove, moveBelow } = getOperations(dragData.source, target);
+		return attachInstruction(
 			{},
 			{
 				input,
@@ -58,38 +69,10 @@ const getDropOperationType = ({
 					combine: rub ? "available" : "not-available",
 				},
 			},
-		),
-	);
-	if (!instruction) return null;
-
-	return Match.value(instruction.operation).pipe(
-		Match.withReturnType<OperationType | null>(),
-		Match.when("combine", () => "rub"),
-		Match.when("reorder-before", () => "moveAbove"),
-		Match.when("reorder-after", () => "moveBelow"),
-		Match.exhaustive,
-	);
-};
-
-const useOperationDropTarget = ({ target, projectId }: { target: Operand; projectId: string }) => {
-	const dispatch = useAppDispatch();
-	const { mutate: runOperation } = useMutation(useRunOperationMutationOptions());
-	const dropRef = useRef<HTMLElement>(null);
-
-	const getDropData = useEffectEvent(({ input, element, source }: GetDataArgs): DropData | null => {
-		const dragData = parseDragData(source.data);
-		if (!dragData) return null;
-
-		const operationType = getDropOperationType({
-			source: dragData.source,
-			target,
-			input,
-			element,
-		});
-		if (operationType === null) return null;
-
-		return { operationType };
+		);
 	});
+
+	const canDrop = useEffectEvent(() => enabled);
 
 	useEffect(() => {
 		const element = dropRef.current;
@@ -97,21 +80,21 @@ const useOperationDropTarget = ({ target, projectId }: { target: Operand; projec
 
 		return dropTargetForElements({
 			element,
-			getData: (args) => getDropData(args) ?? {},
-			canDrop: (args) => getDropData(args) !== null,
+			getData,
+			canDrop,
 			onDrag: (args) => {
 				const [innerMost] = args.location.current.dropTargets;
 				const isActiveDropTarget = innerMost?.element === args.self.element;
 
 				if (!isActiveDropTarget) return;
 
-				const dropData = parseDropData(args.self.data);
+				const operationType = getOperationTypeFromData(args.self.data);
 
 				dispatch(
 					projectActions.updatePointerTransfer({
 						projectId,
-						target: dropData ? target : null,
-						operationType: dropData?.operationType ?? null,
+						target,
+						operationType,
 					}),
 				);
 			},
@@ -131,13 +114,13 @@ const useOperationDropTarget = ({ target, projectId }: { target: Operand; projec
 				if (!isActiveDropTarget) return;
 
 				const dragData = parseDragData(args.source.data);
-				const dropData = parseDropData(args.self.data);
+				const operationType = getOperationTypeFromData(args.self.data);
 				const operation =
-					dragData && dropData
+					dragData && operationType !== null
 						? getOperation({
 								source: dragData.source,
 								target,
-								operationType: dropData.operationType,
+								operationType,
 							})
 						: null;
 
@@ -157,13 +140,14 @@ const useOperationDropTarget = ({ target, projectId }: { target: Operand; projec
 
 export const OperationTarget: FC<
 	{
+		enabled: boolean;
 		target: Operand;
 		projectId: string;
 		isSelected: boolean;
 		isAbsorptionTarget: boolean;
 	} & useRender.ComponentProps<"div">
-> = ({ target, projectId, isSelected, isAbsorptionTarget, render, ...props }) => {
-	const { dropRef } = useOperationDropTarget({ target, projectId });
+> = ({ enabled, target, projectId, isSelected, isAbsorptionTarget, render, ...props }) => {
+	const { dropRef } = useOperationDropTarget({ enabled, target, projectId });
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
 	const insertTargetOperationType = Match.value(outlineMode).pipe(
