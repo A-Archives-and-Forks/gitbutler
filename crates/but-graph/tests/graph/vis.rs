@@ -29,7 +29,6 @@ fn post_graph_traversal() -> anyhow::Result<()> {
             target_ref: None,
             target_commit_id: None,
             push_remote: None,
-            remote_url: "".into(),
         })),
         ..Default::default()
     };
