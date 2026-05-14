@@ -93,7 +93,7 @@ const useOperationDropTarget = ({
 				dispatch(
 					projectActions.updatePointerTransfer({
 						projectId,
-						target: operationType !== null ? target : null,
+						target,
 						operationType,
 					}),
 				);
