@@ -32,7 +32,7 @@ const AbsorbControls: FC<{
 	const absorptionPlan = useQuery(absorptionPlanQueryOptions({ projectId, target: sourceTarget }));
 	const canAbsorb =
 		!absorptionPlan.isPending && !!absorptionPlan.data && absorptionPlan.data.length > 0;
-	const { mutate: absorb } = useMutation({
+	const absorbMutation = useMutation({
 		mutationFn: () => {
 			if (!absorptionPlan.data) return Promise.resolve(0);
 			return window.lite.absorb({ projectId, absorptionPlan: absorptionPlan.data });
@@ -45,7 +45,7 @@ const AbsorbControls: FC<{
 	const confirm = () => {
 		dispatch(projectActions.exitMode({ projectId }));
 
-		absorb();
+		absorbMutation.mutate();
 	};
 
 	const cancel = () => dispatch(projectActions.cancelMode({ projectId }));
