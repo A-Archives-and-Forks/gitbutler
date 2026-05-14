@@ -1062,7 +1062,7 @@ const Changes: FC<{
 		});
 		if (!changes) return;
 
-		commitCreate.mutate(
+		await commitCreate.mutateAsync(
 			{
 				projectId,
 				relativeTo: {
@@ -1130,7 +1130,7 @@ const Changes: FC<{
 		hotkeys: [{ hotkey: "Mod+Shift+B" }],
 	});
 
-	const commitCommand = useCommand(() => void commit(), {
+	const commitCommand = useCommand(commit, {
 		enabled: outlineMode._tag === "Default" && !!branch,
 		group: "Changes",
 		commandPalette: { label: "Commit" },
