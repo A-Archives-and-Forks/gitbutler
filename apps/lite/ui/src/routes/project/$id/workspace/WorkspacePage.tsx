@@ -43,7 +43,7 @@ import styles from "./WorkspacePage.module.css";
 import { OutlinePanel } from "#ui/routes/project/$id/workspace/OutlinePanel.tsx";
 import { classes } from "#ui/ui/classes.ts";
 import { Toast } from "@base-ui/react";
-import { errorMessageForToast } from "#ui/main.tsx";
+import { errorMessageForToast } from "#ui/errors.ts";
 
 type CommandPaletteItem = {
 	group: CommandGroup;

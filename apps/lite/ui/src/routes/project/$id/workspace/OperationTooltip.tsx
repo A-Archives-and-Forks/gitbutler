@@ -22,7 +22,7 @@ import { Match } from "effect";
 import { useHotkeys } from "@tanstack/react-hotkeys";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type AbsorptionTarget } from "@gitbutler/but-sdk";
-import { errorMessageForToast } from "#ui/main.tsx";
+import { errorMessageForToast } from "#ui/errors.ts";
 
 const AbsorbControls: FC<{
 	projectId: string;

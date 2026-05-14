@@ -103,7 +103,7 @@ import { rejectedChangesToastOptions } from "#ui/operations/rejectedChangesToast
 import { toElectronAccelerator } from "#ui/hotkeys.ts";
 import { assert } from "#ui/assert.ts";
 import { Spinner } from "#ui/components/Spinner.tsx";
-import { errorMessageForToast } from "#ui/main.tsx";
+import { errorMessageForToast } from "#ui/errors.ts";
 
 const NavigationIndexContext = createContext<NavigationIndex | null>(null);
 

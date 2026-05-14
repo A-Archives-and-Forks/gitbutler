@@ -5,19 +5,9 @@ import { routeTree } from "#ui/routeTree.ts";
 import { createRoot } from "react-dom/client";
 import "./global.css";
 import { Toast } from "@base-ui/react";
+import { errorMessageForToast } from "#ui/errors.ts";
 
 const toastManager = Toast.createToastManager();
-
-export const errorMessageForToast = (error: unknown): string => {
-	if (error instanceof Error) return error.message;
-	if (typeof error === "string") return error;
-
-	try {
-		return JSON.stringify(error);
-	} catch {
-		return "Unknown error.";
-	}
-};
 
 const queryClient = new ReactQuery.QueryClient({
 	defaultOptions: {

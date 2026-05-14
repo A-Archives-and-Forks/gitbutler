@@ -21,7 +21,7 @@ import { decodeRefName } from "#ui/api/ref-name.ts";
 import { projectActions } from "#ui/projects/state.ts";
 import { useAppDispatch } from "#ui/store.ts";
 import { useParams } from "@tanstack/react-router";
-import { errorMessageForToast } from "#ui/main.tsx";
+import { errorMessageForToast } from "#ui/errors.ts";
 
 /** @public */
 export type CommitAmendOperation = Omit<CommitAmendParams, "dryRun" | "projectId" | "changes"> & {
