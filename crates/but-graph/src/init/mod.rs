@@ -1564,6 +1564,12 @@ fn queue_initial_tips<T: RefMetadata>(
             Instruction::CollectCommit { into: segment },
             limit,
         );
+        // A target ref and its local tracking branch can point at the same
+        // commit. In that case, the integrated target was held back only until
+        // the local side created its segment and goal above. Queue the
+        // integrated item before pushing the current local item so the shared
+        // commit is owned as integrated history while still carrying the local
+        // goal that lets both sides connect.
         let pending_before_current = match &tip.role {
             InitialTipRole::TargetLocal { key, .. } => pending_integrated_tips
                 .get(key)
