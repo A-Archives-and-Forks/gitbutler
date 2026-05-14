@@ -92,12 +92,10 @@ export const resolveDiffSpecs = async ({
 	projectId,
 	queryClient,
 }: {
-	source?: Operand;
+	source: Operand;
 	projectId: string;
 	queryClient: QueryClient;
 }) => {
-	if (!source) return null;
-
 	const fileParent = operandFileParent(source);
 	const commitId = fileParent ? commitIdFromParent(fileParent) : null;
 	const [worktreeChanges, commitDetails] = await Promise.all([
