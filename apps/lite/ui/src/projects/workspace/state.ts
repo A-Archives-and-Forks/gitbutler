@@ -1,5 +1,5 @@
 import { type OperationType } from "#ui/operations/operation.ts";
-import { AbsorptionTarget } from "@gitbutler/but-sdk";
+import { AbsorptionTarget, type RelativeTo } from "@gitbutler/but-sdk";
 import { Match } from "effect";
 import {
 	branchOperand,
@@ -36,6 +36,7 @@ const createInitialSelectionState = (): SelectionState => ({
 });
 
 export type WorkspaceState = {
+	commitTarget: RelativeTo | null;
 	highlightedCommitIds: Array<string>;
 	mode: OutlineMode;
 	replacedCommits: Record<string, string>;
@@ -43,6 +44,7 @@ export type WorkspaceState = {
 };
 
 export const createInitialState = (): WorkspaceState => ({
+	commitTarget: null,
 	highlightedCommitIds: [],
 	mode: defaultOutlineMode,
 	replacedCommits: {},
@@ -147,6 +149,10 @@ export const setHighlightedCommitIds = (state: WorkspaceState, commitIds: Array<
 	state.highlightedCommitIds = commitIds ?? [];
 };
 
+export const setCommitTarget = (state: WorkspaceState, commitTarget: RelativeTo | null) => {
+	state.commitTarget = commitTarget;
+};
+
 export const addReplacedCommits = (
 	state: WorkspaceState,
 	replacedCommits: Record<string, string>,
@@ -173,6 +179,8 @@ export const selectMode = (state: WorkspaceState): OutlineMode => state.mode;
 
 export const selectHighlightedCommitIds = (state: WorkspaceState): Array<string> =>
 	state.highlightedCommitIds;
+
+export const selectCommitTarget = (state: WorkspaceState): RelativeTo | null => state.commitTarget;
 
 export const selectReplacedCommits = (state: WorkspaceState): Record<string, string> =>
 	state.replacedCommits;

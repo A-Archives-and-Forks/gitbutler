@@ -2,7 +2,7 @@ import { useActiveElement } from "#ui/focus.ts";
 import type { CommandGroup } from "#ui/hotkeys.ts";
 import { type OperationType } from "#ui/operations/operation.ts";
 import { keyboardTransferOperationMode } from "#ui/outline/mode.ts";
-import { changesSectionOperand, type Operand } from "#ui/operands.ts";
+import { type Operand } from "#ui/operands.ts";
 import {
 	projectActions,
 	selectProjectOutlineModeState,
@@ -280,15 +280,6 @@ export const useNavigationIndexHotkeys = ({
 				conflictBehavior: "allow",
 				enabled: operationEnabled,
 				meta: { group, name: "Cut" },
-			},
-		},
-		{
-			hotkey: "C",
-			callback: () => enterTransferMode(changesSectionOperand, "moveAbove"),
-			options: {
-				conflictBehavior: "allow",
-				enabled: operationEnabled,
-				meta: { group, name: "Commit" },
 			},
 		},
 	]);
