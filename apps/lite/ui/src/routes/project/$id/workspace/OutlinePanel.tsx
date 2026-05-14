@@ -1065,25 +1065,31 @@ const Changes: FC<{
 			});
 			if (!changes) return;
 
-			await commitCreate.mutateAsync(
-				{
-					projectId,
-					relativeTo: {
-						type: "referenceBytes",
-						subject: branch.branch.branchRef,
+			try {
+				await commitCreate.mutateAsync(
+					{
+						projectId,
+						relativeTo: {
+							type: "referenceBytes",
+							subject: branch.branch.branchRef,
+						},
+						side: "below",
+						changes,
+						message: commitTextareaRef.current?.value ?? "",
+						dryRun: false,
 					},
-					side: "below",
-					changes,
-					message: commitTextareaRef.current?.value ?? "",
-					dryRun: false,
-				},
-				{
-					onSuccess: (response) => {
-						if (response.newCommit !== null && commitTextareaRef.current)
-							commitTextareaRef.current.value = "";
+					{
+						onSuccess: (response) => {
+							if (response.newCommit !== null && commitTextareaRef.current)
+								commitTextareaRef.current.value = "";
+						},
 					},
-				},
-			);
+				);
+			} catch {
+				// Use the global mutation error handler (shows toast) instead of React
+				// error boundaries.
+				return;
+			}
 		});
 	};
 
