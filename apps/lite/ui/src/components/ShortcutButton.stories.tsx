@@ -15,12 +15,12 @@ const meta = preview.meta({
 export const Default = meta.story({
 	args: {
 		children: "Hover me",
-		hotkeys: ["A"],
+		hotkey: "A",
 	},
 });
 
 export const Modifier = Default.extend({
 	args: {
-		hotkeys: ["Mod+A"],
+		hotkey: "Mod+A",
 	},
 });

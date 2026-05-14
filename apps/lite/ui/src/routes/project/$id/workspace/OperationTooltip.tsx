@@ -19,7 +19,7 @@ import { useAppDispatch } from "#ui/store.ts";
 import { projectActions } from "#ui/projects/state.ts";
 import { getTransferOperation, type OutlineMode } from "#ui/outline/mode.ts";
 import { Match } from "effect";
-import { useCommand } from "#ui/commands/manager.ts";
+import { useHotkeys } from "@tanstack/react-hotkeys";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type AbsorptionTarget } from "@gitbutler/but-sdk";
 
@@ -50,33 +50,25 @@ const AbsorbControls: FC<{
 
 	const cancel = () => dispatch(projectActions.cancelMode({ projectId }));
 
-	const confirmCommand = useCommand(confirm, {
-		enabled: canAbsorb,
-		group: "Operation mode",
-		commandPalette: { label: "Confirm" },
-		hotkeys: [{ hotkey: "Enter" }],
-	});
-
-	const cancelCommand = useCommand(cancel, {
-		group: "Operation mode",
-		commandPalette: { label: "Cancel" },
-		hotkeys: [{ hotkey: "Escape" }],
-	});
-
 	return (
 		<>
 			<ShortcutButton
 				className={uiStyles.button}
-				hotkeys={confirmCommand.hotkeys}
-				onClick={confirmCommand.commandFn}
+				hotkey="Enter"
+				hotkeyOptions={{
+					enabled: canAbsorb,
+					meta: { group: "Operation mode", name: "Confirm" },
+				}}
+				onClick={confirm}
 				disabled={!canAbsorb}
 			>
 				Absorb
 			</ShortcutButton>
 			<ShortcutButton
 				className={uiStyles.button}
-				hotkeys={cancelCommand.hotkeys}
-				onClick={cancelCommand.commandFn}
+				hotkey="Escape"
+				hotkeyOptions={{ meta: { group: "Operation mode", name: "Cancel" } }}
+				onClick={cancel}
 			>
 				Cancel
 			</ShortcutButton>
@@ -106,42 +98,21 @@ const TransferOperationControls: FC<{
 	const setOperationType = (operationType: OperationType) =>
 		dispatch(projectActions.updateTransferOperationType({ projectId, operationType }));
 
-	const moveAboveCommand = useCommand(() => setOperationType("moveAbove"), {
-		group: "Operation mode",
-		commandPalette: operations.moveAbove
-			? { label: `Select ${operationLabel(operations.moveAbove)}` }
-			: undefined,
-		hotkeys: [{ hotkey: "A" }],
-	});
-
-	const rubCommand = useCommand(() => setOperationType("rub"), {
-		group: "Operation mode",
-		commandPalette: operations.rub
-			? { label: `Select ${operationLabel(operations.rub)}` }
-			: undefined,
-		hotkeys: [{ hotkey: "R" }],
-	});
-
-	const moveBelowCommand = useCommand(() => setOperationType("moveBelow"), {
-		group: "Operation mode",
-		commandPalette: operations.moveBelow
-			? { label: `Select ${operationLabel(operations.moveBelow)}` }
-			: undefined,
-		hotkeys: [{ hotkey: "B" }],
-	});
-
-	const confirmCommand = useCommand(run, {
-		enabled: !!operation,
-		group: "Operation mode",
-		commandPalette: operation ? { label: operationLabel(operation) } : undefined,
-		hotkeys: [{ hotkey: "Mod+V", ignoreInputs: true }, { hotkey: "Enter" }],
-	});
-
-	const cancelCommand = useCommand(cancel, {
-		group: "Operation mode",
-		commandPalette: { label: "Cancel" },
-		hotkeys: [{ hotkey: "Escape" }],
-	});
+	useHotkeys([
+		{
+			hotkey: "Mod+V",
+			callback: run,
+			options: {
+				conflictBehavior: "allow",
+				enabled: !!operation,
+				ignoreInputs: true,
+				meta: {
+					group: "Operation mode",
+					name: operation ? operationLabel(operation) : "Confirm",
+				},
+			},
+		},
+	]);
 
 	const onValueChange = (value: Array<string>) => {
 		if (value.length === 0) return;
@@ -162,37 +133,82 @@ const TransferOperationControls: FC<{
 				<Toggle
 					value={"moveAbove" satisfies OperationType}
 					className={styles.operationTypeToggle}
-					render={<ShortcutButton hotkeys={moveAboveCommand.hotkeys} />}
+					render={
+						<ShortcutButton
+							hotkey="A"
+							hotkeyOptions={{
+								enabled: !!operations.moveAbove,
+								meta: {
+									group: "Operation mode",
+									name: operations.moveAbove
+										? `Select ${operationLabel(operations.moveAbove)}`
+										: "Select move above",
+								},
+							}}
+						/>
+					}
 				>
 					{operations.moveAbove ? operationLabel(operations.moveAbove) : "Move above"}
 				</Toggle>
 				<Toggle
 					value={"rub" satisfies OperationType}
 					className={styles.operationTypeToggle}
-					render={<ShortcutButton hotkeys={rubCommand.hotkeys} />}
+					render={
+						<ShortcutButton
+							hotkey="R"
+							hotkeyOptions={{
+								enabled: !!operations.rub,
+								meta: {
+									group: "Operation mode",
+									name: operations.rub ? `Select ${operationLabel(operations.rub)}` : "Select rub",
+								},
+							}}
+						/>
+					}
 				>
 					{operations.rub ? operationLabel(operations.rub) : "Rub"}
 				</Toggle>
 				<Toggle
 					value={"moveBelow" satisfies OperationType}
 					className={styles.operationTypeToggle}
-					render={<ShortcutButton hotkeys={moveBelowCommand.hotkeys} />}
+					render={
+						<ShortcutButton
+							hotkey="B"
+							hotkeyOptions={{
+								enabled: !!operations.moveBelow,
+								meta: {
+									group: "Operation mode",
+									name: operations.moveBelow
+										? `Select ${operationLabel(operations.moveBelow)}`
+										: "Select move below",
+								},
+							}}
+						/>
+					}
 				>
 					{operations.moveBelow ? operationLabel(operations.moveBelow) : "Move below"}
 				</Toggle>
 			</ToggleGroup>
 			<ShortcutButton
 				className={uiStyles.button}
-				hotkeys={confirmCommand.hotkeys}
-				onClick={confirmCommand.commandFn}
+				hotkey="Enter"
+				hotkeyOptions={{
+					enabled: !!operation,
+					meta: {
+						group: "Operation mode",
+						name: operation ? operationLabel(operation) : "Confirm",
+					},
+				}}
+				onClick={run}
 				disabled={!operation}
 			>
 				Confirm
 			</ShortcutButton>
 			<ShortcutButton
 				className={uiStyles.button}
-				hotkeys={cancelCommand.hotkeys}
-				onClick={cancelCommand.commandFn}
+				hotkey="Escape"
+				hotkeyOptions={{ meta: { group: "Operation mode", name: "Cancel" } }}
+				onClick={cancel}
 			>
 				Cancel
 			</ShortcutButton>

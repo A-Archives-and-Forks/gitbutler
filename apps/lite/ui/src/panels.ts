@@ -1,5 +1,5 @@
-import { CommandGroup } from "#ui/commands/groups.ts";
 import { useActiveElement } from "#ui/focus.ts";
+import type { CommandGroup } from "#ui/hotkeys.ts";
 import { type OperationType } from "#ui/operations/operation.ts";
 import { keyboardTransferOperationMode } from "#ui/outline/mode.ts";
 import { changesSectionOperand, type Operand } from "#ui/operands.ts";
@@ -15,7 +15,7 @@ import {
 	getPreviousSection,
 	NavigationIndex,
 } from "#ui/workspace/navigation-index.ts";
-import { useCommand } from "#ui/commands/manager.ts";
+import { useHotkeySequences, useHotkeys } from "@tanstack/react-hotkeys";
 
 export type Panel = "outline" | "files" | "details";
 export const orderedPanels: Array<Panel> = ["outline", "files", "details"];
@@ -104,41 +104,138 @@ export const useNavigationIndexHotkeys = ({
 		selectAndFocus(newItem);
 	};
 
-	useCommand(selectPreviousItem, {
-		group,
-		enabled: focusedPanel === panel,
-		hotkeys: [{ hotkey: "ArrowUp" }, { hotkey: "K" }],
-	});
+	const navigationEnabled = focusedPanel === panel;
+	useHotkeys([
+		{
+			hotkey: "ArrowUp",
+			callback: selectPreviousItem,
+			options: {
+				conflictBehavior: "allow",
+				enabled: navigationEnabled,
+				meta: { group, name: "Select previous" },
+			},
+		},
+		{
+			hotkey: "K",
+			callback: selectPreviousItem,
+			options: {
+				conflictBehavior: "allow",
+				enabled: navigationEnabled,
+				meta: { group, name: "Select previous" },
+			},
+		},
+		{
+			hotkey: "ArrowDown",
+			callback: selectNextItem,
+			options: {
+				conflictBehavior: "allow",
+				enabled: navigationEnabled,
+				meta: { group, name: "Select next" },
+			},
+		},
+		{
+			hotkey: "J",
+			callback: selectNextItem,
+			options: {
+				conflictBehavior: "allow",
+				enabled: navigationEnabled,
+				meta: { group, name: "Select next" },
+			},
+		},
+		{
+			hotkey: "Shift+ArrowUp",
+			callback: selectPreviousSection,
+			options: {
+				conflictBehavior: "allow",
+				enabled: navigationEnabled,
+				meta: { group, name: "Select previous section" },
+			},
+		},
+		{
+			hotkey: "Shift+K",
+			callback: selectPreviousSection,
+			options: {
+				conflictBehavior: "allow",
+				enabled: navigationEnabled,
+				meta: { group, name: "Select previous section" },
+			},
+		},
+		{
+			hotkey: "Shift+ArrowDown",
+			callback: selectNextSection,
+			options: {
+				conflictBehavior: "allow",
+				enabled: navigationEnabled,
+				meta: { group, name: "Select next section" },
+			},
+		},
+		{
+			hotkey: "Shift+J",
+			callback: selectNextSection,
+			options: {
+				conflictBehavior: "allow",
+				enabled: navigationEnabled,
+				meta: { group, name: "Select next section" },
+			},
+		},
+		{
+			hotkey: "Home",
+			callback: selectFirstItem,
+			options: {
+				conflictBehavior: "allow",
+				enabled: navigationEnabled,
+				meta: { group, name: "Select first" },
+			},
+		},
+		{
+			hotkey: "Meta+ArrowUp",
+			callback: selectFirstItem,
+			options: {
+				conflictBehavior: "allow",
+				enabled: navigationEnabled,
+				meta: { group, name: "Select first" },
+			},
+		},
+		{
+			hotkey: "End",
+			callback: selectLastItem,
+			options: {
+				conflictBehavior: "allow",
+				enabled: navigationEnabled,
+				meta: { group, name: "Select last" },
+			},
+		},
+		{
+			hotkey: "Meta+ArrowDown",
+			callback: selectLastItem,
+			options: {
+				conflictBehavior: "allow",
+				enabled: navigationEnabled,
+				meta: { group, name: "Select last" },
+			},
+		},
+		{
+			hotkey: "Shift+G",
+			callback: selectLastItem,
+			options: {
+				conflictBehavior: "allow",
+				enabled: navigationEnabled,
+				meta: { group, name: "Select last" },
+			},
+		},
+	]);
 
-	useCommand(selectNextItem, {
-		group,
-		enabled: focusedPanel === panel,
-		hotkeys: [{ hotkey: "ArrowDown" }, { hotkey: "J" }],
-	});
-
-	useCommand(selectPreviousSection, {
-		group,
-		enabled: focusedPanel === panel,
-		hotkeys: [{ hotkey: "Shift+ArrowUp" }, { hotkey: "Shift+K" }],
-	});
-
-	useCommand(selectNextSection, {
-		group,
-		enabled: focusedPanel === panel,
-		hotkeys: [{ hotkey: "Shift+ArrowDown" }, { hotkey: "Shift+J" }],
-	});
-
-	useCommand(selectFirstItem, {
-		group,
-		enabled: focusedPanel === panel,
-		hotkeys: [{ hotkey: "Home" }, { hotkey: "Meta+ArrowUp" }, { sequence: ["G", "G"] }],
-	});
-
-	useCommand(selectLastItem, {
-		group,
-		enabled: focusedPanel === panel,
-		hotkeys: [{ hotkey: "End" }, { hotkey: "Meta+ArrowDown" }, { hotkey: "Shift+G" }],
-	});
+	useHotkeySequences([
+		{
+			sequence: ["G", "G"],
+			callback: selectFirstItem,
+			options: {
+				conflictBehavior: "allow",
+				enabled: navigationEnabled,
+				meta: { group, name: "Select first" },
+			},
+		},
+	]);
 
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
@@ -155,24 +252,44 @@ export const useNavigationIndexHotkeys = ({
 		focusPanel("outline");
 	};
 
-	useCommand(() => enterTransferMode(selection, "moveAbove"), {
-		group,
-		enabled: focusedPanel === panel && outlineMode._tag === "Default",
-		commandPalette: { label: "Move" },
-		hotkeys: [{ hotkey: "M" }],
-	});
-
-	useCommand(() => enterTransferMode(selection, "rub"), {
-		group,
-		enabled: focusedPanel === panel && outlineMode._tag === "Default",
-		commandPalette: { label: "Cut" },
-		hotkeys: [{ hotkey: "Mod+X", ignoreInputs: true }, { hotkey: "R" }],
-	});
-
-	useCommand(() => enterTransferMode(changesSectionOperand, "moveAbove"), {
-		group,
-		enabled: focusedPanel === panel && outlineMode._tag === "Default",
-		commandPalette: { label: "Commit" },
-		hotkeys: [{ hotkey: "C" }],
-	});
+	const operationEnabled = focusedPanel === panel && outlineMode._tag === "Default";
+	useHotkeys([
+		{
+			hotkey: "M",
+			callback: () => enterTransferMode(selection, "moveAbove"),
+			options: {
+				conflictBehavior: "allow",
+				enabled: operationEnabled,
+				meta: { group, name: "Move" },
+			},
+		},
+		{
+			hotkey: "Mod+X",
+			callback: () => enterTransferMode(selection, "rub"),
+			options: {
+				conflictBehavior: "allow",
+				enabled: operationEnabled,
+				ignoreInputs: true,
+				meta: { group, name: "Cut" },
+			},
+		},
+		{
+			hotkey: "R",
+			callback: () => enterTransferMode(selection, "rub"),
+			options: {
+				conflictBehavior: "allow",
+				enabled: operationEnabled,
+				meta: { group, name: "Cut" },
+			},
+		},
+		{
+			hotkey: "C",
+			callback: () => enterTransferMode(changesSectionOperand, "moveAbove"),
+			options: {
+				conflictBehavior: "allow",
+				enabled: operationEnabled,
+				meta: { group, name: "Commit" },
+			},
+		},
+	]);
 };
