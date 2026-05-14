@@ -483,12 +483,14 @@ export const moveOperation = ({
 	if (branchMoveOperation) return branchMoveOperation;
 
 	const relativeTo: RelativeTo | null = Match.value(target).pipe(
-		Match.withReturnType<RelativeTo | null>(),
 		Match.tags({
-			Commit: ({ commitId }) => ({ type: "commit", subject: commitId }),
-			Branch: ({ branchRef }) => ({ type: "referenceBytes", subject: branchRef }),
+			Commit: ({ commitId }): RelativeTo | null => ({ type: "commit", subject: commitId }),
+			Branch: ({ branchRef }): RelativeTo | null => ({
+				type: "referenceBytes",
+				subject: branchRef,
+			}),
 		}),
-		Match.orElse(() => null),
+		Match.orElse((): RelativeTo | null => null),
 	);
 
 	if (!relativeTo) return null;
