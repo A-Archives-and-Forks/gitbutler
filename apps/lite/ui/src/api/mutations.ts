@@ -15,13 +15,6 @@ export const commitInsertBlankMutationOptions = mutationOptions({
 	},
 });
 
-export const commitCreateMutationOptions = mutationOptions({
-	mutationFn: window.lite.commitCreate,
-	onSuccess: async (_data, _input, _ctx, { client }) => {
-		await client.invalidateQueries();
-	},
-});
-
 export const commitDiscardMutationOptions = mutationOptions({
 	mutationFn: window.lite.commitDiscard,
 	onSuccess: async (_data, _input, _ctx, { client }) => {

@@ -8,7 +8,7 @@ import { Toast } from "@base-ui/react";
 
 const toastManager = Toast.createToastManager();
 
-const errorMessageForToast = (error: unknown): string => {
+export const errorMessageForToast = (error: unknown): string => {
 	if (error instanceof Error) return error.message;
 	if (typeof error === "string") return error;
 
