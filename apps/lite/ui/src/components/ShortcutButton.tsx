@@ -41,6 +41,7 @@ export const ShortcutButton: FC<Props> = ({ hotkey, hotkeyOptions, ...props }) =
 			<Tooltip.Portal>
 				<Tooltip.Positioner sideOffset={8}>
 					<Tooltip.Popup className={classes(uiStyles.popup, uiStyles.tooltip, styles.tooltip)}>
+						{hotkeyOptions?.meta?.name}
 						<Keys hotkey={hotkey} />
 					</Tooltip.Popup>
 				</Tooltip.Positioner>
