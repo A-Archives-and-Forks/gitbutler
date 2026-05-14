@@ -33,6 +33,7 @@ import {
 import { focusPanel, useFocusedProjectPanel, useNavigationIndexHotkeys } from "#ui/panels.ts";
 import {
 	projectActions,
+	selectProjectCommitTarget,
 	selectProjectHighlightedCommitIds,
 	selectProjectOutlineModeState,
 	selectProjectReplacedCommits,
@@ -43,7 +44,7 @@ import { OperationSourceLabel } from "#ui/routes/project/$id/workspace/Operation
 import { OperationTarget } from "#ui/routes/project/$id/workspace/OperationTarget.tsx";
 import { useAppDispatch, useAppSelector } from "#ui/store.ts";
 import { classes } from "#ui/ui/classes.ts";
-import { MenuTriggerIcon, PushIcon } from "#ui/ui/icons.tsx";
+import { BullseyeIcon, MenuTriggerIcon, PushIcon } from "#ui/ui/icons.tsx";
 import {
 	buildNavigationIndex,
 	navigationIndexIncludes,
@@ -58,6 +59,7 @@ import {
 	BranchReference,
 	Commit,
 	RefInfo,
+	RelativeTo,
 	Segment,
 	Stack,
 	TreeChange,
@@ -520,6 +522,7 @@ const CommitRow: FC<
 		reword: "Enter",
 		moveUp: "Alt+ArrowUp",
 		moveDown: "Alt+ArrowDown",
+		composeCommitHere: "C",
 	} satisfies Record<string, RegisterableHotkey>;
 
 	const navigationIndex = assert(use(NavigationIndexContext));
@@ -528,6 +531,7 @@ const CommitRow: FC<
 	);
 	const dryRunCommit = useDryRunCommit(commit.id);
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
+	const { selectedItem: commitTarget } = useCommitTargetCombobox(projectId);
 
 	const dispatch = useAppDispatch();
 	const commitOperandV: CommitOperand = {
@@ -736,6 +740,14 @@ const CommitRow: FC<
 		focusPanel("outline");
 	};
 
+	const relativeTo: RelativeTo = { type: "commit", subject: commit.id };
+	const isCommitTarget = commitTarget && relativeToEquals(commitTarget.relativeTo, relativeTo);
+
+	const composeCommitHere = () => {
+		dispatch(projectActions.setCommitTarget({ projectId, commitTarget: relativeTo }));
+		focusCommitMessageInput();
+	};
+
 	const defaultCommitHotkeysEnabled =
 		isSelected && focusedPanel === "outline" && outlineMode._tag === "Default";
 	useHotkeys([
@@ -773,6 +785,15 @@ const CommitRow: FC<
 				conflictBehavior: "allow",
 				enabled: defaultCommitHotkeysEnabled && !runOperationMutation.isPending,
 				meta: { group: "Commit", name: "Move commit down" },
+			},
+		},
+		{
+			hotkey: hotkeys.composeCommitHere,
+			callback: composeCommitHere,
+			options: {
+				conflictBehavior: "allow",
+				enabled: defaultCommitHotkeysEnabled,
+				meta: { group: "Commit", name: "Compose commit here" },
 			},
 		},
 	]);
@@ -815,6 +836,12 @@ const CommitRow: FC<
 		enabled: !commitDiscard.isPending,
 		onSelect: deleteCommit,
 	};
+	const setCommitTargetContextMenuItem: NativeMenuItem = {
+		_tag: "Item",
+		label: "Compose commit here",
+		accelerator: toElectronAccelerator(hotkeys.composeCommitHere),
+		onSelect: composeCommitHere,
+	};
 
 	const menuItems: Array<NativeMenuItem> = [
 		amendCommitContextMenuItem,
@@ -826,6 +853,7 @@ const CommitRow: FC<
 			submenu: [insertBlankCommitAboveContextMenuItem, insertBlankCommitBelowContextMenuItem],
 		},
 		deleteCommitContextMenuItem,
+		setCommitTargetContextMenuItem,
 	];
 
 	return (
@@ -874,6 +902,15 @@ const CommitRow: FC<
 								<MenuTriggerIcon />
 							</Toolbar.Button>
 						</WorkspaceItemRowToolbar>
+					)}
+					{isCommitTarget && (
+						<span
+							className={styles.commitTargetIndicator}
+							aria-label="Commit target"
+							title="Commit target"
+						>
+							<BullseyeIcon />
+						</span>
 					)}
 				</>
 			)}
@@ -1009,25 +1046,103 @@ const BaseCommit: FC<{
 	);
 };
 
-type CommitBranchComboboxItem = {
-	id: string;
+type CommitTargetComboboxItem = {
 	label: string;
-	branch: BranchOperand;
+	relativeTo: RelativeTo;
 };
 
-const CommitBranchComboboxPopup: FC = () => (
-	<Combobox.Popup className={classes(uiStyles.popup, styles.commitBranchComboboxPopup)}>
+const relativeToKey = (relativeTo: RelativeTo): string => {
+	switch (relativeTo.type) {
+		case "reference":
+			return JSON.stringify(["reference", relativeTo.subject]);
+		case "referenceBytes":
+			return JSON.stringify(["referenceBytes", relativeTo.subject]);
+		case "commit":
+			return JSON.stringify(["commit", relativeTo.subject]);
+	}
+};
+
+const relativeToEquals = (a: RelativeTo, b: RelativeTo): boolean =>
+	relativeToKey(a) === relativeToKey(b);
+
+const buildCommitTargetComboboxItems = ({
+	headInfo,
+	commitTargetState,
+}: {
+	headInfo: RefInfo | undefined;
+	commitTargetState: RelativeTo | null;
+}): Array<CommitTargetComboboxItem> => {
+	const commitTarget =
+		headInfo && commitTargetState?.type === "commit"
+			? findCommit({ headInfo, commitId: commitTargetState.subject })
+			: null;
+
+	return [
+		...(commitTarget
+			? ([
+					{
+						label: `Commit: ${commitTitle(commitTarget.message)}`,
+						relativeTo: { type: "commit", subject: commitTarget.id },
+					},
+				] satisfies Array<CommitTargetComboboxItem>)
+			: []),
+		...(headInfo
+			? headInfo.stacks.flatMap(
+					(stack): Array<CommitTargetComboboxItem> =>
+						stack.segments.flatMap((segment): Array<CommitTargetComboboxItem> => {
+							const refName = segment.refName;
+							if (!refName) return [];
+
+							return [
+								{
+									label: refName.displayName,
+									relativeTo: { type: "referenceBytes", subject: refName.fullNameBytes },
+								},
+							];
+						}),
+				)
+			: []),
+	];
+};
+
+const selectCommitTargetComboboxItem = ({
+	items,
+	commitTargetState,
+}: {
+	items: Array<CommitTargetComboboxItem>;
+	commitTargetState: RelativeTo | null;
+}): CommitTargetComboboxItem | null =>
+	(commitTargetState &&
+		items.find((item) => relativeToEquals(item.relativeTo, commitTargetState))) ??
+	items[0] ??
+	null;
+
+const useCommitTargetCombobox = (projectId: string) => {
+	const commitTargetState = useAppSelector((state) => selectProjectCommitTarget(state, projectId));
+	const { data: headInfo } = useQuery(headInfoQueryOptions(projectId));
+	const items = buildCommitTargetComboboxItems({ headInfo, commitTargetState });
+	const selectedItem = selectCommitTargetComboboxItem({ items, commitTargetState });
+
+	return { items, selectedItem };
+};
+
+const CommitTargetComboboxPopup: FC = () => (
+	<Combobox.Popup className={classes(uiStyles.popup, styles.commitTargetComboboxPopup)}>
 		<Combobox.Input
-			aria-label="Search branches"
-			placeholder="Search branches…"
-			className={styles.commitBranchComboboxInput}
+			aria-label="Search targets"
+			placeholder="Search targets…"
+			className={styles.commitTargetComboboxInput}
 		/>
 		<Combobox.Empty>
-			<div className={styles.commitBranchComboboxEmpty}>No branches found.</div>
+			<div className={styles.commitTargetComboboxEmpty}>No targets found.</div>
 		</Combobox.Empty>
-		<Combobox.List className={styles.commitBranchComboboxList}>
-			{(item: CommitBranchComboboxItem) => (
-				<Combobox.Item key={item.id} value={item} className={styles.commitBranchComboboxItem}>
+		<Combobox.List className={styles.commitTargetComboboxList}>
+			{(item: CommitTargetComboboxItem) => (
+				<Combobox.Item
+					key={relativeToKey(item.relativeTo)}
+					value={item}
+					className={styles.commitTargetComboboxItem}
+				>
 					{item.label}
 				</Combobox.Item>
 			)}
@@ -1035,15 +1150,21 @@ const CommitBranchComboboxPopup: FC = () => (
 	</Combobox.Popup>
 );
 
+const commitMessageInputId = "commit-message-input";
+const focusCommitMessageInput = () => {
+	document.getElementById(commitMessageInputId)?.focus();
+};
+
 const Changes: FC<{
 	projectId: string;
 }> = ({ projectId }) => {
 	const toastManager = Toast.useToastManager();
 	const queryClient = useQueryClient();
+	const dispatch = useAppDispatch();
 
 	const commitCreate = useMutation({
 		mutationFn: async () => {
-			if (!branch) throw new Error("No branch.");
+			if (!commitTarget) throw new Error("No target.");
 
 			const worktreeChanges = await queryClient.fetchQuery(
 				changesInWorktreeQueryOptions(projectId),
@@ -1052,10 +1173,7 @@ const Changes: FC<{
 
 			return await window.lite.commitCreate({
 				projectId,
-				relativeTo: {
-					type: "referenceBytes",
-					subject: branch.branch.branchRef,
-				},
+				relativeTo: commitTarget.relativeTo,
 				changes,
 				side: "below",
 				message: commitTextareaRef.current?.value ?? "",
@@ -1064,6 +1182,14 @@ const Changes: FC<{
 		},
 		onSuccess: async (response, _input, _ctx, { client }) => {
 			await client.invalidateQueries();
+
+			if (commitTarget?.relativeTo.type === "commit" && response.newCommit !== null)
+				dispatch(
+					projectActions.setCommitTarget({
+						projectId,
+						commitTarget: { type: "commit", subject: response.newCommit },
+					}),
+				);
 
 			if (response.rejectedChanges.length > 0)
 				toastManager.add(
@@ -1094,36 +1220,21 @@ const Changes: FC<{
 	const operand = changesSectionOperand;
 	const commitTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 	const focusedPanel = useFocusedProjectPanel(projectId);
-	const dispatch = useAppDispatch();
 
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
-	const { data: headInfo } = useQuery(headInfoQueryOptions(projectId));
-	const branchComboboxItems =
-		headInfo?.stacks.flatMap((stack): Array<CommitBranchComboboxItem> => {
-			// oxlint-disable-next-line typescript/no-non-null-assertion -- [ref:stack-id-required]
-			const stackId = stack.id!;
-			return stack.segments.flatMap((segment): Array<CommitBranchComboboxItem> => {
-				const refName = segment.refName;
-				if (!refName) return [];
-
-				return [
-					{
-						id: JSON.stringify([stackId, refName.fullNameBytes]),
-						label: refName.displayName,
-						branch: { stackId, branchRef: refName.fullNameBytes },
-					},
-				];
-			});
-		}) ?? [];
-
-	const [branchId, setBranchId] = useState<string | null>(null);
-	const branch = branchComboboxItems.find((item) => item.id === branchId) ?? branchComboboxItems[0];
+	const { items: branchComboboxItems, selectedItem: commitTarget } =
+		useCommitTargetCombobox(projectId);
 
 	const [open, setOpen] = useState(false);
 
-	const selectBranch = (option: CommitBranchComboboxItem | null) => {
-		setBranchId(option?.id ?? null);
+	const selectBranch = (option: CommitTargetComboboxItem | null) => {
+		dispatch(
+			projectActions.setCommitTarget({
+				projectId,
+				commitTarget: option?.relativeTo ?? null,
+			}),
+		);
 		setOpen(false);
 	};
 
@@ -1189,6 +1300,7 @@ const Changes: FC<{
 			<ChangesSectionRow changes={worktreeChanges?.changes ?? []} projectId={projectId} />
 
 			<textarea
+				id={commitMessageInputId}
 				ref={commitTextareaRef}
 				aria-label="Compose commit message"
 				disabled={outlineMode._tag !== "Default"}
@@ -1204,21 +1316,21 @@ const Changes: FC<{
 			/>
 
 			<div className={styles.commitControls}>
-				<Combobox.Root<CommitBranchComboboxItem>
+				<Combobox.Root<CommitTargetComboboxItem>
 					items={branchComboboxItems}
 					open={open}
 					onOpenChange={setOpen}
 					// Note `undefined` means uncontrolled.
-					value={branch ?? null}
+					value={commitTarget ?? null}
 					onValueChange={selectBranch}
 					itemToStringLabel={(x) => x.label}
-					itemToStringValue={(x) => x.id}
-					isItemEqualToValue={(a, b) => a.id === b.id}
+					itemToStringValue={(x) => relativeToKey(x.relativeTo)}
+					isItemEqualToValue={(a, b) => relativeToEquals(a.relativeTo, b.relativeTo)}
 					autoHighlight
 					disabled={outlineMode._tag !== "Default" || commitCreate.isPending}
 				>
 					<Combobox.Trigger
-						className={classes(uiStyles.button, styles.commitBranchComboboxTrigger)}
+						className={classes(uiStyles.button, styles.commitTargetComboboxTrigger)}
 						aria-label="Select branch"
 						render={
 							<ShortcutButton
@@ -1234,7 +1346,7 @@ const Changes: FC<{
 					</Combobox.Trigger>
 					<Combobox.Portal>
 						<Combobox.Positioner align="start" sideOffset={8}>
-							<CommitBranchComboboxPopup />
+							<CommitTargetComboboxPopup />
 						</Combobox.Positioner>
 					</Combobox.Portal>
 				</Combobox.Root>
@@ -1242,12 +1354,12 @@ const Changes: FC<{
 				<ShortcutButton
 					hotkey="Mod+Enter"
 					hotkeyOptions={{
-						enabled: outlineMode._tag === "Default" && !!branch && !commitCreate.isPending,
+						enabled: outlineMode._tag === "Default" && !!commitTarget && !commitCreate.isPending,
 						meta: { group: "Changes", name: "Commit" },
 					}}
 					className={classes(uiStyles.button, styles.changesSectionCommitButton)}
 					type="submit"
-					disabled={outlineMode._tag !== "Default" || !branch || commitCreate.isPending}
+					disabled={outlineMode._tag !== "Default" || !commitTarget || commitCreate.isPending}
 				>
 					Commit
 				</ShortcutButton>
@@ -1316,9 +1428,11 @@ const BranchRow: FC<
 > = ({ projectId, branchName, branchRef, stackId, ...restProps }) => {
 	const hotkeys = {
 		rename: "Enter",
+		composeCommitHere: "C",
 	} satisfies Record<string, RegisterableHotkey>;
 
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
+	const { selectedItem: commitTarget } = useCommitTargetCombobox(projectId);
 	const dispatch = useAppDispatch();
 	const branchOperandV: BranchOperand = {
 		stackId,
@@ -1390,14 +1504,27 @@ const BranchRow: FC<
 		});
 	};
 
+	const relativeTo: RelativeTo = { type: "referenceBytes", subject: branchRef };
+	const isCommitTarget = commitTarget && relativeToEquals(relativeTo, commitTarget.relativeTo);
+
+	const composeCommitHere = () => {
+		dispatch(projectActions.setCommitTarget({ projectId, commitTarget: relativeTo }));
+		focusCommitMessageInput();
+	};
+
+	const defaultBranchHotkeysEnabled =
+		isSelected && focusedPanel === "outline" && outlineMode._tag === "Default";
+
 	useHotkey(hotkeys.rename, startEditing, {
 		conflictBehavior: "allow",
-		enabled:
-			isSelected &&
-			focusedPanel === "outline" &&
-			outlineMode._tag === "Default" &&
-			!isRenamePending,
+		enabled: defaultBranchHotkeysEnabled && !isRenamePending,
 		meta: { group: "Branch", name: "Rename branch" },
+	});
+
+	useHotkey(hotkeys.composeCommitHere, composeCommitHere, {
+		conflictBehavior: "allow",
+		enabled: defaultBranchHotkeysEnabled,
+		meta: { group: "Branch", name: "Compose commit here" },
 	});
 
 	const startEditingContextMenuItem: NativeMenuItem = {
@@ -1407,8 +1534,17 @@ const BranchRow: FC<
 		accelerator: toElectronAccelerator(hotkeys.rename),
 		onSelect: startEditing,
 	};
+	const setCommitTargetContextMenuItem: NativeMenuItem = {
+		_tag: "Item",
+		label: "Compose commit here",
+		accelerator: toElectronAccelerator(hotkeys.composeCommitHere),
+		onSelect: composeCommitHere,
+	};
 
-	const menuItems: Array<NativeMenuItem> = [startEditingContextMenuItem];
+	const menuItems: Array<NativeMenuItem> = [
+		startEditingContextMenuItem,
+		setCommitTargetContextMenuItem,
+	];
 
 	return (
 		<ItemRow {...restProps} projectId={projectId} operand={operand}>
@@ -1458,6 +1594,15 @@ const BranchRow: FC<
 								<MenuTriggerIcon />
 							</Toolbar.Button>
 						</WorkspaceItemRowToolbar>
+					)}
+					{isCommitTarget && (
+						<span
+							className={styles.commitTargetIndicator}
+							aria-label="Commit target"
+							title="Commit target"
+						>
+							<BullseyeIcon />
+						</span>
 					)}
 				</>
 			)}

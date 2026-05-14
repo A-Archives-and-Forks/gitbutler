@@ -1,6 +1,6 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { RootState } from "#ui/store.ts";
-import { type AbsorptionTarget } from "@gitbutler/but-sdk";
+import { type AbsorptionTarget, type RelativeTo } from "@gitbutler/but-sdk";
 import { type BranchOperand, type CommitOperand, type Operand } from "#ui/operands.ts";
 import { type Panel } from "#ui/panels.ts";
 import * as panels from "#ui/panels/state.ts";
@@ -135,6 +135,13 @@ const projectSlice = createSlice({
 			const { projectId, commitIds } = action.payload;
 			workspace.setHighlightedCommitIds(ensureProjectState(state, projectId).workspace, commitIds);
 		},
+		setCommitTarget: (
+			state,
+			action: PayloadAction<{ projectId: string; commitTarget: RelativeTo | null }>,
+		) => {
+			const { projectId, commitTarget } = action.payload;
+			workspace.setCommitTarget(ensureProjectState(state, projectId).workspace, commitTarget);
+		},
 		showPanel: (state, action: PayloadAction<{ projectId: string; panel: Panel }>) => {
 			panels.showPanel(
 				ensureProjectState(state, action.payload.projectId).panels,
@@ -215,6 +222,9 @@ export const selectProjectOutlineModeState = (state: RootState, projectId: strin
 
 export const selectProjectHighlightedCommitIds = (state: RootState, projectId: string) =>
 	workspace.selectHighlightedCommitIds(selectProjectWorkspaceState(state, projectId));
+
+export const selectProjectCommitTarget = (state: RootState, projectId: string) =>
+	workspace.selectCommitTarget(selectProjectWorkspaceState(state, projectId));
 
 export const selectProjectReplacedCommits = (state: RootState, projectId: string) =>
 	workspace.selectReplacedCommits(selectProjectWorkspaceState(state, projectId));
