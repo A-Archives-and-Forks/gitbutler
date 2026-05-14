@@ -23,8 +23,11 @@ import { useMutation } from "@tanstack/react-query";
 
 type DropTargetParams = Parameters<typeof dropTargetForElements>[0];
 type GetDataArgs = Parameters<NonNullable<DropTargetParams["getData"]>>[0];
+type OnDropArgs = Parameters<NonNullable<DropTargetParams["onDrop"]>>[0];
 
-const getOperationTypeFromData = (data: Record<string | symbol, unknown>): OperationType | null => {
+type DropData = OnDropArgs["self"]["data"];
+
+const getOperationTypeFromData = (data: DropData): OperationType | null => {
 	const instruction = extractInstruction(data);
 	if (!instruction) return null;
 
