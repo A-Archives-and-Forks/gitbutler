@@ -21,9 +21,17 @@ import {
 import { TopBarActionsPortal } from "#ui/portals.tsx";
 import { Keys } from "#ui/components/Keys.tsx";
 import { ShortcutButton } from "#ui/components/ShortcutButton.tsx";
+import type { CommandGroup } from "#ui/hotkeys.ts";
 import { useAppDispatch, useAppSelector } from "#ui/store.ts";
 import { BranchListing, Segment, Stack } from "@gitbutler/but-sdk";
-import { Hotkey, HotkeySequence, normalizeRegisterableHotkey } from "@tanstack/react-hotkeys";
+import {
+	getHotkeyManager,
+	getSequenceManager,
+	Hotkey,
+	HotkeySequence,
+	useHotkey,
+	useHotkeyRegistrations,
+} from "@tanstack/react-hotkeys";
 import { useMutation, useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { Match, Order } from "effect";
@@ -33,44 +41,27 @@ import { branchOperand, type BranchOperand } from "#ui/operands.ts";
 import { PickerDialog, type PickerDialogGroup } from "#ui/ui/PickerDialog/PickerDialog.tsx";
 import { DetailsPanel } from "./DetailsPanel.tsx";
 import styles from "./WorkspacePage.module.css";
-import type { CommandGroup } from "#ui/commands/groups.ts";
 import { OutlinePanel } from "#ui/routes/project/$id/workspace/OutlinePanel.tsx";
 import { classes } from "#ui/ui/classes.ts";
-import { CommandOptions, useCommand, useCommandFn } from "#ui/commands/manager.ts";
-import type { CommandRegistrationId } from "#ui/commands/state.ts";
 
 type CommandPaletteItem = {
+	group: CommandGroup;
 	id: string;
 	name: string;
-	hotkeys?: Array<Hotkey | HotkeySequence>;
+	hotkey: Hotkey | HotkeySequence;
+	type: "hotkey" | "sequence";
 };
 
 const groupCommandPaletteItems = (
-	regs: Record<CommandRegistrationId, CommandOptions>,
+	items: Array<CommandPaletteItem>,
 ): Array<PickerDialogGroup<CommandPaletteItem>> => {
-	const grouped: Map<CommandGroup, Array<CommandPaletteItem>> = new Map();
-
-	for (const [id, cmd] of Object.entries(regs)) {
-		if (cmd.enabled === false || cmd.commandPalette === undefined) continue;
-
-		const mitems = grouped.get(cmd.group) ?? [];
-		grouped.set(cmd.group, [
-			...mitems,
-			{
-				id,
-				name: cmd.commandPalette.label,
-				hotkeys: cmd.hotkeys?.map((hk) =>
-					"sequence" in hk ? hk.sequence : normalizeRegisterableHotkey(hk.hotkey),
-				),
-			},
-		]);
-	}
+	const grouped = Map.groupBy(items, (item) => item.group);
 
 	return Array.from(grouped.entries())
-		.toSorted(Order.mapInput(Order.string, ([g]) => g))
-		.map(([group, cmds]) => ({
+		.toSorted(Order.mapInput(Order.string, ([group]) => group))
+		.map(([group, items]) => ({
 			value: group,
-			items: cmds.toSorted(Order.mapInput(Order.string, (cmd) => cmd.name)),
+			items: items.toSorted(Order.mapInput(Order.string, (item) => item.name)),
 		}));
 };
 
@@ -78,33 +69,52 @@ const CommandPalette: FC<{
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 }> = ({ open, onOpenChange }) => {
-	const regs = useAppSelector((state) => state.commands.registrations);
-	const items = groupCommandPaletteItems(regs);
-	const getCommandFn = useCommandFn();
+	const { hotkeys, sequences } = useHotkeyRegistrations();
+	const hotkeyItems: Array<CommandPaletteItem> = [
+		...hotkeys.flatMap((hotkey): CommandPaletteItem | [] =>
+			hotkey.options.enabled !== false && hotkey.options.meta?.name !== undefined
+				? {
+						group: hotkey.options.meta.group,
+						id: hotkey.id,
+						name: hotkey.options.meta.name,
+						hotkey: hotkey.hotkey,
+						type: "hotkey",
+					}
+				: [],
+		),
+		...sequences.flatMap((sequence): CommandPaletteItem | [] =>
+			sequence.options.enabled !== false && sequence.options.meta?.name !== undefined
+				? {
+						group: sequence.options.meta.group,
+						id: sequence.id,
+						name: sequence.options.meta.name,
+						hotkey: sequence.sequence,
+						type: "sequence",
+					}
+				: [],
+		),
+	];
+	const items = groupCommandPaletteItems(hotkeyItems);
 
-	const runCommand = (hotkey: CommandPaletteItem) => {
+	const runHotkey = (item: CommandPaletteItem) => {
 		onOpenChange(false);
-		// oxlint-disable-next-line typescript/no-non-null-assertion: Let it loudly fail.
-		getCommandFn(hotkey.id)!("commandPalette");
+		if (item.type === "hotkey") getHotkeyManager().triggerRegistration(item.id);
+		else getSequenceManager().triggerSequence(item.id);
 	};
 
 	return (
 		<PickerDialog
 			ariaLabel="Command palette"
 			closeLabel="Close command palette"
-			emptyLabel="No commands found."
+			emptyLabel="No hotkeys found."
 			getItemKey={(x) => x.id}
 			getItemLabel={(x) => x.name}
-			getItemType={(x) => {
-				// TODO: Render all hotkeys.
-				const firstViable = x.hotkeys?.find((hk) => typeof hk === "string");
-				return firstViable !== undefined && <Keys hotkey={firstViable} />;
-			}}
+			getItemType={(x) => <Keys hotkey={x.hotkey} />}
 			items={items}
 			open={open}
 			onOpenChange={onOpenChange}
-			onSelectItem={runCommand}
-			placeholder="Search commands…"
+			onSelectItem={runHotkey}
+			placeholder="Search hotkeys…"
 		/>
 	);
 };
@@ -273,50 +283,35 @@ const TopBarActions: FC = () => {
 		togglePanel("details");
 	};
 
-	const applyBranchCommand = useCommand(openApplyBranchPicker, {
-		group: "Branches",
-		commandPalette: { label: "Apply" },
-		hotkeys: [{ hotkey: "Mod+Shift+A" }],
-	});
-
-	const toggleFilesCommand = useCommand(toggleFiles, {
-		group: "Files",
-		commandPalette: {
-			label: isPanelVisible(panelsState, "files") ? "Close" : "Open",
-		},
-		hotkeys: [{ hotkey: "F" }],
-	});
-
-	const toggleDetailsCommand = useCommand(toggleDetails, {
-		group: "Details",
-		commandPalette: {
-			label: isPanelVisible(panelsState, "details") ? "Close" : "Open",
-		},
-		hotkeys: [{ hotkey: "D" }],
-	});
-
 	return (
 		<>
 			<ShortcutButton
 				className={uiStyles.button}
-				hotkeys={applyBranchCommand.hotkeys}
-				onClick={applyBranchCommand.commandFn}
+				hotkey="Mod+Shift+A"
+				hotkeyOptions={{ meta: { group: "Branches", name: "Apply branch" } }}
+				onClick={openApplyBranchPicker}
 			>
 				Apply branch
 			</ShortcutButton>
 			<ShortcutButton
 				className={uiStyles.button}
-				hotkeys={toggleFilesCommand.hotkeys}
+				hotkey="F"
+				hotkeyOptions={{
+					meta: { group: "Files", name: "Toggle files" },
+				}}
 				aria-pressed={isPanelVisible(panelsState, "files")}
-				onClick={toggleFilesCommand.commandFn}
+				onClick={toggleFiles}
 			>
 				Files
 			</ShortcutButton>
 			<ShortcutButton
 				className={uiStyles.button}
-				hotkeys={toggleDetailsCommand.hotkeys}
+				hotkey="D"
+				hotkeyOptions={{
+					meta: { group: "Details", name: "Toggle details" },
+				}}
 				aria-pressed={isPanelVisible(panelsState, "details")}
-				onClick={toggleDetailsCommand.commandFn}
+				onClick={toggleDetails}
 			>
 				Details
 			</ShortcutButton>
@@ -331,25 +326,27 @@ const usePanelsHotkeys = ({
 	focusedPanel: PanelType | null;
 	visiblePanels: Array<PanelType>;
 }) => {
-	useCommand(
+	useHotkey(
+		"H",
 		() => {
 			focusAdjacentPanel(-1, visiblePanels);
 		},
 		{
-			group: "Panels",
+			conflictBehavior: "allow",
 			enabled: focusedPanel !== null,
-			hotkeys: [{ hotkey: "H" }],
+			meta: { group: "Panels", name: "Focus previous panel" },
 		},
 	);
 
-	useCommand(
+	useHotkey(
+		"L",
 		() => {
 			focusAdjacentPanel(1, visiblePanels);
 		},
 		{
-			group: "Panels",
+			conflictBehavior: "allow",
 			enabled: focusedPanel !== null,
-			hotkeys: [{ hotkey: "L" }],
+			meta: { group: "Panels", name: "Focus next panel" },
 		},
 	);
 };
@@ -363,15 +360,13 @@ const WorkspacePage: FC = () => {
 	const panelsState = useAppSelector((state) => selectProjectPanelsState(state, projectId));
 	const focusedPanel = useFocusedProjectPanel(projectId);
 
-	useCommand(
+	useHotkey(
+		"Mod+K",
 		() => {
 			if (dialog._tag === "CommandPalette") dispatch(projectActions.closeDialog({ projectId }));
 			else dispatch(projectActions.openCommandPalette({ projectId, focusedPanel }));
 		},
-		{
-			group: "Global",
-			hotkeys: [{ hotkey: "Mod+K" }],
-		},
+		{ conflictBehavior: "allow", meta: { group: "Global", name: "Command palette" } },
 	);
 
 	usePanelsHotkeys({ focusedPanel, visiblePanels: panelsState.visiblePanels });

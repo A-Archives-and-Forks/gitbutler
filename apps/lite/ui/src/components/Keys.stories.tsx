@@ -17,3 +17,9 @@ export const Modifier = meta.story({
 		hotkey: "Mod+A",
 	},
 });
+
+export const Sequence = meta.story({
+	args: {
+		hotkey: ["G", "G"],
+	},
+});

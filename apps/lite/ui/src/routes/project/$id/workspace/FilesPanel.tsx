@@ -52,8 +52,9 @@ import {
 	NavigationIndex,
 	navigationIndexIncludes,
 } from "#ui/workspace/navigation-index.ts";
-import { useCommand } from "#ui/commands/manager.ts";
+import { toElectronAccelerator } from "#ui/hotkeys.ts";
 import { assert } from "#ui/assert.ts";
+import { useHotkey, type RegisterableHotkey } from "@tanstack/react-hotkeys";
 
 const NavigationIndexContext = createContext<NavigationIndex | null>(null);
 
@@ -451,6 +452,10 @@ const ChangesFileRow: FC<{
 
 	projectId: string;
 }> = ({ change, dependencyCommitIds, projectId }) => {
+	const hotkeys = {
+		absorb: "A",
+	} satisfies Record<string, RegisterableHotkey>;
+
 	const operand = fileOperand({ parent: changesFileParent, path: change.path });
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 	const isSelected = useIsSelected({ projectId, operand });
@@ -472,17 +477,19 @@ const ChangesFileRow: FC<{
 		});
 	};
 
-	const { contextMenu: absorbContextMenuItem } = useCommand(absorb, {
+	useHotkey(hotkeys.absorb, absorb, {
+		conflictBehavior: "allow",
 		enabled: isSelected && focusedPanel === "files" && outlineMode._tag === "Default",
-		group: "Changes file",
-		commandPalette: { label: "Absorb" },
-		hotkeys: [{ hotkey: "A" }],
-		contextMenu: {
-			label: "Absorb",
-			// Focus change is too slow / the menu item isn't reactive.
-			enabled: true,
-		},
+		meta: { group: "Changes file", name: "Absorb" },
 	});
+
+	const absorbContextMenuItem: NativeMenuItem = {
+		_tag: "Item",
+		label: "Absorb",
+		enabled: true,
+		accelerator: toElectronAccelerator(hotkeys.absorb),
+		onSelect: absorb,
+	};
 
 	const menuItems: Array<NativeMenuItem> = [absorbContextMenuItem];
 

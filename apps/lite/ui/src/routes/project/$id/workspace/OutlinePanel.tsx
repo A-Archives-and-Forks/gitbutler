@@ -71,7 +71,12 @@ import {
 	TreeChange,
 	WorkspaceState,
 } from "@gitbutler/but-sdk";
-import { formatForDisplay } from "@tanstack/react-hotkeys";
+import {
+	formatForDisplay,
+	useHotkey,
+	useHotkeys,
+	type RegisterableHotkey,
+} from "@tanstack/react-hotkeys";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { Match } from "effect";
@@ -103,7 +108,7 @@ import { defaultOutlineSelection } from "#ui/projects/workspace/state.ts";
 import { ShortcutButton } from "#ui/components/ShortcutButton.tsx";
 import { resolveDiffSpecs } from "#ui/operations/diff-specs.ts";
 import { rejectedChangesToastOptions } from "#ui/operations/rejectedChangesToastOptions.tsx";
-import { useCommand } from "#ui/commands/manager.ts";
+import { toElectronAccelerator } from "#ui/hotkeys.ts";
 import { assert } from "#ui/assert.ts";
 import { Spinner } from "#ui/components/Spinner.tsx";
 
@@ -310,10 +315,9 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 		dispatch(projectActions.openBranchPicker({ projectId }));
 	};
 
-	useCommand(openBranchPicker, {
-		group: "Outline",
-		commandPalette: { label: "Select branch" },
-		hotkeys: [{ hotkey: "T" }],
+	useHotkey("T", openBranchPicker, {
+		conflictBehavior: "allow",
+		meta: { group: "Outline", name: "Select branch" },
 	});
 
 	const operationSource = getOperationSource(outlineMode);
@@ -471,16 +475,18 @@ const InlineRewordCommit: FC<{
 		onSubmit(formData.get("message") as string);
 	};
 
-	useCommand(() => formRef.current?.requestSubmit(), {
-		group: "Reword commit",
+	useHotkey("Enter", () => formRef.current?.requestSubmit(), {
+		conflictBehavior: "allow",
 		enabled: focusedPanel === "outline",
-		hotkeys: [{ hotkey: "Enter", ignoreInputs: false }],
+		ignoreInputs: false,
+		meta: { group: "Reword commit", name: "Save reworded commit" },
 	});
 
-	useCommand(onExit, {
-		group: "Reword commit",
+	useHotkey("Escape", onExit, {
+		conflictBehavior: "allow",
 		enabled: focusedPanel === "outline",
-		hotkeys: [{ hotkey: "Escape", ignoreInputs: false }],
+		ignoreInputs: false,
+		meta: { group: "Reword commit", name: "Cancel reword commit" },
 	});
 
 	return (
@@ -514,6 +520,13 @@ const CommitRow: FC<
 		stackId: string;
 	} & ComponentProps<"div">
 > = ({ commit, projectId, stackId, ...restProps }) => {
+	const hotkeys = {
+		amend: "Shift+A",
+		reword: "Enter",
+		moveUp: "Alt+ArrowUp",
+		moveDown: "Alt+ArrowDown",
+	} satisfies Record<string, RegisterableHotkey>;
+
 	const navigationIndex = assert(use(NavigationIndexContext));
 	const isHighlighted = useAppSelector((state) =>
 		selectProjectHighlightedCommitIds(state, projectId).includes(commit.id),
@@ -687,106 +700,85 @@ const CommitRow: FC<
 		focusPanel("outline");
 	};
 
-	const { contextMenu: amendCommitContextMenuItem } = useCommand(amendCommit, {
-		enabled: isSelected && focusedPanel === "outline" && outlineMode._tag === "Default",
-		group: "Commit",
-		commandPalette: { label: "Amend" },
-		contextMenu: {
-			label: "Amend commit",
-			// Focus change is too slow / the menu item isn't reactive.
-			enabled: true,
-		},
-		hotkeys: [{ hotkey: "Shift+A" }],
-	});
-
-	const { contextMenu: cutCommitContextMenuItem } = useCommand(cutCommit, {
-		enabled: isSelected && focusedPanel === "outline" && outlineMode._tag === "Default",
-		group: "Commit",
-		commandPalette: { label: "Cut" },
-		// TODO: missing shortcut because it's defined elsewhere for all operands
-		contextMenu: {
-			label: "Cut commit",
-			// Focus change is too slow / the menu item isn't reactive.
-			enabled: true,
-		},
-	});
-
-	const { contextMenu: startEditingContextMenuItem } = useCommand(startEditing, {
-		enabled:
-			!isCommitMessagePending &&
-			isSelected &&
-			focusedPanel === "outline" &&
-			outlineMode._tag === "Default",
-		group: "Commit",
-		commandPalette: { label: "Reword" },
-		hotkeys: [{ hotkey: "Enter" }],
-		contextMenu: {
-			label: "Reword commit",
-			enabled: !isCommitMessagePending,
-		},
-	});
-
-	useCommand(() => moveCommit(-1), {
-		enabled:
-			!runOperationMutation.isPending &&
-			isSelected &&
-			focusedPanel === "outline" &&
-			outlineMode._tag === "Default",
-		group: "Commit",
-		hotkeys: [{ hotkey: "Alt+ArrowUp" }],
-	});
-
-	useCommand(() => moveCommit(1), {
-		enabled:
-			!runOperationMutation.isPending &&
-			isSelected &&
-			focusedPanel === "outline" &&
-			outlineMode._tag === "Default",
-		group: "Commit",
-		hotkeys: [{ hotkey: "Alt+ArrowDown" }],
-	});
-
-	const { contextMenu: insertBlankCommitAboveContextMenuItem } = useCommand(
-		insertBlankCommitAbove,
+	const defaultCommitHotkeysEnabled =
+		isSelected && focusedPanel === "outline" && outlineMode._tag === "Default";
+	useHotkeys([
 		{
-			enabled: isSelected && focusedPanel === "outline" && outlineMode._tag === "Default",
-			group: "Commit",
-			commandPalette: { label: "Add empty commit above" },
-			contextMenu: {
-				label: "Above",
-				// Focus change is too slow / the menu item isn't reactive.
-				enabled: true,
+			hotkey: hotkeys.amend,
+			callback: amendCommit,
+			options: {
+				conflictBehavior: "allow",
+				enabled: defaultCommitHotkeysEnabled,
+				meta: { group: "Commit", name: "Amend commit" },
 			},
 		},
-	);
-
-	const { contextMenu: insertBlankCommitBelowContextMenuItem } = useCommand(
-		insertBlankCommitBelow,
 		{
-			enabled: isSelected && focusedPanel === "outline" && outlineMode._tag === "Default",
-			group: "Commit",
-			commandPalette: { label: "Add empty commit below" },
-			contextMenu: {
-				label: "Below",
-				// Focus change is too slow / the menu item isn't reactive.
-				enabled: true,
+			hotkey: hotkeys.reword,
+			callback: startEditing,
+			options: {
+				conflictBehavior: "allow",
+				enabled: defaultCommitHotkeysEnabled && !isCommitMessagePending,
+				meta: { group: "Commit", name: "Reword commit" },
 			},
 		},
-	);
-
-	const { contextMenu: deleteCommitContextMenuItem } = useCommand(deleteCommit, {
-		enabled:
-			!commitDiscard.isPending &&
-			isSelected &&
-			focusedPanel === "outline" &&
-			outlineMode._tag === "Default",
-		group: "Commit",
-		commandPalette: { label: "Delete commit" },
-		contextMenu: {
-			label: "Delete commit",
-			enabled: !commitDiscard.isPending,
+		{
+			hotkey: hotkeys.moveUp,
+			callback: () => moveCommit(-1),
+			options: {
+				conflictBehavior: "allow",
+				enabled: defaultCommitHotkeysEnabled && !runOperationMutation.isPending,
+				meta: { group: "Commit", name: "Move commit up" },
+			},
 		},
-	});
+		{
+			hotkey: hotkeys.moveDown,
+			callback: () => moveCommit(1),
+			options: {
+				conflictBehavior: "allow",
+				enabled: defaultCommitHotkeysEnabled && !runOperationMutation.isPending,
+				meta: { group: "Commit", name: "Move commit down" },
+			},
+		},
+	]);
+
+	const amendCommitContextMenuItem: NativeMenuItem = {
+		_tag: "Item",
+		label: "Amend commit",
+		enabled: true,
+		accelerator: toElectronAccelerator(hotkeys.amend),
+		onSelect: amendCommit,
+	};
+	const cutCommitContextMenuItem: NativeMenuItem = {
+		_tag: "Item",
+		label: "Cut commit",
+		enabled: true,
+		onSelect: cutCommit,
+	};
+	const startEditingContextMenuItem: NativeMenuItem = {
+		_tag: "Item",
+		label: "Reword commit",
+		enabled: !isCommitMessagePending,
+		accelerator: toElectronAccelerator(hotkeys.reword),
+		onSelect: startEditing,
+	};
+	const insertBlankCommitAboveContextMenuItem: NativeMenuItem = {
+		_tag: "Item",
+		label: "Above",
+		enabled: true,
+		onSelect: insertBlankCommitAbove,
+	};
+	const insertBlankCommitBelowContextMenuItem: NativeMenuItem = {
+		_tag: "Item",
+		label: "Below",
+		enabled: true,
+		onSelect: insertBlankCommitBelow,
+	};
+	const deleteCommitContextMenuItem: NativeMenuItem = {
+		_tag: "Item",
+		label: "Delete commit",
+		enabled: !commitDiscard.isPending,
+		onSelect: deleteCommit,
+	};
 
 	const menuItems: Array<NativeMenuItem> = [
 		amendCommitContextMenuItem,
@@ -877,6 +869,10 @@ const ChangesSectionRow: FC<{
 
 	projectId: string;
 }> = ({ changes, projectId }) => {
+	const hotkeys = {
+		absorb: "A",
+	} satisfies Record<string, RegisterableHotkey>;
+
 	const operand = changesSectionOperand;
 	const isSelected = useIsSelected({ projectId, operand });
 	const focusedPanel = useFocusedProjectPanel(projectId);
@@ -891,20 +887,23 @@ const ChangesSectionRow: FC<{
 		enterAbsorbMode(operand, { type: "all" });
 	};
 
-	const { contextMenu: absorbContextMenuItem } = useCommand(absorb, {
+	useHotkey(hotkeys.absorb, absorb, {
+		conflictBehavior: "allow",
 		enabled:
 			changes.length > 0 &&
 			isSelected &&
 			focusedPanel === "outline" &&
 			outlineMode._tag === "Default",
-		group: "Changes",
-		commandPalette: { label: "Absorb" },
-		hotkeys: [{ hotkey: "A" }],
-		contextMenu: {
-			label: "Absorb",
-			enabled: changes.length > 0,
-		},
+		meta: { group: "Changes", name: "Absorb" },
 	});
+
+	const absorbContextMenuItem: NativeMenuItem = {
+		_tag: "Item",
+		label: "Absorb",
+		enabled: changes.length > 0,
+		accelerator: toElectronAccelerator(hotkeys.absorb),
+		onSelect: absorb,
+	};
 
 	const menuItems: Array<NativeMenuItem> = [absorbContextMenuItem];
 
@@ -1065,25 +1064,31 @@ const Changes: FC<{
 			});
 			if (!changes) return;
 
-			await commitCreate.mutateAsync(
-				{
-					projectId,
-					relativeTo: {
-						type: "referenceBytes",
-						subject: branch.branch.branchRef,
+			try {
+				await commitCreate.mutateAsync(
+					{
+						projectId,
+						relativeTo: {
+							type: "referenceBytes",
+							subject: branch.branch.branchRef,
+						},
+						side: "below",
+						changes,
+						message: commitTextareaRef.current?.value ?? "",
+						dryRun: false,
 					},
-					side: "below",
-					changes,
-					message: commitTextareaRef.current?.value ?? "",
-					dryRun: false,
-				},
-				{
-					onSuccess: (response) => {
-						if (response.newCommit !== null && commitTextareaRef.current)
-							commitTextareaRef.current.value = "";
+					{
+						onSuccess: (response) => {
+							if (response.newCommit !== null && commitTextareaRef.current)
+								commitTextareaRef.current.value = "";
+						},
 					},
-				},
-			);
+				);
+			} catch {
+				// Use the global mutation error handler (shows toast) instead of React
+				// error boundaries.
+				return;
+			}
 		});
 	};
 
@@ -1093,7 +1098,6 @@ const Changes: FC<{
 		setBranchId(option?.id ?? null);
 		setOpen(false);
 	};
-	const openBranchCombobox = () => setOpen(true);
 
 	const isSelected = useIsSelected({ projectId, operand });
 	const selectChanges = () => {
@@ -1108,38 +1112,30 @@ const Changes: FC<{
 		commitTextareaRef.current?.focus();
 	};
 
-	useCommand(selectChangesAndFocusOutline, {
-		group: "Outline",
-		commandPalette: { label: "Select changes" },
-		hotkeys: [{ hotkey: "Z" }],
-	});
-
-	useCommand(composeCommitMessage, {
-		group: "Outline",
-		commandPalette: { label: "Compose commit message" },
-		hotkeys: [{ hotkey: "Shift+Z" }],
-	});
-
-	useCommand(() => commitTextareaRef.current?.focus(), {
-		enabled: isSelected && focusedPanel === "outline" && outlineMode._tag === "Default",
-		group: "Changes",
-		commandPalette: { label: "Compose commit message" },
-		hotkeys: [{ hotkey: "Enter" }],
-	});
-
-	const openBranchComboboxCommand = useCommand(openBranchCombobox, {
-		enabled: outlineMode._tag === "Default",
-		group: "Changes",
-		commandPalette: { label: "Select commit branch" },
-		hotkeys: [{ hotkey: "Mod+Shift+B" }],
-	});
-
-	const commitCommand = useCommand(commit, {
-		enabled: outlineMode._tag === "Default" && !!branch && !commitCreatePending,
-		group: "Changes",
-		commandPalette: { label: "Commit" },
-		hotkeys: [{ hotkey: "Mod+Enter" }],
-	});
+	useHotkeys([
+		{
+			hotkey: "Z",
+			callback: selectChangesAndFocusOutline,
+			options: { conflictBehavior: "allow", meta: { group: "Outline", name: "Select changes" } },
+		},
+		{
+			hotkey: "Shift+Z",
+			callback: composeCommitMessage,
+			options: {
+				conflictBehavior: "allow",
+				meta: { group: "Outline", name: "Compose commit message" },
+			},
+		},
+		{
+			hotkey: "Enter",
+			callback: () => commitTextareaRef.current?.focus(),
+			options: {
+				conflictBehavior: "allow",
+				enabled: isSelected && focusedPanel === "outline" && outlineMode._tag === "Default",
+				meta: { group: "Changes", name: "Compose commit message" },
+			},
+		},
+	]);
 
 	return (
 		<TreeItem
@@ -1148,11 +1144,7 @@ const Changes: FC<{
 			aria-label={`Changes (${worktreeChanges?.changes.length ?? 0})`}
 			className={classes(workspaceItemRowStyles.section, styles.changesSection)}
 			render={
-				<OperandC
-					projectId={projectId}
-					operand={operand}
-					render={<form action={commitCommand.commandFn} />}
-				/>
+				<OperandC projectId={projectId} operand={operand} render={<form action={commit} />} />
 			}
 		>
 			<ChangesSectionRow changes={worktreeChanges?.changes ?? []} projectId={projectId} />
@@ -1188,7 +1180,15 @@ const Changes: FC<{
 					<Combobox.Trigger
 						className={classes(uiStyles.button, styles.commitBranchComboboxTrigger)}
 						aria-label="Select branch"
-						render={<ShortcutButton hotkeys={openBranchComboboxCommand.hotkeys} />}
+						render={
+							<ShortcutButton
+								hotkey="Mod+Shift+B"
+								hotkeyOptions={{
+									enabled: outlineMode._tag === "Default",
+									meta: { group: "Changes", name: "Select commit branch" },
+								}}
+							/>
+						}
 					>
 						<Combobox.Value placeholder="Select branch" />
 					</Combobox.Trigger>
@@ -1200,7 +1200,11 @@ const Changes: FC<{
 				</Combobox.Root>
 
 				<ShortcutButton
-					hotkeys={commitCommand.hotkeys}
+					hotkey="Mod+Enter"
+					hotkeyOptions={{
+						enabled: outlineMode._tag === "Default" && !!branch && !commitCreatePending,
+						meta: { group: "Changes", name: "Commit" },
+					}}
 					className={classes(uiStyles.button, styles.changesSectionCommitButton)}
 					type="submit"
 					disabled={outlineMode._tag !== "Default" || !branch || commitCreatePending}
@@ -1225,16 +1229,18 @@ const InlineRenameBranch: FC<{
 		onSubmit(formData.get("branchName") as string);
 	};
 
-	useCommand(() => formRef.current?.requestSubmit(), {
-		group: "Rename branch",
+	useHotkey("Enter", () => formRef.current?.requestSubmit(), {
+		conflictBehavior: "allow",
 		enabled: focusedPanel === "outline",
-		hotkeys: [{ hotkey: "Enter", ignoreInputs: false }],
+		ignoreInputs: false,
+		meta: { group: "Rename branch", name: "Save branch name" },
 	});
 
-	useCommand(onExit, {
-		group: "Rename branch",
+	useHotkey("Escape", onExit, {
+		conflictBehavior: "allow",
 		enabled: focusedPanel === "outline",
-		hotkeys: [{ hotkey: "Escape", ignoreInputs: false }],
+		ignoreInputs: false,
+		meta: { group: "Rename branch", name: "Cancel branch rename" },
 	});
 
 	return (
@@ -1268,6 +1274,10 @@ const BranchRow: FC<
 		stackId: string;
 	} & ComponentProps<"div">
 > = ({ projectId, branchName, branchRef, stackId, ...restProps }) => {
+	const hotkeys = {
+		rename: "Enter",
+	} satisfies Record<string, RegisterableHotkey>;
+
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 	const dispatch = useAppDispatch();
 	const branchOperandV: BranchOperand = {
@@ -1332,16 +1342,23 @@ const BranchRow: FC<
 		});
 	};
 
-	const { contextMenu: startEditingContextMenuItem } = useCommand(startEditing, {
-		enabled: isSelected && focusedPanel === "outline" && outlineMode._tag === "Default",
-		group: "Branch",
-		commandPalette: { label: "Rename" },
-		hotkeys: [{ hotkey: "Enter" }],
-		contextMenu: {
-			label: "Rename branch",
-			enabled: !isRenamePending,
-		},
+	useHotkey(hotkeys.rename, startEditing, {
+		conflictBehavior: "allow",
+		enabled:
+			isSelected &&
+			focusedPanel === "outline" &&
+			outlineMode._tag === "Default" &&
+			!isRenamePending,
+		meta: { group: "Branch", name: "Rename branch" },
 	});
+
+	const startEditingContextMenuItem: NativeMenuItem = {
+		_tag: "Item",
+		label: "Rename branch",
+		enabled: !isRenamePending,
+		accelerator: toElectronAccelerator(hotkeys.rename),
+		onSelect: startEditing,
+	};
 
 	const menuItems: Array<NativeMenuItem> = [startEditingContextMenuItem];
 
@@ -1407,8 +1424,6 @@ const StackRow: FC<
 	} & ComponentProps<"div">
 > = ({ projectId, stackId, ...restProps }) => {
 	const operand = stackOperand({ stackId });
-	const isSelected = useIsSelected({ projectId, operand });
-	const focusedPanel = useFocusedProjectPanel(projectId);
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
 	const unapplyStack = useMutation(unapplyStackMutationOptions);
@@ -1416,20 +1431,12 @@ const StackRow: FC<
 		unapplyStack.mutate({ projectId, stackId });
 	};
 
-	const { contextMenu: unapplyContextMenuItem } = useCommand(unapply, {
-		enabled:
-			isSelected &&
-			focusedPanel === "outline" &&
-			outlineMode._tag === "Default" &&
-			!unapplyStack.isPending,
-		group: "Stack",
-		commandPalette: { label: "Unapply stack" },
-		contextMenu: {
-			label: "Unapply stack",
-			// Focus change is too slow / the menu item isn't reactive.
-			enabled: !unapplyStack.isPending,
-		},
-	});
+	const unapplyContextMenuItem: NativeMenuItem = {
+		_tag: "Item",
+		label: "Unapply stack",
+		enabled: !unapplyStack.isPending,
+		onSelect: unapply,
+	};
 
 	const menuItems: Array<NativeMenuItem> = [
 		{ _tag: "Item", label: "Move up", enabled: false },
