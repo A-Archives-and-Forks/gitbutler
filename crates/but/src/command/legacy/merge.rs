@@ -15,7 +15,7 @@ pub async fn handle(
 ) -> anyhow::Result<()> {
     let mut progress = out.progress_channel();
     let t = theme::get();
-    let guard = ctx.exclusive_worktree_access();
+    let mut guard = ctx.exclusive_worktree_access();
 
     let id_map = IdMap::new_from_context(ctx, None, guard.read_permission())?;
 
@@ -35,8 +35,10 @@ pub async fn handle(
     };
 
     // Get the base branch data to find the target
-    let base_branch = but_api::legacy::virtual_branches::get_base_branch_data(ctx)?
-        .ok_or_else(|| anyhow::anyhow!("No base branch configured"))?;
+    let base_branch = {
+        but_api::legacy::virtual_branches::get_base_branch_data(ctx, guard.write_permission())?
+            .ok_or_else(|| anyhow::anyhow!("No base branch configured"))?
+    };
 
     let target_remote = base_branch.remote_name;
 
@@ -129,6 +131,10 @@ pub async fn handle(
 
         // TODO: Drop the guard as we can't keep it across await, and `handle` will obtain its own as well.
         drop(guard);
+
+        // After we've updated the target_ref, we should invalidate the workspace.
+        ctx.invalidate_workspace_cache()?;
+
         crate::command::legacy::pull::handle(ctx, out, false).await?;
 
         writeln!(

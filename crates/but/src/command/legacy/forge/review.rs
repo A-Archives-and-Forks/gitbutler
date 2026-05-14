@@ -351,7 +351,10 @@ pub async fn create_review(
 /// Make sure that the account that is about to be used in this repository's forge is correctly authenticated.
 async fn ensure_forge_authentication(ctx: &mut Context) -> Result<(), anyhow::Error> {
     let (storage, forge_repo_info, preferred_forge_user) = {
-        let base_branch = gitbutler_branch_actions::base::get_base_branch_data(ctx)?;
+        let base_branch = gitbutler_branch_actions::base::get_base_branch_data(
+            ctx,
+            ctx.shared_worktree_access().read_permission(),
+        )?;
         let forge_repo_info = but_forge::derive_forge_repo_info(&base_branch.remote_url);
         (
             but_forge_storage::Controller::from_path(but_path::app_data_dir()?),
@@ -527,7 +530,10 @@ fn prompt_for_branch_selection(
     applied_stacks: &[but_workspace::legacy::ui::StackEntry],
     out: &mut OutputChannel,
 ) -> anyhow::Result<Vec<String>> {
-    let base_branch = gitbutler_branch_actions::base::get_base_branch_data(ctx)?;
+    let base_branch = gitbutler_branch_actions::base::get_base_branch_data(
+        ctx,
+        ctx.shared_worktree_access().read_permission(),
+    )?;
     let base_branch_id = base_branch.current_sha;
     let repo = &*ctx.repo.get()?;
 
@@ -627,7 +633,10 @@ async fn publish_reviews_for_branch_and_dependents(
     out: &mut OutputChannel,
 ) -> Result<PublishReviewsOutcome, anyhow::Error> {
     let t = theme::get();
-    let base_branch = gitbutler_branch_actions::base::get_base_branch_data(ctx)?;
+    let base_branch = {
+        let guard = ctx.shared_worktree_access();
+        gitbutler_branch_actions::base::get_base_branch_data(ctx, guard.read_permission())?
+    };
     let all_branches_up_to_subject = stack_entry
         .heads
         .iter()
