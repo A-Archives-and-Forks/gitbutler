@@ -64,5 +64,14 @@ declare module "@tanstack/react-router" {
 const rootElement = document.getElementById("root");
 if (!rootElement) throw new Error("Root element not found");
 
-const root = createRoot(rootElement);
+const root = createRoot(rootElement, {
+	onUncaughtError: (error: unknown) => {
+		toastManager.add({
+			type: "error",
+			title: "Error",
+			description: errorMessageForToast(error),
+			priority: "high",
+		});
+	},
+});
 root.render(<App queryClient={queryClient} toastManager={toastManager} router={router} />);
