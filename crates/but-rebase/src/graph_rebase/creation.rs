@@ -62,14 +62,8 @@ impl<'ws, 'meta, M: RefMetadata> Editor<'ws, 'meta, M> {
         // common base
         let entrypoint = workspace.graph.lookup_entrypoint()?;
 
-        let mut entrypoints = vec![entrypoint.segment_index];
-
-        let immutable_references = options
-            .extra_refs
-            .iter()
-            .filter(|extra_ref| extra_ref.mutability == ExtraRefMutability::Immutable)
-            .map(|extra_ref| extra_ref.ref_name.to_owned())
-            .collect::<HashSet<_>>();
+        let mut mutable_entrypoints = vec![entrypoint.segment_index];
+        let mut immutable_entrypoints = vec![];
 
         for extra_ref in &options.extra_refs {
             let Some((segment, _)) = workspace
@@ -81,18 +75,46 @@ impl<'ws, 'meta, M: RefMetadata> Editor<'ws, 'meta, M> {
                     extra_ref.ref_name
                 );
             };
-            entrypoints.push(segment.id);
+            if extra_ref.mutability == ExtraRefMutability::Mutable {
+                mutable_entrypoints.push(segment.id);
+            } else {
+                immutable_entrypoints.push(segment.id);
+            }
         }
 
         let mut segments_to_add = vec![];
         let mut seen_segments = HashSet::new();
 
-        for entrypoint in entrypoints {
+        for entrypoint in mutable_entrypoints {
             workspace.graph.visit_all_segments_including_start_until(
                 entrypoint,
                 Direction::Outgoing,
                 |segment| {
                     if seen_segments.insert(segment.id) {
+                        segments_to_add.push(segment.id);
+                        false
+                    } else {
+                        true
+                    }
+                },
+            );
+        }
+        let mut immutable_references = HashSet::new();
+        for entrypoint in immutable_entrypoints {
+            workspace.graph.visit_all_segments_including_start_until(
+                entrypoint,
+                Direction::Outgoing,
+                |segment| {
+                    if seen_segments.insert(segment.id) {
+                        immutable_references.extend(segment.ref_name().map(|r| r.to_owned()));
+                        immutable_references.extend(
+                            segment
+                                .commits
+                                .iter()
+                                .flat_map(|c| c.ref_iter())
+                                .map(|r| r.to_owned()),
+                        );
+
                         segments_to_add.push(segment.id);
                         false
                     } else {

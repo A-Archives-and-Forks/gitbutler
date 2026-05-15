@@ -21,13 +21,17 @@ pub trait Testing {
 
 impl<M: RefMetadata> Testing for Editor<'_, '_, M> {
     fn steps_ascii(&self) -> String {
-        render_ascii_graph(&self.graph, |id| lookup_commit_title(&self.repo, id))
+        render_ascii_graph(&self.graph, &self.immutable_references, |id| {
+            lookup_commit_title(&self.repo, id)
+        })
     }
 }
 
 impl<M: RefMetadata> Testing for SuccessfulRebase<'_, '_, M> {
     fn steps_ascii(&self) -> String {
-        render_ascii_graph(&self.graph, |id| lookup_commit_title(&self.repo, id))
+        render_ascii_graph(&self.graph, &self.immutable_references, |id| {
+            lookup_commit_title(&self.repo, id)
+        })
     }
 }
 /// An extension trait that adds debugging output for graphs
@@ -201,7 +205,11 @@ impl LayoutState {
 }
 
 /// Format a step for display, optionally with a commit title
-fn format_step(step: &Step, title: Option<String>) -> String {
+fn format_step(
+    immutable_references: &HashSet<gix::refs::FullName>,
+    step: &Step,
+    title: Option<String>,
+) -> String {
     match step {
         Step::Pick(Pick { id, .. }) => {
             let mut sha = id.to_string();
@@ -211,7 +219,14 @@ fn format_step(step: &Step, title: Option<String>) -> String {
                 None => sha,
             }
         }
-        Step::Reference { refname } => refname.as_bstr().to_string(),
+        Step::Reference { refname } => {
+            let name = refname.as_bstr().to_string();
+            if immutable_references.contains(refname) {
+                format!("{name} (immutable)")
+            } else {
+                name
+            }
+        }
         Step::None => "no-op".to_string(),
     }
 }
@@ -369,7 +384,12 @@ fn compute_layout(graph: &StepGraph, order: &[StepGraphIndex]) -> Vec<LayoutEven
 }
 
 /// Phase 2: Render events to ASCII
-fn render_events<F>(graph: &StepGraph, events: &[LayoutEvent], mut get_title: F) -> String
+fn render_events<F>(
+    graph: &StepGraph,
+    immutable_references: &HashSet<gix::refs::FullName>,
+    events: &[LayoutEvent],
+    mut get_title: F,
+) -> String
 where
     F: FnMut(gix::ObjectId) -> Option<String>,
 {
@@ -383,7 +403,13 @@ where
                     Step::Pick(Pick { id, .. }) => get_title(*id),
                     _ => None,
                 };
-                lines.push(render_node_line(*col, step, active.as_slice(), title));
+                lines.push(render_node_line(
+                    immutable_references,
+                    *col,
+                    step,
+                    active.as_slice(),
+                    title,
+                ));
             }
             LayoutEvent::Fork {
                 from_col,
@@ -405,7 +431,13 @@ where
 }
 
 /// Render a node line
-fn render_node_line(col: usize, step: &Step, active: &[bool], title: Option<String>) -> String {
+fn render_node_line(
+    immutable_references: &HashSet<gix::refs::FullName>,
+    col: usize,
+    step: &Step,
+    active: &[bool],
+    title: Option<String>,
+) -> String {
     let width = active.len().max(col + 1);
     let mut cells: Vec<[char; 2]> = vec![[' ', ' ']; width];
 
@@ -418,7 +450,11 @@ fn render_node_line(col: usize, step: &Step, active: &[bool], title: Option<Stri
     }
 
     let grid: String = cells.iter().flat_map(|c| c.iter()).collect();
-    format!("{} {}", grid.trim_end(), format_step(step, title))
+    format!(
+        "{} {}",
+        grid.trim_end(),
+        format_step(immutable_references, step, title)
+    )
 }
 
 /// Render a fork line
@@ -511,7 +547,11 @@ fn render_terminate_line(col: usize, active: &[bool]) -> String {
 }
 
 /// Main entry point: render graph as ASCII
-pub(crate) fn render_ascii_graph<F>(graph: &StepGraph, get_title: F) -> String
+pub(crate) fn render_ascii_graph<F>(
+    graph: &StepGraph,
+    immutable_references: &HashSet<gix::refs::FullName>,
+    get_title: F,
+) -> String
 where
     F: FnMut(gix::ObjectId) -> Option<String>,
 {
@@ -534,7 +574,7 @@ where
     }
 
     let events = compute_layout(graph, &order);
-    render_events(graph, &events, get_title)
+    render_events(graph, immutable_references, &events, get_title)
 }
 
 #[cfg(test)]
@@ -573,7 +613,7 @@ mod tests {
         add_edge(&mut graph, c, d, 0);
         add_edge(&mut graph, d, none, 0);
 
-        let output = render_ascii_graph(&graph, |_| None);
+        let output = render_ascii_graph(&graph, &HashSet::new(), |_| None);
         insta::assert_snapshot!(output, @"
         ◎ refs/heads/main
         ● 1111111
@@ -605,7 +645,7 @@ mod tests {
         add_edge(&mut graph, a, c, 0);
         add_edge(&mut graph, b, c, 0);
 
-        let output = render_ascii_graph(&graph, |_| None);
+        let output = render_ascii_graph(&graph, &HashSet::new(), |_| None);
         insta::assert_snapshot!(output, @"
         ◎ refs/heads/main
         ├─╮
@@ -641,7 +681,7 @@ mod tests {
         add_edge(&mut graph, b, d, 0);
         add_edge(&mut graph, c, d, 0);
 
-        let output = render_ascii_graph(&graph, |_| None);
+        let output = render_ascii_graph(&graph, &HashSet::new(), |_| None);
         insta::assert_snapshot!(output, @"
         ◎ refs/heads/main
         ├─┬─╮
@@ -690,7 +730,7 @@ mod tests {
         // B also goes to C
         add_edge(&mut graph, b, c, 0);
 
-        let output = render_ascii_graph(&graph, |_| None);
+        let output = render_ascii_graph(&graph, &HashSet::new(), |_| None);
         insta::assert_snapshot!(output, @"
         ◎ refs/heads/main
         ├─╮
@@ -727,7 +767,7 @@ mod tests {
         add_edge(&mut graph, c, base, 0);
         add_edge(&mut graph, d, base, 0);
 
-        let output = render_ascii_graph(&graph, |_| None);
+        let output = render_ascii_graph(&graph, &HashSet::new(), |_| None);
         insta::assert_snapshot!(output, @"
         ◎ refs/heads/main
         ├─┬─┬─╮
@@ -768,7 +808,7 @@ mod tests {
         add_edge(&mut graph, a3, c, 0);
         add_edge(&mut graph, b, c, 0);
 
-        let output = render_ascii_graph(&graph, |_| None);
+        let output = render_ascii_graph(&graph, &HashSet::new(), |_| None);
         insta::assert_snapshot!(output, @"
         ◎ refs/heads/main
         ├─╮
@@ -813,7 +853,7 @@ mod tests {
         add_edge(&mut graph, e, f, 0);
         add_edge(&mut graph, c, f, 0);
 
-        let output = render_ascii_graph(&graph, |_| None);
+        let output = render_ascii_graph(&graph, &HashSet::new(), |_| None);
         insta::assert_snapshot!(output, @"
         ◎ refs/heads/main
         ├─╮
@@ -866,7 +906,7 @@ mod tests {
         add_edge(&mut graph, b, d, 0);
         add_edge(&mut graph, c, d, 0);
 
-        let output = render_ascii_graph(&graph, |_| None);
+        let output = render_ascii_graph(&graph, &HashSet::new(), |_| None);
         insta::assert_snapshot!(output, @"
         ◎ refs/heads/main
         ├─┬─╮
@@ -927,7 +967,7 @@ mod tests {
         add_edge(&mut graph, e, base, 0);
         add_edge(&mut graph, f, base, 0);
 
-        let output = render_ascii_graph(&graph, |_| None);
+        let output = render_ascii_graph(&graph, &HashSet::new(), |_| None);
         insta::assert_snapshot!(output, @"
         ◎ refs/heads/main
         ├─┬─╮
@@ -992,7 +1032,7 @@ mod tests {
         add_edge(&mut graph, e, f, 0);
         add_edge(&mut graph, g, f, 0);
 
-        let output = render_ascii_graph(&graph, |_| None);
+        let output = render_ascii_graph(&graph, &HashSet::new(), |_| None);
         insta::assert_snapshot!(output, @"
         ◎ refs/heads/main
         ├─┬─╮
@@ -1057,7 +1097,7 @@ mod tests {
         add_edge(&mut graph, f, base, 0);
         add_edge(&mut graph, shared, base, 0);
 
-        let output = render_ascii_graph(&graph, |_| None);
+        let output = render_ascii_graph(&graph, &HashSet::new(), |_| None);
         insta::assert_snapshot!(output, @"
         ◎ refs/heads/main
         ├─┬─╮
