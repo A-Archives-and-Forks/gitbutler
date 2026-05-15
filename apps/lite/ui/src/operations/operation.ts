@@ -37,25 +37,35 @@ export type CommitSplitOperation = Omit<CommitInsertBlankParams, "dryRun" | "pro
 		source: Operand;
 	};
 /** @public */
-export type CommitMoveOperation = Omit<CommitMoveParams, "dryRun" | "projectId">;
+export type CommitMoveOperation = Omit<CommitMoveParams, "dryRun" | "projectId"> & {
+	source: Operand;
+};
 /** @public */
 export type CommitMoveChangesBetweenOperation = Omit<
 	CommitMoveChangesBetweenParams,
 	"dryRun" | "projectId" | "changes"
 > & { source: Operand };
 /** @public */
-export type CommitSquashOperation = Omit<CommitSquashParams, "dryRun" | "projectId">;
+export type CommitSquashOperation = Omit<CommitSquashParams, "dryRun" | "projectId"> & {
+	source: Operand;
+};
 /** @public */
-export type CommitUncommitOperation = Omit<CommitUncommitParams, "dryRun" | "projectId">;
+export type CommitUncommitOperation = Omit<CommitUncommitParams, "dryRun" | "projectId"> & {
+	source: Operand;
+};
 /** @public */
 export type CommitUncommitChangesOperation = Omit<
 	CommitUncommitChangesParams,
 	"dryRun" | "projectId" | "changes"
 > & { source: Operand };
 /** @public */
-export type MoveBranchOperation = Omit<MoveBranchParams, "dryRun" | "projectId">;
+export type MoveBranchOperation = Omit<MoveBranchParams, "dryRun" | "projectId"> & {
+	source: Operand;
+};
 /** @public */
-export type TearOffBranchOperation = Omit<TearOffBranchParams, "dryRun" | "projectId">;
+export type TearOffBranchOperation = Omit<TearOffBranchParams, "dryRun" | "projectId"> & {
+	source: Operand;
+};
 
 export type Operation =
 	| ({ _tag: "CommitAmend" } & CommitAmendOperation)
@@ -284,19 +294,6 @@ const runOperation = async ({
 		}),
 	);
 
-const operationSource = (operation: Operation): Operand | undefined =>
-	Match.value(operation).pipe(
-		Match.withReturnType<Operand | undefined>(),
-		Match.tags({
-			CommitAmend: ({ source }) => source,
-			CommitCreate: ({ source }) => source,
-			CommitSplit: ({ source }) => source,
-			CommitMoveChangesBetween: ({ source }) => source,
-			CommitUncommitChanges: ({ source }) => source,
-		}),
-		Match.orElse(() => undefined),
-	);
-
 export const useDryRunOperation = ({
 	projectId,
 	operation,
@@ -306,7 +303,7 @@ export const useDryRunOperation = ({
 }) => {
 	const changes = useResolveDiffSpecs({
 		projectId,
-		source: operation ? operationSource(operation) : undefined,
+		source: operation ? operation.source : undefined,
 	});
 
 	return useQuery({
@@ -394,6 +391,7 @@ const rubOperation = ({ source, target }: { source: Operand; target: Operand }):
 			},
 			({ source, target }) =>
 				commitSquashOperation({
+					source,
 					sourceCommitIds: [source.commitId],
 					destinationCommitId: target.commitId,
 				}),
@@ -405,6 +403,7 @@ const rubOperation = ({ source, target }: { source: Operand; target: Operand }):
 			},
 			({ source }) =>
 				commitUncommitOperation({
+					source,
 					subjectCommitIds: [source.commitId],
 					assignTo: null,
 				}),
@@ -469,6 +468,7 @@ const moveOperation = ({
 			},
 			({ source, target }) =>
 				moveBranchOperation({
+					source,
 					subjectBranch: decodeRefName(source.branchRef),
 					targetBranch: decodeRefName(target.branchRef),
 				}),
@@ -481,6 +481,7 @@ const moveOperation = ({
 			},
 			({ source }) =>
 				tearOffBranchOperation({
+					source,
 					subjectBranch: decodeRefName(source.branchRef),
 				}),
 		),
@@ -505,6 +506,7 @@ const moveOperation = ({
 	return Match.value({ source, sourceFileParent: operandFileParent(source) }).pipe(
 		Match.when({ source: { _tag: "Commit" } }, ({ source }) =>
 			commitMoveOperation({
+				source,
 				subjectCommitIds: [source.commitId],
 				relativeTo,
 				side,
