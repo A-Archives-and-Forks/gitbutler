@@ -9,7 +9,8 @@ use but_graph::workspace::commit::is_managed_workspace_by_message;
 use but_rebase::{
     commit::DateMode,
     graph_rebase::{
-        Editor, GraphEditorOptions, LookupStep, Pick, Selector, Step, SuccessfulRebase, ToSelector,
+        Editor, ExtraRef, GraphEditorOptions, LookupStep, Pick, Selector, Step, SuccessfulRebase,
+        ToSelector,
         mutate::{InsertSide, RelativeTo},
     },
 };
@@ -144,7 +145,7 @@ pub fn integrate_upstream<'ws, 'meta, M: RefMetadata>(
     let head_is_workspace_commit = is_managed_workspace_by_message(head_commit.message_raw()?);
 
     let editor_options = GraphEditorOptions {
-        extra_refs: vec![target_ref.ref_name.as_ref()],
+        extra_refs: vec![ExtraRef::immutable(target_ref.ref_name.as_ref())],
         ..GraphEditorOptions::default()
     };
     let mut editor = Editor::create_with_opts(workspace, meta, repo, &editor_options)?;

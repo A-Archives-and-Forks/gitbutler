@@ -51,6 +51,7 @@ fn diamond_partially_historically_integrated_rebase() -> Result<()> {
     ");
 
     let mut workspace = graph.into_workspace()?;
+    let remote_tip_before = repo.rev_parse_single("origin/master")?.detach();
     let but_workspace::IntegrateUpstreamOutcome { rebase, .. } = integrate_upstream(
         &mut workspace,
         &mut meta,
@@ -79,6 +80,11 @@ fn diamond_partially_historically_integrated_rebase() -> Result<()> {
     |/  
     * 85aa44b (o1) o1
     ");
+
+    assert_eq!(
+        repo.rev_parse_single("origin/master")?.detach(),
+        remote_tip_before
+    );
 
     Ok(())
 }

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use but_graph::Graph;
-use but_rebase::graph_rebase::{Editor, GraphEditorOptions, testing::Testing as _};
+use but_rebase::graph_rebase::{Editor, ExtraRef, GraphEditorOptions, testing::Testing as _};
 use but_testsupport::{StackState, graph_tree, visualize_commit_graph_all};
 
 use crate::{
@@ -467,7 +467,7 @@ fn includes_extra_refs_in_editor_creation() -> Result<()> {
             &mut *meta,
             &repo,
             &GraphEditorOptions {
-                extra_refs: vec![main_ref.as_ref()],
+                extra_refs: vec![ExtraRef::mutable(main_ref.as_ref())],
                 ..<_>::default()
             },
         )?;
