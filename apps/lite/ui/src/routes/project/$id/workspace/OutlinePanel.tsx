@@ -42,7 +42,7 @@ import {
 import { OperationSourceC } from "#ui/routes/project/$id/workspace/OperationSourceC.tsx";
 import { OperationSourceLabel } from "#ui/routes/project/$id/workspace/OperationSourceLabel.tsx";
 import { OperationTarget } from "#ui/routes/project/$id/workspace/OperationTarget.tsx";
-import { RootState, useAppDispatch, useAppSelector } from "#ui/store.ts";
+import { useAppDispatch, useAppSelector } from "#ui/store.ts";
 import { classes } from "#ui/ui/classes.ts";
 import { BullseyeIcon, ChevronDownIcon, MenuTriggerIcon, PushIcon } from "#ui/ui/icons.tsx";
 import {
@@ -320,6 +320,13 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 
 	const operationSource = getOperationSource(outlineMode);
 
+	const commitTargetState = useAppSelector((state) => selectProjectCommitTarget(state, projectId));
+	const targetComboboxItems = buildCommitTargetComboboxItems({ headInfo, commitTargetState });
+	const commitTarget = selectCommitTargetComboboxItem({
+		items: targetComboboxItems,
+		commitTargetState,
+	});
+
 	return (
 		<NavigationIndexContext value={navigationIndex}>
 			<AbsorptionTargetKeysContext value={absorptionTargetKeys}>
@@ -332,12 +339,21 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 						className={classes(panelProps.className, styles.panel)}
 					>
 						<div className={styles.panelPadding}>
-							<Changes projectId={projectId} />
+							<Changes
+								projectId={projectId}
+								commitTarget={commitTarget}
+								targetComboboxItems={targetComboboxItems}
+							/>
 						</div>
 
 						<div className={styles.headInfo}>
 							{headInfo?.stacks.map((stack) => (
-								<StackC key={stack.id} projectId={projectId} stack={stack} />
+								<StackC
+									key={stack.id}
+									projectId={projectId}
+									stack={stack}
+									commitTarget={commitTarget?.relativeTo ?? null}
+								/>
 							))}
 
 							<BaseCommit
@@ -518,8 +534,9 @@ const CommitRow: FC<
 		commit: Commit;
 		projectId: string;
 		stackId: string;
+		isCommitTarget: boolean;
 	} & ComponentProps<"div">
-> = ({ commit, projectId, stackId, ...restProps }) => {
+> = ({ commit, projectId, stackId, isCommitTarget, ...restProps }) => {
 	const hotkeys = {
 		amend: "Shift+A",
 		reword: "Enter",
@@ -743,7 +760,6 @@ const CommitRow: FC<
 	};
 
 	const relativeTo: RelativeTo = { type: "commit", subject: commit.id };
-	const isCommitTarget = useIsCommitTarget(projectId, relativeTo);
 
 	const composeCommitHere = () => {
 		dispatch(projectActions.setCommitTarget({ projectId, commitTarget: relativeTo }));
@@ -926,7 +942,8 @@ const CommitC: FC<{
 	commit: Commit;
 	projectId: string;
 	stackId: string;
-}> = ({ commit, projectId, stackId }) => {
+	isCommitTarget: boolean;
+}> = ({ commit, projectId, stackId, isCommitTarget }) => {
 	const operand = commitOperand({ stackId, commitId: commit.id });
 
 	return (
@@ -936,7 +953,12 @@ const CommitC: FC<{
 			aria-label={commitTitle(commit.message)}
 			render={<OperandC projectId={projectId} operand={operand} />}
 		>
-			<CommitRow commit={commit} projectId={projectId} stackId={stackId} />
+			<CommitRow
+				commit={commit}
+				projectId={projectId}
+				stackId={stackId}
+				isCommitTarget={isCommitTarget}
+			/>
 		</TreeItem>
 	);
 };
@@ -1121,30 +1143,6 @@ const selectCommitTargetComboboxItem = ({
 	items[0] ??
 	null;
 
-const selectCommitTargetCombobox = (
-	state: RootState,
-	projectId: string,
-	headInfo: RefInfo | undefined,
-) => {
-	const commitTargetState = selectProjectCommitTarget(state, projectId);
-	const items = buildCommitTargetComboboxItems({ headInfo, commitTargetState });
-	const selectedItem = selectCommitTargetComboboxItem({ items, commitTargetState });
-	return { items, selectedItem };
-};
-
-const useCommitTargetCombobox = (projectId: string) => {
-	const { data: headInfo } = useQuery(headInfoQueryOptions(projectId));
-	return useAppSelector((state) => selectCommitTargetCombobox(state, projectId, headInfo));
-};
-
-const useIsCommitTarget = (projectId: string, relativeTo: RelativeTo): boolean => {
-	const { data: headInfo } = useQuery(headInfoQueryOptions(projectId));
-	return useAppSelector((state) => {
-		const { selectedItem: commitTarget } = selectCommitTargetCombobox(state, projectId, headInfo);
-		return commitTarget ? relativeToEquals(commitTarget.relativeTo, relativeTo) : false;
-	});
-};
-
 const CommitTargetComboboxPopup: FC = () => (
 	<Combobox.Popup className={classes(uiStyles.popup, styles.commitTargetComboboxPopup)}>
 		<Combobox.Input
@@ -1176,7 +1174,9 @@ const focusCommitMessageInput = () => {
 
 const Changes: FC<{
 	projectId: string;
-}> = ({ projectId }) => {
+	commitTarget: CommitTargetComboboxItem | null;
+	targetComboboxItems: Array<CommitTargetComboboxItem>;
+}> = ({ projectId, commitTarget, targetComboboxItems }) => {
 	const toastManager = Toast.useToastManager();
 	const queryClient = useQueryClient();
 	const dispatch = useAppDispatch();
@@ -1311,8 +1311,6 @@ const Changes: FC<{
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
 	const { data: headInfo } = useQuery(headInfoQueryOptions(projectId));
-	const { items: branchComboboxItems, selectedItem: commitTarget } =
-		useCommitTargetCombobox(projectId);
 	const isAltHeld = useKeyHold("Alt");
 	const isAmendMode = isAltHeld;
 	const hotkeys = {
@@ -1437,7 +1435,7 @@ const Changes: FC<{
 
 			<div className={styles.commitControls}>
 				<Combobox.Root<CommitTargetComboboxItem>
-					items={branchComboboxItems}
+					items={targetComboboxItems}
 					open={open}
 					onOpenChange={setOpen}
 					// Note `undefined` means uncontrolled.
@@ -1555,8 +1553,9 @@ const BranchRow: FC<
 		branchName: string;
 		branchRef: Array<number>;
 		stackId: string;
+		isCommitTarget: boolean;
 	} & ComponentProps<"div">
-> = ({ projectId, branchName, branchRef, stackId, ...restProps }) => {
+> = ({ projectId, branchName, branchRef, stackId, isCommitTarget, ...restProps }) => {
 	const hotkeys = {
 		rename: "Enter",
 		composeCommitHere: "C",
@@ -1660,7 +1659,6 @@ const BranchRow: FC<
 	};
 
 	const relativeTo: RelativeTo = { type: "referenceBytes", subject: branchRef };
-	const isCommitTarget = useIsCommitTarget(projectId, relativeTo);
 
 	const composeCommitHere = () => {
 		dispatch(projectActions.setCommitTarget({ projectId, commitTarget: relativeTo }));
@@ -1867,7 +1865,8 @@ const BranchSegment: FC<{
 	segment: Segment;
 	refName: BranchReference;
 	stackId: string;
-}> = ({ projectId, segment, refName, stackId }) => {
+	commitTarget: RelativeTo | null;
+}> = ({ projectId, segment, refName, stackId, commitTarget }) => {
 	const operand = branchOperand({ stackId, branchRef: refName.fullNameBytes });
 
 	return (
@@ -1887,6 +1886,14 @@ const BranchSegment: FC<{
 						branchName={refName.displayName}
 						branchRef={refName.fullNameBytes}
 						stackId={stackId}
+						isCommitTarget={
+							commitTarget
+								? relativeToEquals(commitTarget, {
+										type: "referenceBytes",
+										subject: refName.fullNameBytes,
+									})
+								: false
+						}
 					/>
 				}
 			/>
@@ -1896,7 +1903,17 @@ const BranchSegment: FC<{
 			) : (
 				<div role="group">
 					{segment.commits.map((commit) => (
-						<CommitC key={commit.id} commit={commit} projectId={projectId} stackId={stackId} />
+						<CommitC
+							key={commit.id}
+							commit={commit}
+							projectId={projectId}
+							stackId={stackId}
+							isCommitTarget={
+								commitTarget
+									? relativeToEquals(commitTarget, { type: "commit", subject: commit.id })
+									: false
+							}
+						/>
 					))}
 				</div>
 			)}
@@ -1908,10 +1925,21 @@ const BranchlessSegment: FC<{
 	projectId: string;
 	segment: Segment;
 	stackId: string;
-}> = ({ projectId, segment, stackId }) => (
+	commitTarget: RelativeTo | null;
+}> = ({ projectId, segment, stackId, commitTarget }) => (
 	<div className={classes(workspaceItemRowStyles.section, styles.segment)}>
 		{segment.commits.map((commit) => (
-			<CommitC key={commit.id} commit={commit} projectId={projectId} stackId={stackId} />
+			<CommitC
+				key={commit.id}
+				commit={commit}
+				projectId={projectId}
+				stackId={stackId}
+				isCommitTarget={
+					commitTarget
+						? relativeToEquals(commitTarget, { type: "commit", subject: commit.id })
+						: false
+				}
+			/>
 		))}
 	</div>
 );
@@ -1919,7 +1947,8 @@ const BranchlessSegment: FC<{
 const StackC: FC<{
 	projectId: string;
 	stack: Stack;
-}> = ({ projectId, stack }) => {
+	commitTarget: RelativeTo | null;
+}> = ({ projectId, stack, commitTarget }) => {
 	// From Caleb:
 	// > There shouldn't be a way within GitButler to end up with a stack without a
 	//   StackId. Users can disrupt our matching against our metadata by playing
@@ -1951,6 +1980,7 @@ const StackC: FC<{
 							segment={segment}
 							refName={segment.refName}
 							stackId={stackId}
+							commitTarget={commitTarget}
 						/>
 					) : (
 						// A segment should always either have a branch reference or at
@@ -1961,6 +1991,7 @@ const StackC: FC<{
 								projectId={projectId}
 								segment={segment}
 								stackId={stackId}
+								commitTarget={commitTarget}
 							/>
 						)
 					),
