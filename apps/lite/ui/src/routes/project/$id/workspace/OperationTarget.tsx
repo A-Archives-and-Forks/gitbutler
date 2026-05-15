@@ -6,7 +6,7 @@ import {
 	getOperation,
 	getOperations,
 	type OperationType,
-	useRunOperationMutationOptions,
+	useRunOperation,
 } from "#ui/operations/operation.ts";
 import { classes } from "#ui/ui/classes.ts";
 import { projectActions, selectProjectOutlineModeState } from "#ui/projects/state.ts";
@@ -19,7 +19,6 @@ import {
 import { mergeProps, useRender } from "@base-ui/react";
 import { Match, pipe } from "effect";
 import { FC, useEffect, useEffectEvent, useRef } from "react";
-import { useMutation } from "@tanstack/react-query";
 
 type DropTargetParams = Parameters<typeof dropTargetForElements>[0];
 type GetDataArgs = Parameters<NonNullable<DropTargetParams["getData"]>>[0];
@@ -50,7 +49,7 @@ const useOperationDropTarget = ({
 	projectId: string;
 }) => {
 	const dispatch = useAppDispatch();
-	const { mutate: runOperation } = useMutation(useRunOperationMutationOptions());
+	const { mutate: runOperation } = useRunOperation();
 	const dropRef = useRef<HTMLElement>(null);
 
 	const getData = useEffectEvent(({ input, element, source }: GetDataArgs) => {

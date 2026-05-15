@@ -4,6 +4,7 @@ import {
 	commitDetailsWithLineStatsQueryOptions,
 } from "#ui/api/queries.ts";
 import {
+	nativeMenuItem,
 	showNativeContextMenu,
 	showNativeMenuFromTrigger,
 	type NativeMenuItem,
@@ -525,13 +526,12 @@ const ChangesFileRow: FC<{
 		});
 	};
 
-	const absorbContextMenuItem: NativeMenuItem = {
-		_tag: "Item",
+	const absorbContextMenuItem = nativeMenuItem({
 		label: "Absorb",
 		enabled: true,
 		accelerator: toElectronAccelerator(changesFileHotkeys.absorb.hotkey),
 		onSelect: absorb,
-	};
+	});
 
 	const menuItems: Array<NativeMenuItem> = [absorbContextMenuItem];
 

@@ -13,6 +13,17 @@ export type NativeMenuItemData = {
 
 export type NativeMenuItem = { _tag: "Separator" } | ({ _tag: "Item" } & NativeMenuItemData);
 
+/** @public */
+export const nativeMenuSeparator: NativeMenuItem = {
+	_tag: "Separator",
+};
+
+/** @public */
+export const nativeMenuItem = (item: NativeMenuItemData): NativeMenuItem => ({
+	_tag: "Item",
+	...item,
+});
+
 const serializeNativeMenuItems = (
 	items: Array<NativeMenuItem>,
 	handlers: Map<string, NativeMenuAction | undefined>,

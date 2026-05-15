@@ -21,7 +21,7 @@ import { TopBarActionsPortal } from "#ui/portals.tsx";
 import { Keys } from "#ui/components/Keys.tsx";
 import { ShortcutButton } from "#ui/components/ShortcutButton.tsx";
 import { globalHotkeys, workspaceHotkeys, type CommandGroup } from "#ui/hotkeys.ts";
-import { useAppDispatch, useAppSelector } from "#ui/store.ts";
+import { type AppThunk, useAppDispatch, useAppSelector } from "#ui/store.ts";
 import { BranchListing, Segment, Stack } from "@gitbutler/but-sdk";
 import {
 	getHotkeyManager,
@@ -52,6 +52,28 @@ type CommandPaletteItem = {
 	hotkey: Hotkey | HotkeySequence;
 	type: "hotkey" | "sequence";
 };
+
+const toggleProjectPanel =
+	({
+		projectId,
+		panel,
+		focusedPanel,
+	}: {
+		projectId: string;
+		panel: PanelType;
+		focusedPanel: PanelType | null;
+	}): AppThunk =>
+	(dispatch, getState) => {
+		const panelsState = selectProjectPanelsState(getState(), projectId);
+
+		if (focusedPanel === panel && isPanelVisible(panelsState, panel)) {
+			const panelIndex = panelsState.visiblePanels.indexOf(panel);
+			const nextPanel = panelsState.visiblePanels[panelIndex - 1];
+			if (nextPanel !== undefined) focusPanel(nextPanel);
+		}
+
+		dispatch(projectActions.togglePanel({ projectId, panel }));
+	};
 
 const groupCommandPaletteItems = (
 	items: Array<CommandPaletteItem>,
@@ -286,13 +308,7 @@ const TopBarActions: FC = () => {
 		dispatch(projectActions.openApplyBranchPicker({ projectId }));
 	};
 	const togglePanel = (panel: PanelType) => {
-		if (focusedPanel === panel && isPanelVisible(panelsState, panel)) {
-			const panelIndex = panelsState.visiblePanels.indexOf(panel);
-			const nextPanel = panelsState.visiblePanels[panelIndex - 1];
-			if (nextPanel !== undefined) focusPanel(nextPanel);
-		}
-
-		dispatch(projectActions.togglePanel({ projectId, panel }));
+		dispatch(toggleProjectPanel({ projectId, panel, focusedPanel }));
 	};
 	const toggleFiles = () => {
 		togglePanel("files");
@@ -340,13 +356,7 @@ const useWorkspaceHotkeys = (projectId: string) => {
 	const focusedPanel = useFocusedProjectPanel(projectId);
 
 	const togglePanel = (panel: PanelType) => {
-		if (focusedPanel === panel && isPanelVisible(panelsState, panel)) {
-			const panelIndex = panelsState.visiblePanels.indexOf(panel);
-			const nextPanel = panelsState.visiblePanels[panelIndex - 1];
-			if (nextPanel !== undefined) focusPanel(nextPanel);
-		}
-
-		dispatch(projectActions.togglePanel({ projectId, panel }));
+		dispatch(toggleProjectPanel({ projectId, panel, focusedPanel }));
 	};
 
 	useHotkeys([
