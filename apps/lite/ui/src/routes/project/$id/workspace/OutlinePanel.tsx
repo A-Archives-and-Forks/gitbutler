@@ -5,7 +5,7 @@ import {
 	headInfoQueryOptions,
 } from "#ui/api/queries.ts";
 import { findCommit, getCommonBaseCommitId, resolveRelativeTo } from "#ui/api/ref-info.ts";
-import { encodeRefName } from "#ui/api/ref-name.ts";
+import { decodeRefName, encodeRefName } from "#ui/api/ref-name.ts";
 import { commitTitle, shortCommitId } from "#ui/commit.ts";
 import {
 	showNativeContextMenu,
@@ -231,28 +231,11 @@ const useNavigationIndex = ({
 
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
-	const navigationIndex = filterNavigationIndexForOutlineMode({
+	return filterNavigationIndexForOutlineMode({
 		navigationIndex: navigationIndexUnfiltered,
 		outlineMode,
 		absorptionTargetKeys,
 	});
-
-	const focusedPanel = useFocusedProjectPanel(projectId);
-
-	const select = (newItem: Operand) =>
-		dispatch(projectActions.selectOutline({ projectId, selection: newItem }));
-
-	useNavigationIndexHotkeys({
-		focusedPanel,
-		navigationIndex,
-		projectId,
-		group: "Outline",
-		panel: "outline",
-		select,
-		selection,
-	});
-
-	return navigationIndex;
 };
 
 export const OutlinePanel: FC<PanelProps> = ({ ...panelProps }) => (
@@ -295,6 +278,21 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 		absorptionTargetKeys,
 	});
 
+	const focusedPanel = useFocusedProjectPanel(projectId);
+
+	const select = (newItem: Operand) =>
+		dispatch(projectActions.selectOutline({ projectId, selection: newItem }));
+
+	useNavigationIndexHotkeys({
+		focusedPanel,
+		navigationIndex,
+		projectId,
+		group: "Outline",
+		panel: "outline",
+		select,
+		selection,
+	});
+
 	const dryRunOperation = Match.value(outlineMode).pipe(
 		Match.tag(
 			"Transfer",
@@ -320,6 +318,13 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 
 	const operationSource = getOperationSource(outlineMode);
 
+	const commitTargetState = useAppSelector((state) => selectProjectCommitTarget(state, projectId));
+	const targetComboboxItems = buildCommitTargetComboboxItems({ headInfo, commitTargetState });
+	const commitTarget = selectCommitTargetComboboxItem({
+		items: targetComboboxItems,
+		commitTargetState,
+	});
+
 	return (
 		<NavigationIndexContext value={navigationIndex}>
 			<AbsorptionTargetKeysContext value={absorptionTargetKeys}>
@@ -332,12 +337,21 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 						className={classes(panelProps.className, styles.panel)}
 					>
 						<div className={styles.panelPadding}>
-							<Changes projectId={projectId} />
+							<Changes
+								projectId={projectId}
+								commitTarget={commitTarget}
+								targetComboboxItems={targetComboboxItems}
+							/>
 						</div>
 
 						<div className={styles.headInfo}>
 							{headInfo?.stacks.map((stack) => (
-								<StackC key={stack.id} projectId={projectId} stack={stack} />
+								<StackC
+									key={stack.id}
+									projectId={projectId}
+									stack={stack}
+									commitTarget={commitTarget?.relativeTo ?? null}
+								/>
 							))}
 
 							<BaseCommit
@@ -518,8 +532,9 @@ const CommitRow: FC<
 		commit: Commit;
 		projectId: string;
 		stackId: string;
+		isCommitTarget: boolean;
 	} & ComponentProps<"div">
-> = ({ commit, projectId, stackId, ...restProps }) => {
+> = ({ commit, projectId, stackId, isCommitTarget, ...restProps }) => {
 	const hotkeys = {
 		amend: "Shift+A",
 		reword: "Enter",
@@ -534,7 +549,6 @@ const CommitRow: FC<
 	);
 	const dryRunCommit = useDryRunCommit(commit.id);
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
-	const { selectedItem: commitTarget } = useCommitTargetCombobox(projectId);
 
 	const dispatch = useAppDispatch();
 	const commitOperandV: CommitOperand = {
@@ -744,7 +758,6 @@ const CommitRow: FC<
 	};
 
 	const relativeTo: RelativeTo = { type: "commit", subject: commit.id };
-	const isCommitTarget = commitTarget && relativeToEquals(commitTarget.relativeTo, relativeTo);
 
 	const composeCommitHere = () => {
 		dispatch(projectActions.setCommitTarget({ projectId, commitTarget: relativeTo }));
@@ -927,7 +940,8 @@ const CommitC: FC<{
 	commit: Commit;
 	projectId: string;
 	stackId: string;
-}> = ({ commit, projectId, stackId }) => {
+	isCommitTarget: boolean;
+}> = ({ commit, projectId, stackId, isCommitTarget }) => {
 	const operand = commitOperand({ stackId, commitId: commit.id });
 
 	return (
@@ -937,7 +951,12 @@ const CommitC: FC<{
 			aria-label={commitTitle(commit.message)}
 			render={<OperandC projectId={projectId} operand={operand} />}
 		>
-			<CommitRow commit={commit} projectId={projectId} stackId={stackId} />
+			<CommitRow
+				commit={commit}
+				projectId={projectId}
+				stackId={stackId}
+				isCommitTarget={isCommitTarget}
+			/>
 		</TreeItem>
 	);
 };
@@ -1122,15 +1141,6 @@ const selectCommitTargetComboboxItem = ({
 	items[0] ??
 	null;
 
-const useCommitTargetCombobox = (projectId: string) => {
-	const commitTargetState = useAppSelector((state) => selectProjectCommitTarget(state, projectId));
-	const { data: headInfo } = useQuery(headInfoQueryOptions(projectId));
-	const items = buildCommitTargetComboboxItems({ headInfo, commitTargetState });
-	const selectedItem = selectCommitTargetComboboxItem({ items, commitTargetState });
-
-	return { headInfo, items, selectedItem };
-};
-
 const CommitTargetComboboxPopup: FC = () => (
 	<Combobox.Popup className={classes(uiStyles.popup, styles.commitTargetComboboxPopup)}>
 		<Combobox.Input
@@ -1162,7 +1172,9 @@ const focusCommitMessageInput = () => {
 
 const Changes: FC<{
 	projectId: string;
-}> = ({ projectId }) => {
+	commitTarget: CommitTargetComboboxItem | null;
+	targetComboboxItems: Array<CommitTargetComboboxItem>;
+}> = ({ projectId, commitTarget, targetComboboxItems }) => {
 	const toastManager = Toast.useToastManager();
 	const queryClient = useQueryClient();
 	const dispatch = useAppDispatch();
@@ -1296,13 +1308,14 @@ const Changes: FC<{
 
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
-	const {
-		headInfo,
-		items: branchComboboxItems,
-		selectedItem: commitTarget,
-	} = useCommitTargetCombobox(projectId);
+	const { data: headInfo } = useQuery(headInfoQueryOptions(projectId));
 	const isAltHeld = useKeyHold("Alt");
 	const isAmendMode = isAltHeld;
+	const hotkeys = {
+		selectCommitBranch: "Mod+Shift+B",
+		commit: "Mod+Enter",
+		amendCommit: "Mod+Alt+Enter",
+	} satisfies Record<string, RegisterableHotkey>;
 	const isCommitOrAmendPending = commitCreate.isPending || commitAmend.isPending;
 	const canCommit =
 		outlineMode._tag === "Default" && commitTarget !== null && !isCommitOrAmendPending;
@@ -1353,14 +1366,14 @@ const Changes: FC<{
 			_tag: "Item",
 			label: "Commit",
 			enabled: canCommit,
-			accelerator: toElectronAccelerator("Mod+Enter"),
+			accelerator: toElectronAccelerator(hotkeys.commit),
 			onSelect: () => commitCreate.mutate(),
 		},
 		{
 			_tag: "Item",
 			label: "Amend Commit",
 			enabled: canAmend,
-			accelerator: toElectronAccelerator("Mod+Alt+Enter"),
+			accelerator: toElectronAccelerator(hotkeys.amendCommit),
 			onSelect: () => commitAmend.mutate(),
 		},
 	];
@@ -1420,7 +1433,7 @@ const Changes: FC<{
 
 			<div className={styles.commitControls}>
 				<Combobox.Root<CommitTargetComboboxItem>
-					items={branchComboboxItems}
+					items={targetComboboxItems}
 					open={open}
 					onOpenChange={setOpen}
 					// Note `undefined` means uncontrolled.
@@ -1437,7 +1450,7 @@ const Changes: FC<{
 						aria-label="Select branch"
 						render={
 							<ShortcutButton
-								hotkey="Mod+Shift+B"
+								hotkey={hotkeys.selectCommitBranch}
 								hotkeyOptions={{
 									meta: { group: "Changes", name: "Select commit branch" },
 								}}
@@ -1455,7 +1468,7 @@ const Changes: FC<{
 
 				<div className={styles.commitActionControls}>
 					<ShortcutButton
-						hotkey={isAmendMode ? "Mod+Alt+Enter" : "Mod+Enter"}
+						hotkey={isAmendMode ? hotkeys.amendCommit : hotkeys.commit}
 						hotkeyOptions={{
 							meta: { group: "Changes", name: isAmendMode ? "Amend" : "Commit" },
 						}}
@@ -1538,15 +1551,15 @@ const BranchRow: FC<
 		branchName: string;
 		branchRef: Array<number>;
 		stackId: string;
+		isCommitTarget: boolean;
 	} & ComponentProps<"div">
-> = ({ projectId, branchName, branchRef, stackId, ...restProps }) => {
+> = ({ projectId, branchName, branchRef, stackId, isCommitTarget, ...restProps }) => {
 	const hotkeys = {
 		rename: "Enter",
 		composeCommitHere: "C",
 	} satisfies Record<string, RegisterableHotkey>;
 
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
-	const { selectedItem: commitTarget } = useCommitTargetCombobox(projectId);
 	const dispatch = useAppDispatch();
 	const branchOperandV: BranchOperand = {
 		stackId,
@@ -1592,6 +1605,31 @@ const BranchRow: FC<
 
 	const toastManager = Toast.useToastManager();
 
+	const tearOffBranchMutation = useMutation({
+		mutationFn: window.lite.tearOffBranch,
+		onSuccess: async (response, _input, _context, mutation) => {
+			dispatch(
+				projectActions.addReplacedCommits({
+					projectId,
+					replacedCommits: response.workspace.replacedCommits,
+				}),
+			);
+
+			await mutation.client.invalidateQueries();
+		},
+		onError: (error) => {
+			// oxlint-disable-next-line no-console
+			console.error(error);
+
+			toastManager.add({
+				type: "error",
+				title: "Failed to tear off branch",
+				description: errorMessageForToast(error),
+				priority: "high",
+			});
+		},
+	});
+
 	const saveBranchName = (newBranchName: string) => {
 		const trimmed = newBranchName.trim();
 		if (trimmed === "" || trimmed === branchName) return;
@@ -1619,11 +1657,18 @@ const BranchRow: FC<
 	};
 
 	const relativeTo: RelativeTo = { type: "referenceBytes", subject: branchRef };
-	const isCommitTarget = commitTarget && relativeToEquals(relativeTo, commitTarget.relativeTo);
 
 	const composeCommitHere = () => {
 		dispatch(projectActions.setCommitTarget({ projectId, commitTarget: relativeTo }));
 		focusCommitMessageInput();
+	};
+
+	const tearOffBranch = () => {
+		tearOffBranchMutation.mutate({
+			projectId,
+			subjectBranch: decodeRefName(branchRef),
+			dryRun: false,
+		});
 	};
 
 	const defaultBranchHotkeysEnabled =
@@ -1654,10 +1699,18 @@ const BranchRow: FC<
 		accelerator: toElectronAccelerator(hotkeys.composeCommitHere),
 		onSelect: composeCommitHere,
 	};
+	const tearOffBranchContextMenuItem: NativeMenuItem = {
+		_tag: "Item",
+		label: "Tear Off Branch",
+		enabled: !tearOffBranchMutation.isPending,
+		onSelect: tearOffBranch,
+	};
 
 	const menuItems: Array<NativeMenuItem> = [
 		startEditingContextMenuItem,
 		setCommitTargetContextMenuItem,
+		{ _tag: "Separator" },
+		tearOffBranchContextMenuItem,
 	];
 
 	return (
@@ -1810,7 +1863,8 @@ const BranchSegment: FC<{
 	segment: Segment;
 	refName: BranchReference;
 	stackId: string;
-}> = ({ projectId, segment, refName, stackId }) => {
+	commitTarget: RelativeTo | null;
+}> = ({ projectId, segment, refName, stackId, commitTarget }) => {
 	const operand = branchOperand({ stackId, branchRef: refName.fullNameBytes });
 
 	return (
@@ -1830,6 +1884,14 @@ const BranchSegment: FC<{
 						branchName={refName.displayName}
 						branchRef={refName.fullNameBytes}
 						stackId={stackId}
+						isCommitTarget={
+							commitTarget
+								? relativeToEquals(commitTarget, {
+										type: "referenceBytes",
+										subject: refName.fullNameBytes,
+									})
+								: false
+						}
 					/>
 				}
 			/>
@@ -1839,7 +1901,17 @@ const BranchSegment: FC<{
 			) : (
 				<div role="group">
 					{segment.commits.map((commit) => (
-						<CommitC key={commit.id} commit={commit} projectId={projectId} stackId={stackId} />
+						<CommitC
+							key={commit.id}
+							commit={commit}
+							projectId={projectId}
+							stackId={stackId}
+							isCommitTarget={
+								commitTarget
+									? relativeToEquals(commitTarget, { type: "commit", subject: commit.id })
+									: false
+							}
+						/>
 					))}
 				</div>
 			)}
@@ -1851,10 +1923,21 @@ const BranchlessSegment: FC<{
 	projectId: string;
 	segment: Segment;
 	stackId: string;
-}> = ({ projectId, segment, stackId }) => (
+	commitTarget: RelativeTo | null;
+}> = ({ projectId, segment, stackId, commitTarget }) => (
 	<div className={classes(workspaceItemRowStyles.section, styles.segment)}>
 		{segment.commits.map((commit) => (
-			<CommitC key={commit.id} commit={commit} projectId={projectId} stackId={stackId} />
+			<CommitC
+				key={commit.id}
+				commit={commit}
+				projectId={projectId}
+				stackId={stackId}
+				isCommitTarget={
+					commitTarget
+						? relativeToEquals(commitTarget, { type: "commit", subject: commit.id })
+						: false
+				}
+			/>
 		))}
 	</div>
 );
@@ -1862,7 +1945,8 @@ const BranchlessSegment: FC<{
 const StackC: FC<{
 	projectId: string;
 	stack: Stack;
-}> = ({ projectId, stack }) => {
+	commitTarget: RelativeTo | null;
+}> = ({ projectId, stack, commitTarget }) => {
 	// From Caleb:
 	// > There shouldn't be a way within GitButler to end up with a stack without a
 	//   StackId. Users can disrupt our matching against our metadata by playing
@@ -1894,6 +1978,7 @@ const StackC: FC<{
 							segment={segment}
 							refName={segment.refName}
 							stackId={stackId}
+							commitTarget={commitTarget}
 						/>
 					) : (
 						// A segment should always either have a branch reference or at
@@ -1904,6 +1989,7 @@ const StackC: FC<{
 								projectId={projectId}
 								segment={segment}
 								stackId={stackId}
+								commitTarget={commitTarget}
 							/>
 						)
 					),
