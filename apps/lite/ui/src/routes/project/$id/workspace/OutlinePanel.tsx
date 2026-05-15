@@ -97,11 +97,7 @@ import { Panel, PanelProps } from "react-resizable-panels";
 import styles from "./OutlinePanel.module.css";
 import workspaceItemRowStyles from "./WorkspaceItemRow.module.css";
 import { WorkspaceItemRow, WorkspaceItemRowToolbar } from "./WorkspaceItemRow.tsx";
-import {
-	moveOperation,
-	useDryRunOperation,
-	useRunOperationMutationOptions,
-} from "#ui/operations/operation.ts";
+import { useDryRunOperation } from "#ui/operations/operation.ts";
 import { isNonEmptyArray, NonEmptyArray } from "effect/Array";
 import { defaultOutlineSelection } from "#ui/projects/workspace/state.ts";
 import { ShortcutButton } from "#ui/components/ShortcutButton.tsx";
@@ -269,7 +265,31 @@ const useOutlineTreeHotkeys = ({
 	const select = (newItem: Operand) =>
 		dispatch(projectActions.selectOutline({ projectId, selection: newItem }));
 
-	const runOperationMutation = useMutation(useRunOperationMutationOptions());
+	const toastManager = Toast.useToastManager();
+	const commitMoveMutation = useMutation({
+		mutationFn: window.lite.commitMove,
+		onSuccess: async (response, input, _context, mutation) => {
+			dispatch(
+				projectActions.addReplacedCommits({
+					projectId: input.projectId,
+					replacedCommits: response.workspace.replacedCommits,
+				}),
+			);
+
+			await mutation.client.invalidateQueries();
+		},
+		onError: (error) => {
+			// oxlint-disable-next-line no-console
+			console.error(error);
+
+			toastManager.add({
+				type: "error",
+				title: "Failed to move commit",
+				description: errorMessageForToast(error),
+				priority: "high",
+			});
+		},
+	});
 
 	const openBranchPicker = () => {
 		dispatch(projectActions.openBranchPicker({ projectId }));
@@ -307,14 +327,25 @@ const useOutlineTreeHotkeys = ({
 		const nextItem = navigationIndex.items[selectionIdx + offset];
 		if (!nextItem) return;
 
-		const operation = moveOperation({
-			source,
-			target: nextItem,
-			side: offset === -1 ? "above" : "below",
-		});
-		if (!operation) return;
+		const relativeTo = Match.value(nextItem).pipe(
+			Match.tags({
+				Commit: ({ commitId }): RelativeTo => ({ type: "commit", subject: commitId }),
+				Branch: ({ branchRef }): RelativeTo => ({
+					type: "referenceBytes",
+					subject: branchRef,
+				}),
+			}),
+			Match.orElse(() => null),
+		);
+		if (!relativeTo) return;
 
-		runOperationMutation.mutate(operation);
+		commitMoveMutation.mutate({
+			projectId,
+			subjectCommitIds: [selection.commitId],
+			relativeTo,
+			side: offset === -1 ? "above" : "below",
+			dryRun: false,
+		});
 	};
 
 	const defaultOutlineHotkeysEnabled = focusedPanel === "outline" && outlineMode._tag === "Default";
@@ -417,8 +448,7 @@ const useOutlineTreeHotkeys = ({
 			callback: () => moveSelectedCommit(-1),
 			options: {
 				conflictBehavior: "allow",
-				enabled:
-					defaultOutlineHotkeysEnabled && isSelectedCommit && !runOperationMutation.isPending,
+				enabled: defaultOutlineHotkeysEnabled && isSelectedCommit && !commitMoveMutation.isPending,
 				meta: outlineHotkeys.moveCommitUp.meta,
 			},
 		},
@@ -427,8 +457,7 @@ const useOutlineTreeHotkeys = ({
 			callback: () => moveSelectedCommit(1),
 			options: {
 				conflictBehavior: "allow",
-				enabled:
-					defaultOutlineHotkeysEnabled && isSelectedCommit && !runOperationMutation.isPending,
+				enabled: defaultOutlineHotkeysEnabled && isSelectedCommit && !commitMoveMutation.isPending,
 				meta: outlineHotkeys.moveCommitDown.meta,
 			},
 		},
