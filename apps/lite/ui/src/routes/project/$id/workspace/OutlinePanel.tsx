@@ -1669,8 +1669,17 @@ const BranchRow: FC<
 		branchRef: Array<number>;
 		stackId: string;
 		isCommitTarget: boolean;
+		canTearOffBranch: boolean;
 	} & ComponentProps<"div">
-> = ({ projectId, branchName, branchRef, stackId, isCommitTarget, ...restProps }) => {
+> = ({
+	projectId,
+	branchName,
+	branchRef,
+	stackId,
+	isCommitTarget,
+	canTearOffBranch,
+	...restProps
+}) => {
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 	const dispatch = useAppDispatch();
 	const branchOperandV: BranchOperand = {
@@ -1794,7 +1803,7 @@ const BranchRow: FC<
 	});
 	const tearOffBranchContextMenuItem = nativeMenuItem({
 		label: "Tear Off Branch",
-		enabled: !tearOffBranchMutation.isPending,
+		enabled: canTearOffBranch && !tearOffBranchMutation.isPending,
 		onSelect: tearOffBranch,
 	});
 
@@ -1955,7 +1964,8 @@ const BranchSegment: FC<{
 	refName: BranchReference;
 	stackId: string;
 	commitTarget: RelativeTo | null;
-}> = ({ projectId, segment, refName, stackId, commitTarget }) => {
+	canTearOffBranch: boolean;
+}> = ({ projectId, segment, refName, stackId, commitTarget, canTearOffBranch }) => {
 	const operand = branchOperand({ stackId, branchRef: refName.fullNameBytes });
 
 	return (
@@ -1975,6 +1985,7 @@ const BranchSegment: FC<{
 						branchName={refName.displayName}
 						branchRef={refName.fullNameBytes}
 						stackId={stackId}
+						canTearOffBranch={canTearOffBranch}
 						isCommitTarget={
 							commitTarget
 								? relativeToEquals(commitTarget, {
@@ -2048,6 +2059,7 @@ const StackC: FC<{
 	// oxlint-disable-next-line typescript/no-non-null-assertion -- [tag:stack-id-required]
 	const stackId = stack.id!;
 	const operand = stackOperand({ stackId });
+	const canTearOffBranch = stack.segments.length > 1;
 
 	return (
 		<TreeItem
@@ -2070,6 +2082,7 @@ const StackC: FC<{
 							refName={segment.refName}
 							stackId={stackId}
 							commitTarget={commitTarget}
+							canTearOffBranch={canTearOffBranch}
 						/>
 					) : (
 						// A segment should always either have a branch reference or at
