@@ -6,8 +6,8 @@ use but_graph::{Commit, SegmentIndex};
 use petgraph::{Direction, visit::EdgeRef as _};
 
 use crate::graph_rebase::{
-    Checkout, Edge, Editor, Pick, RevisionHistory, Selector, Step, StepGraph, StepGraphIndex,
-    SuccessfulRebase, util,
+    Checkout, Edge, Editor, ExtraRef, ExtraRefMutability, Pick, RevisionHistory, Selector, Step,
+    StepGraph, StepGraphIndex, SuccessfulRebase, util,
 };
 
 #[derive(Clone)]
@@ -18,8 +18,9 @@ pub struct GraphEditorOptions<'a> {
     /// Extra references that should be included in the editor.
     ///
     /// If the parentage of a commit in the extra references list gets modified,
-    /// the extra reference will be updated.
-    pub extra_refs: Vec<&'a gix::refs::FullNameRef>,
+    /// mutable extra references will be updated while immutable ones remain
+    /// traversal-only.
+    pub extra_refs: Vec<ExtraRef<'a>>,
 }
 
 impl Default for GraphEditorOptions<'_> {
@@ -63,10 +64,22 @@ impl<'ws, 'meta, M: RefMetadata> Editor<'ws, 'meta, M> {
 
         let mut entrypoints = vec![entrypoint.segment_index];
 
+        let immutable_references = options
+            .extra_refs
+            .iter()
+            .filter(|extra_ref| extra_ref.mutability == ExtraRefMutability::Immutable)
+            .map(|extra_ref| extra_ref.ref_name.to_owned())
+            .collect::<HashSet<_>>();
+
         for extra_ref in &options.extra_refs {
-            let Some((segment, _)) = workspace.graph.segment_and_commit_by_ref_name(extra_ref)
+            let Some((segment, _)) = workspace
+                .graph
+                .segment_and_commit_by_ref_name(extra_ref.ref_name)
             else {
-                bail!("Failed to find corresponding segment for {extra_ref}");
+                bail!(
+                    "Failed to find corresponding segment for {}",
+                    extra_ref.ref_name
+                );
             };
             entrypoints.push(segment.id);
         }
@@ -306,6 +319,7 @@ impl<'ws, 'meta, M: RefMetadata> Editor<'ws, 'meta, M> {
                 .collect(),
             repo: repo.clone().with_object_memory(),
             history: RevisionHistory::new(),
+            immutable_references,
             workspace,
             meta,
         })
@@ -321,6 +335,7 @@ impl<'ws, 'meta, M: RefMetadata> SuccessfulRebase<'ws, 'meta, M> {
             checkouts: self.checkouts,
             repo: self.repo,
             history: self.history,
+            immutable_references: self.immutable_references,
             workspace: self.workspace,
             meta: self.meta,
         }

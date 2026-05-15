@@ -1,10 +1,15 @@
 //! Tests for `materialize` vs `materialize_without_checkout` behavior differences
 use anyhow::Result;
 use but_graph::Graph;
-use but_rebase::graph_rebase::{Editor, Step};
-use but_testsupport::{graph_tree, visualize_commit_graph_all, visualize_disk_tree_skip_dot_git};
+use but_rebase::graph_rebase::{Editor, ExtraRef, GraphEditorOptions, Step};
+use but_testsupport::{
+    StackState, graph_tree, visualize_commit_graph_all, visualize_disk_tree_skip_dot_git,
+};
 
-use crate::utils::{fixture_writable, standard_options};
+use crate::{
+    graph_rebase::add_stack_with_segments,
+    utils::{fixture_writable, standard_options},
+};
 
 #[test]
 fn materialize_removes_dropped_commit_changes_from_worktree() -> Result<()> {
@@ -192,6 +197,108 @@ fn both_methods_update_references_identically() -> Result<()> {
     );
 
     insta::assert_snapshot!(ref_after_materialize, @"a96434e2505c2ea0896cf4f58fec0778e074d3da");
+
+    Ok(())
+}
+
+#[test]
+fn materialize_keeps_immutable_extra_refs_unchanged_while_updating_local_refs() -> Result<()> {
+    let (repo, _tmpdir, mut meta) = fixture_writable("workspace-with-empty-stack")?;
+    add_stack_with_segments(&mut meta, 1, "stack-1", StackState::InWorkspace, &[]);
+    add_stack_with_segments(&mut meta, 2, "stack-2", StackState::InWorkspace, &[]);
+    let main_ref = gix::refs::FullName::try_from("refs/heads/main")?;
+    let main_before = repo.rev_parse_single("main")?.detach();
+
+    insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
+    *   74bcc92 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    |\  
+    * | 2169646 (stack-1) Commit D
+    * | 46ef828 Commit C
+    |/  
+    | * a0f2ac5 (origin/main, main) Commit X
+    |/  
+    * f555940 (stack-2) Commit A
+    * d664be0 Commit B
+    * fafd9d0 init
+    ");
+
+    let graph = Graph::from_head(&repo, &*meta, standard_options())?.validated()?;
+    let mut ws = graph.into_workspace()?;
+    let mut editor = Editor::create_with_opts(
+        &mut ws,
+        &mut *meta,
+        &repo,
+        &GraphEditorOptions {
+            extra_refs: vec![ExtraRef::immutable(main_ref.as_ref())],
+            ..<_>::default()
+        },
+    )?;
+
+    let stack_tip = repo.rev_parse_single("stack-2")?.detach();
+    let stack_tip_sel = editor.select_commit(stack_tip)?;
+    editor.replace(stack_tip_sel, Step::None)?;
+
+    let outcome = editor.rebase()?;
+    outcome.materialize()?;
+
+    insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
+    *   3cc8b6f (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    |\  
+    * | c869f24 (stack-1) Commit D
+    * | 07a9b49 Commit C
+    |/  
+    | * a0f2ac5 (origin/main, main) Commit X
+    | * f555940 Commit A
+    |/  
+    * d664be0 (stack-2) Commit B
+    * fafd9d0 init
+    ");
+
+    assert_eq!(repo.rev_parse_single("main")?.detach(), main_before);
+
+    Ok(())
+}
+
+#[test]
+fn materialize_does_not_delete_immutable_extra_refs_removed_from_graph() -> Result<()> {
+    let (repo, _tmpdir, mut meta) = fixture_writable("workspace-with-empty-stack")?;
+    add_stack_with_segments(&mut meta, 1, "stack-1", StackState::InWorkspace, &[]);
+    add_stack_with_segments(&mut meta, 2, "stack-2", StackState::InWorkspace, &[]);
+    let main_ref = gix::refs::FullName::try_from("refs/heads/main")?;
+    let main_before = repo.rev_parse_single("main")?.detach();
+
+    let graph = Graph::from_head(&repo, &*meta, standard_options())?.validated()?;
+    let mut ws = graph.into_workspace()?;
+    let mut editor = Editor::create_with_opts(
+        &mut ws,
+        &mut *meta,
+        &repo,
+        &GraphEditorOptions {
+            extra_refs: vec![ExtraRef::immutable(main_ref.as_ref())],
+            ..<_>::default()
+        },
+    )?;
+
+    let main_sel = editor.select_reference(main_ref.as_ref())?;
+    editor.replace(main_sel, Step::None)?;
+
+    let outcome = editor.rebase()?;
+    outcome.materialize()?;
+
+    assert_eq!(repo.rev_parse_single("main")?.detach(), main_before);
+
+    insta::assert_snapshot!(visualize_commit_graph_all(&repo)?, @r"
+    *   74bcc92 (HEAD -> gitbutler/workspace) GitButler Workspace Commit
+    |\  
+    * | 2169646 (stack-1) Commit D
+    * | 46ef828 Commit C
+    |/  
+    | * a0f2ac5 (origin/main, main) Commit X
+    |/  
+    * f555940 (stack-2) Commit A
+    * d664be0 Commit B
+    * fafd9d0 init
+    ");
 
     Ok(())
 }

@@ -24,6 +24,42 @@ pub mod mutate;
 pub mod ordering;
 pub(crate) mod util;
 
+/// Additional reference to include in an editor, with persistence behavior.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ExtraRef<'a> {
+    /// The reference name to include in the editor graph.
+    pub ref_name: &'a gix::refs::FullNameRef,
+    /// Whether rebases/materialization may update this ref.
+    pub mutability: ExtraRefMutability,
+}
+
+impl<'a> ExtraRef<'a> {
+    /// Track an extra ref and allow the editor to update it.
+    pub fn mutable(ref_name: &'a gix::refs::FullNameRef) -> Self {
+        Self {
+            ref_name,
+            mutability: ExtraRefMutability::Mutable,
+        }
+    }
+
+    /// Track an extra ref for traversal only, without persisting updates.
+    pub fn immutable(ref_name: &'a gix::refs::FullNameRef) -> Self {
+        Self {
+            ref_name,
+            mutability: ExtraRefMutability::Immutable,
+        }
+    }
+}
+
+/// Controls whether an extra ref may be updated by editor materialization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExtraRefMutability {
+    /// The ref may be rewritten and deleted as needed by the edited graph.
+    Mutable,
+    /// The ref is available for graph traversal but must not be persisted.
+    Immutable,
+}
+
 /// Utilities for testing
 pub mod testing;
 
@@ -239,6 +275,9 @@ pub struct Editor<'ws, 'meta, M: RefMetadata> {
     repo: gix::Repository,
     /// Provides data about how the editor instance was transformed.
     history: RevisionHistory,
+    /// References that should remain selectable in the graph but must never be
+    /// updated or deleted during materialization.
+    immutable_references: std::collections::HashSet<gix::refs::FullName>,
     /// A reference to the workspace that the editor was created for.
     workspace: &'ws mut but_graph::Workspace,
     /// A reference to the metadata that the editor was created for.
@@ -258,6 +297,7 @@ pub struct SuccessfulRebase<'ws, 'meta, M: RefMetadata> {
     pub(crate) checkouts: Vec<Checkout>,
     /// Provides data about how the editor instance was transformed.
     pub history: RevisionHistory,
+    pub(crate) immutable_references: std::collections::HashSet<gix::refs::FullName>,
     /// A reference to the workspace that the editor was created for.
     workspace: &'ws mut but_graph::Workspace,
     /// A reference to the metadata that the editor was created for.
