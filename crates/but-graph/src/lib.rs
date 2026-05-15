@@ -210,7 +210,6 @@ pub use api::FirstParent;
 /// Produce a graph from a Git repository.
 pub mod init;
 pub mod projection;
-pub mod target_ref_relations;
 mod utils;
 
 mod statistics;

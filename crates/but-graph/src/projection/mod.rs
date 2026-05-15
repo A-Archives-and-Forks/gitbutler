@@ -14,6 +14,9 @@ pub use stack::{Stack, StackCommit, StackCommitDebugFlags, StackCommitFlags, Sta
 pub(crate) mod workspace;
 pub use workspace::{TargetCommit, TargetRef, Workspace, WorkspaceKind};
 
+#[cfg(feature = "legacy")]
+pub use workspace::api::legacy::HeadStatus;
+
 /// utilities for workspace-related commits.
 pub mod commit {
     use bstr::{BStr, ByteSlice};

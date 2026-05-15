@@ -4,7 +4,7 @@ use anyhow::{Context as _, Result, bail};
 use bstr::ByteSlice;
 use but_core::{RefMetadata, Reference, RepositoryExt, WORKSPACE_REF_NAME, ref_metadata::StackId};
 use but_ctx::{Context, access::RepoExclusive};
-use but_graph::target_ref_relations::FirstParentTraversal;
+use but_graph::FirstParent;
 use but_rebase::{RebaseOutput, RebaseStep};
 use but_serde::BStringForFrontend;
 use but_workspace::{legacy::stack_ext::StackDetailsExt, ref_info::Options};
@@ -237,21 +237,20 @@ impl<'a> UpstreamIntegrationContext<'a> {
         }
 
         let (target_ref_name, old_target_id, upstream_commits) = {
-            let (repo, ws, _db) = ctx.workspace_and_db_with_perm(permission.read_permission())?;
-            let target_ref = ws
+            let (_repo, ws, _db) = ctx.workspace_and_db_with_perm(permission.read_permission())?;
+            let target_ref_name = ws
                 .target_ref_name()
                 .context("failed to get target reference name")?
                 .to_owned();
 
             let upstream_commits = ws
-                .graph
-                .upstream_commits(&repo, target_ref.as_ref(), FirstParentTraversal::Yes)?
+                .upstream_commits(FirstParent::Yes)?
                 .into_iter()
                 .map(|h| h.upstream_commits)
                 .max_by_key(|us| us.len())
                 .unwrap_or_default();
             (
-                target_ref,
+                target_ref_name,
                 ws.target_base_commit_id()
                     .context("failed to get target base oid")?,
                 upstream_commits,

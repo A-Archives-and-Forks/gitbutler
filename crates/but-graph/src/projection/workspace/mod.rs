@@ -3,7 +3,7 @@ use but_core::ref_metadata;
 
 use crate::{Graph, SegmentIndex, projection::Stack};
 
-mod api;
+pub(super) mod api;
 mod init;
 pub(crate) use init::Downgrade;
 

@@ -688,8 +688,6 @@ impl Graph {
     /// Visit the ancestry of `start` along the first parents, itself excluded, until `stop` returns `true`.
     /// Also return the segment that we stopped at.
     /// **Important**: `stop` is not called with `start`, this is a feature.
-    ///
-    /// Note that the traversal assumes as well-segmented graph without cycles.
     pub fn visit_segments_downward_along_first_parent_exclude_start(
         &self,
         start: SegmentIndex,
@@ -709,6 +707,18 @@ impl Graph {
                     .next();
             }
         }
+    }
+
+    /// Visit the ancestry of `start` along the first parents, including `start`, until `stop` returns `true`.
+    pub fn visit_segments_downward_along_first_parent_include_start(
+        &self,
+        start: SegmentIndex,
+        mut stop: impl FnMut(&Segment) -> bool,
+    ) {
+        if stop(&self[start]) {
+            return;
+        }
+        self.visit_segments_downward_along_first_parent_exclude_start(start, stop);
     }
 
     /// Return `true` if this graph is possibly partial as the hard limit was hit,
