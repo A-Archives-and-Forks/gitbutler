@@ -23,6 +23,7 @@ import { useHotkeys } from "@tanstack/react-hotkeys";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type AbsorptionTarget } from "@gitbutler/but-sdk";
 import { errorMessageForToast } from "#ui/errors.ts";
+import { operationHotkeys } from "#ui/hotkeys.ts";
 
 const AbsorbControls: FC<{
 	projectId: string;
@@ -63,14 +64,32 @@ const AbsorbControls: FC<{
 
 	const cancel = () => dispatch(projectActions.cancelMode({ projectId }));
 
+	useHotkeys([
+		{
+			hotkey: operationHotkeys.confirm.hotkey,
+			callback: confirm,
+			options: {
+				conflictBehavior: "allow",
+				enabled: canAbsorb,
+				meta: operationHotkeys.confirm.meta,
+			},
+		},
+		{
+			hotkey: operationHotkeys.cancel.hotkey,
+			callback: cancel,
+			options: {
+				conflictBehavior: "allow",
+				meta: operationHotkeys.cancel.meta,
+			},
+		},
+	]);
+
 	return (
 		<>
 			<ShortcutButton
 				className={uiStyles.button}
-				hotkey="Enter"
-				hotkeyOptions={{
-					meta: { group: "Operation mode", name: "Confirm" },
-				}}
+				hotkey={operationHotkeys.confirm.hotkey}
+				hotkeyOptions={{ meta: operationHotkeys.confirm.meta }}
 				onClick={confirm}
 				disabled={!canAbsorb}
 			>
@@ -78,8 +97,8 @@ const AbsorbControls: FC<{
 			</ShortcutButton>
 			<ShortcutButton
 				className={uiStyles.button}
-				hotkey="Escape"
-				hotkeyOptions={{ meta: { group: "Operation mode", name: "Cancel" } }}
+				hotkey={operationHotkeys.cancel.hotkey}
+				hotkeyOptions={{ meta: operationHotkeys.cancel.meta }}
 				onClick={cancel}
 			>
 				Cancel
@@ -112,16 +131,54 @@ const TransferOperationControls: FC<{
 
 	useHotkeys([
 		{
-			hotkey: "Mod+V",
+			hotkey: operationHotkeys.confirmTransfer.hotkey,
 			callback: run,
 			options: {
 				conflictBehavior: "allow",
 				enabled: !!operation,
 				ignoreInputs: true,
-				meta: {
-					group: "Operation mode",
-					name: "Confirm",
-				},
+				meta: operationHotkeys.confirmTransfer.meta,
+			},
+		},
+		{
+			hotkey: operationHotkeys.selectMoveAbove.hotkey,
+			callback: () => setOperationType("moveAbove"),
+			options: {
+				conflictBehavior: "allow",
+				meta: operationHotkeys.selectMoveAbove.meta,
+			},
+		},
+		{
+			hotkey: operationHotkeys.selectRub.hotkey,
+			callback: () => setOperationType("rub"),
+			options: {
+				conflictBehavior: "allow",
+				meta: operationHotkeys.selectRub.meta,
+			},
+		},
+		{
+			hotkey: operationHotkeys.selectMoveBelow.hotkey,
+			callback: () => setOperationType("moveBelow"),
+			options: {
+				conflictBehavior: "allow",
+				meta: operationHotkeys.selectMoveBelow.meta,
+			},
+		},
+		{
+			hotkey: operationHotkeys.confirm.hotkey,
+			callback: run,
+			options: {
+				conflictBehavior: "allow",
+				enabled: !!operation,
+				meta: operationHotkeys.confirm.meta,
+			},
+		},
+		{
+			hotkey: operationHotkeys.cancel.hotkey,
+			callback: cancel,
+			options: {
+				conflictBehavior: "allow",
+				meta: operationHotkeys.cancel.meta,
 			},
 		},
 	]);
@@ -147,13 +204,8 @@ const TransferOperationControls: FC<{
 					className={styles.operationTypeToggle}
 					render={
 						<ShortcutButton
-							hotkey="A"
-							hotkeyOptions={{
-								meta: {
-									group: "Operation mode",
-									name: "Select move above",
-								},
-							}}
+							hotkey={operationHotkeys.selectMoveAbove.hotkey}
+							hotkeyOptions={{ meta: operationHotkeys.selectMoveAbove.meta }}
 						/>
 					}
 				>
@@ -164,13 +216,8 @@ const TransferOperationControls: FC<{
 					className={styles.operationTypeToggle}
 					render={
 						<ShortcutButton
-							hotkey="R"
-							hotkeyOptions={{
-								meta: {
-									group: "Operation mode",
-									name: "Select rub",
-								},
-							}}
+							hotkey={operationHotkeys.selectRub.hotkey}
+							hotkeyOptions={{ meta: operationHotkeys.selectRub.meta }}
 						/>
 					}
 				>
@@ -181,13 +228,8 @@ const TransferOperationControls: FC<{
 					className={styles.operationTypeToggle}
 					render={
 						<ShortcutButton
-							hotkey="B"
-							hotkeyOptions={{
-								meta: {
-									group: "Operation mode",
-									name: "Select move below",
-								},
-							}}
+							hotkey={operationHotkeys.selectMoveBelow.hotkey}
+							hotkeyOptions={{ meta: operationHotkeys.selectMoveBelow.meta }}
 						/>
 					}
 				>
@@ -196,8 +238,8 @@ const TransferOperationControls: FC<{
 			</ToggleGroup>
 			<ShortcutButton
 				className={uiStyles.button}
-				hotkey="Enter"
-				hotkeyOptions={{ meta: { group: "Operation mode", name: "Confirm" } }}
+				hotkey={operationHotkeys.confirm.hotkey}
+				hotkeyOptions={{ meta: operationHotkeys.confirm.meta }}
 				onClick={run}
 				disabled={!operation}
 			>
@@ -205,8 +247,8 @@ const TransferOperationControls: FC<{
 			</ShortcutButton>
 			<ShortcutButton
 				className={uiStyles.button}
-				hotkey="Escape"
-				hotkeyOptions={{ meta: { group: "Operation mode", name: "Cancel" } }}
+				hotkey={operationHotkeys.cancel.hotkey}
+				hotkeyOptions={{ meta: operationHotkeys.cancel.meta }}
 				onClick={cancel}
 			>
 				Cancel
