@@ -151,9 +151,7 @@ const TransferOperationControls: FC<{
 							hotkeyOptions={{
 								meta: {
 									group: "Operation mode",
-									name: operations.moveAbove
-										? `Select ${operationLabel(operations.moveAbove)}`
-										: "Select move above",
+									name: "Select move above",
 								},
 							}}
 						/>
@@ -170,7 +168,7 @@ const TransferOperationControls: FC<{
 							hotkeyOptions={{
 								meta: {
 									group: "Operation mode",
-									name: operations.rub ? `Select ${operationLabel(operations.rub)}` : "Select rub",
+									name: "Select rub",
 								},
 							}}
 						/>
@@ -187,9 +185,7 @@ const TransferOperationControls: FC<{
 							hotkeyOptions={{
 								meta: {
 									group: "Operation mode",
-									name: operations.moveBelow
-										? `Select ${operationLabel(operations.moveBelow)}`
-										: "Select move below",
+									name: "Select move below",
 								},
 							}}
 						/>
