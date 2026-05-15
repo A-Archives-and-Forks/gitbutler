@@ -1,5 +1,5 @@
 import { Toast } from "@base-ui/react";
-import { mutationOptions, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Match } from "effect";
 import {
 	type CommitAmendParams,
@@ -326,13 +326,13 @@ export const useDryRunOperation = ({
 	});
 };
 
-export const useRunOperationMutationOptions = () => {
+export const useRunOperation = () => {
 	const { id: projectId } = useParams({ from: "/project/$id/workspace" });
 	const dispatch = useAppDispatch();
 	const queryClient = useQueryClient();
 	const toastManager = Toast.useToastManager();
 
-	return mutationOptions({
+	return useMutation({
 		mutationFn: (operation: Operation) =>
 			runOperation({
 				projectId,

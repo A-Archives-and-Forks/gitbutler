@@ -3,7 +3,7 @@ import { classes } from "#ui/ui/classes.ts";
 import {
 	getOperations,
 	operationLabel,
-	useRunOperationMutationOptions,
+	useRunOperation,
 	type OperationType,
 	type OperationsByType,
 } from "#ui/operations/operation.ts";
@@ -113,7 +113,7 @@ const TransferOperationControls: FC<{
 	operationType: OperationType;
 }> = ({ projectId, operations, operationType }) => {
 	const dispatch = useAppDispatch();
-	const { mutate: runOperation } = useMutation(useRunOperationMutationOptions());
+	const { mutate: runOperation } = useRunOperation();
 	const operation = operations[operationType];
 
 	const run = () => {
