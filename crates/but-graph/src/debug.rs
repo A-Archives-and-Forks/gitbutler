@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::collections::{BTreeMap, VecDeque};
 
 use anyhow::{Context as _, bail};
 use bstr::{BString, ByteSlice, ByteVec};
@@ -442,7 +442,7 @@ impl Graph {
             );
             let mut next = VecDeque::new();
             next.extend(self.base_segments());
-            let mut seen = BTreeSet::new();
+            let mut seen = self.seen_table();
             while let Some(sidx) = next.pop_front() {
                 if to_remove == 0 {
                     break;
@@ -463,7 +463,7 @@ impl Graph {
                 }
                 next.extend(
                     self.neighbors_directed(sidx, petgraph::Direction::Incoming)
-                        .filter(|n| seen.insert(*n)),
+                        .filter(|n| seen.insert_unseen(*n)),
                 );
                 self.remove_node(sidx);
                 to_remove -= 1;
@@ -478,12 +478,13 @@ impl Graph {
     }
 
     fn remove_in_workspace_flag_below_lower_bound(&mut self, lower_bound_segment_id: SegmentIndex) {
-        let mut seen = BTreeSet::from([lower_bound_segment_id]);
+        let mut seen = self.seen_table();
+        seen.insert_unseen(lower_bound_segment_id);
         let mut queue = VecDeque::from([lower_bound_segment_id]);
         while let Some(sidx) = queue.pop_front() {
             let below_segments: Vec<_> = self
                 .neighbors_directed(sidx, petgraph::Direction::Outgoing)
-                .filter(|n| seen.insert(*n))
+                .filter(|n| seen.insert_unseen(*n))
                 .collect();
             for below_sidx in below_segments {
                 if let Some(segment) = self.node_weight_mut(below_sidx)

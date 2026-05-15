@@ -1,6 +1,6 @@
 use std::{
     cmp::Reverse,
-    collections::{BTreeSet, BinaryHeap, VecDeque},
+    collections::BinaryHeap,
     ops::{Deref, Index, IndexMut},
 };
 
@@ -14,8 +14,10 @@ use petgraph::{
 
 use crate::{
     Commit, CommitFlags, CommitIndex, Edge, EntryPoint, EntryPointCommit, Graph, Segment,
-    SegmentFlags, SegmentIndex, SegmentRelation, StopCondition, init::PetGraph,
-    projection::commit::is_managed_workspace_by_message, utils::SegmentTable,
+    SegmentFlags, SegmentIndex, SegmentRelation, StopCondition,
+    init::PetGraph,
+    projection::commit::is_managed_workspace_by_message,
+    utils::{SegmentTable, SegmentVisitScratch},
 };
 
 boolean_enums::gen_boolean_enum!(pub FirstParent);
@@ -691,34 +693,50 @@ impl Graph {
     pub fn visit_segments_downward_along_first_parent_exclude_start(
         &self,
         start: SegmentIndex,
-        mut stop: impl FnMut(&Segment) -> bool,
+        stop: impl FnMut(&Segment) -> bool,
     ) {
-        let mut edge = self.inner.edges_directed(start, Direction::Outgoing).next();
-        let mut seen = BTreeSet::new();
-        while let Some(first_edge) = edge {
-            let next = &self[first_edge.target()];
-            if stop(next) {
-                break;
-            }
-            if seen.insert(next.id) {
-                edge = self
-                    .inner
-                    .edges_directed(next.id, Direction::Outgoing)
-                    .next();
-            }
-        }
+        self.visit_segments_downward_along_first_parent(start, false, stop);
     }
 
     /// Visit the ancestry of `start` along the first parents, including `start`, until `stop` returns `true`.
     pub fn visit_segments_downward_along_first_parent_include_start(
         &self,
         start: SegmentIndex,
-        mut stop: impl FnMut(&Segment) -> bool,
+        stop: impl FnMut(&Segment) -> bool,
     ) {
-        if stop(&self[start]) {
-            return;
+        self.visit_segments_downward_along_first_parent(start, true, stop);
+    }
+
+    fn visit_segments_downward_along_first_parent(
+        &self,
+        start: SegmentIndex,
+        include_start: bool,
+        mut stop: impl FnMut(&Segment) -> bool,
+    ) -> Option<SegmentIndex> {
+        let mut next = if include_start {
+            Some(start)
+        } else {
+            self.inner
+                .edges_directed(start, Direction::Outgoing)
+                .next()
+                .map(|edge| edge.target())
+        };
+        let mut seen = self.seen_table();
+        while let Some(sidx) = next {
+            let segment = &self[sidx];
+            if stop(segment) {
+                return Some(sidx);
+            }
+            next = if seen.insert_unseen(sidx) {
+                self.inner
+                    .edges_directed(sidx, Direction::Outgoing)
+                    .next()
+                    .map(|edge| edge.target())
+            } else {
+                None
+            };
         }
-        self.visit_segments_downward_along_first_parent_exclude_start(start, stop);
+        None
     }
 
     /// Return `true` if this graph is possibly partial as the hard limit was hit,
@@ -875,21 +893,10 @@ impl Graph {
         &self,
         start: SegmentIndex,
         direction: Direction,
-        mut visit_and_prune: impl FnMut(&Segment) -> bool,
+        visit_and_prune: impl FnMut(&Segment) -> bool,
     ) {
-        let mut next = VecDeque::new();
-        next.push_back(start);
-        let mut seen = SegmentTable::new(self.inner.node_bound(), false);
-        seen.set(start, true);
-        while let Some(next_sidx) = next.pop_front() {
-            if !visit_and_prune(&self[next_sidx]) {
-                next.extend(
-                    self.inner
-                        .neighbors_directed(next_sidx, direction)
-                        .filter(|n| seen.set_if_empty(*n, true)),
-                )
-            }
-        }
+        let mut scratch = SegmentVisitScratch::new(self);
+        scratch.visit_including_start_until(self, start, direction, visit_and_prune);
     }
 
     /// Visit all segments, excluding `start`, until `visit_and_prune(segment)` returns `true`.
@@ -899,21 +906,10 @@ impl Graph {
         &self,
         start: SegmentIndex,
         direction: Direction,
-        mut visit_and_prune: impl FnMut(&Segment) -> bool,
+        visit_and_prune: impl FnMut(&Segment) -> bool,
     ) {
-        let mut next = VecDeque::new();
-        next.push_back(start);
-        let mut seen = SegmentTable::new(self.inner.node_bound(), false);
-        seen.set(start, true);
-        while let Some(next_sidx) = next.pop_front() {
-            if start == next_sidx || !visit_and_prune(&self[next_sidx]) {
-                next.extend(
-                    self.inner
-                        .neighbors_directed(next_sidx, direction)
-                        .filter(|n| seen.set_if_empty(*n, true)),
-                )
-            }
-        }
+        let mut scratch = SegmentVisitScratch::new(self);
+        scratch.visit_excluding_start_until(self, start, direction, visit_and_prune);
     }
 }
 

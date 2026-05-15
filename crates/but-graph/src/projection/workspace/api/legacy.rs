@@ -42,7 +42,7 @@ impl Workspace {
     ///
     /// Also, we can easily write what's needed to serve the needs of new code, so it's
     /// also fine if this goes away.
-    /// 
+    ///
     /// If only the commits that aren't in the workspace were needed (i.e. not per stack),
     /// then one can do a mere pruned traversal from `target_tip ^InWorkspace`.
     pub fn upstream_commits(&self, first_parent: FirstParent) -> Result<Vec<HeadStatus>> {

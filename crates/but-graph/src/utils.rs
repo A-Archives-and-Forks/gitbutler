@@ -4,6 +4,43 @@ use petgraph::{Direction, visit::NodeIndexable};
 
 use crate::{Graph, Segment, SegmentIndex};
 
+impl Graph {
+    pub(crate) fn seen_table(&self) -> SeenTable {
+        SeenTable::new(self.inner.node_bound())
+    }
+}
+
+/// Fixed-size storage for tracking visited segments during graph walks.
+///
+/// Unlike [`SegmentTable<bool>`], this type only represents one concept:
+/// whether a segment was seen in the current walk. It is intentionally static:
+/// create it after the graph shape is known, and don't use it for segments
+/// inserted after construction.
+pub(crate) struct SeenTable {
+    values: Vec<bool>,
+}
+
+impl SeenTable {
+    /// Create a table with space for `num_segments` segment indices.
+    fn new(num_segments: usize) -> Self {
+        SeenTable {
+            values: vec![false; num_segments],
+        }
+    }
+
+    /// Insert `sidx` into the seen set if it wasn't present yet.
+    ///
+    /// Returns `true` if `sidx` was unseen before this call.
+    pub(crate) fn insert_unseen(&mut self, sidx: SegmentIndex) -> bool {
+        let value = &mut self.values[sidx.index()];
+        if *value {
+            return false;
+        }
+        *value = true;
+        true
+    }
+}
+
 /// Scratch storage keyed directly by [`SegmentIndex`].
 ///
 /// Segment indices are dense `petgraph::NodeIndex` values while a graph is alive,
