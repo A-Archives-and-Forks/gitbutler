@@ -8,6 +8,8 @@ import { findCommit, getCommonBaseCommitId, resolveRelativeTo } from "#ui/api/re
 import { decodeRefName, encodeRefName } from "#ui/api/ref-name.ts";
 import { commitTitle, shortCommitId } from "#ui/commit.ts";
 import {
+	nativeMenuItem,
+	nativeMenuSeparator,
 	showNativeContextMenu,
 	showNativeMenuFromTrigger,
 	type NativeMenuItem,
@@ -937,63 +939,55 @@ const CommitRow: FC<
 		focusCommitMessageInput();
 	};
 
-	const amendCommitContextMenuItem: NativeMenuItem = {
-		_tag: "Item",
+	const amendCommitContextMenuItem = nativeMenuItem({
 		label: "Amend Commit",
 		enabled: true,
 		accelerator: toElectronAccelerator(outlineHotkeys.amendCommit.hotkey),
 		onSelect: amendCommit,
-	};
-	const cutCommitContextMenuItem: NativeMenuItem = {
-		_tag: "Item",
+	});
+	const cutCommitContextMenuItem = nativeMenuItem({
 		label: "Cut Commit",
 		enabled: true,
 		onSelect: cutCommit,
-	};
-	const startEditingContextMenuItem: NativeMenuItem = {
-		_tag: "Item",
+	});
+	const startEditingContextMenuItem = nativeMenuItem({
 		label: "Reword Commit",
 		enabled: !isCommitMessagePending,
 		accelerator: toElectronAccelerator(outlineHotkeys.rewordCommit.hotkey),
 		onSelect: startEditing,
-	};
-	const insertBlankCommitAboveContextMenuItem: NativeMenuItem = {
-		_tag: "Item",
+	});
+	const insertBlankCommitAboveContextMenuItem = nativeMenuItem({
 		label: "Above",
 		enabled: true,
 		onSelect: insertBlankCommitAbove,
-	};
-	const insertBlankCommitBelowContextMenuItem: NativeMenuItem = {
-		_tag: "Item",
+	});
+	const insertBlankCommitBelowContextMenuItem = nativeMenuItem({
 		label: "Below",
 		enabled: true,
 		onSelect: insertBlankCommitBelow,
-	};
-	const deleteCommitContextMenuItem: NativeMenuItem = {
-		_tag: "Item",
+	});
+	const deleteCommitContextMenuItem = nativeMenuItem({
 		label: "Delete Commit",
 		enabled: !commitDiscard.isPending,
 		onSelect: deleteCommit,
-	};
-	const setCommitTargetContextMenuItem: NativeMenuItem = {
-		_tag: "Item",
+	});
+	const setCommitTargetContextMenuItem = nativeMenuItem({
 		label: "Compose Commit Here",
 		accelerator: toElectronAccelerator(outlineHotkeys.composeCommitHere.hotkey),
 		onSelect: composeCommitHere,
-	};
+	});
 
 	const menuItems: Array<NativeMenuItem> = [
 		startEditingContextMenuItem,
 		amendCommitContextMenuItem,
 		cutCommitContextMenuItem,
-		{ _tag: "Separator" },
+		nativeMenuSeparator,
 		setCommitTargetContextMenuItem,
-		{
-			_tag: "Item",
+		nativeMenuItem({
 			label: "Add Empty Commit",
 			submenu: [insertBlankCommitAboveContextMenuItem, insertBlankCommitBelowContextMenuItem],
-		},
-		{ _tag: "Separator" },
+		}),
+		nativeMenuSeparator,
 		deleteCommitContextMenuItem,
 	];
 
@@ -1101,13 +1095,12 @@ const ChangesSectionRow: FC<{
 		enterAbsorbMode(operand, { type: "all" });
 	};
 
-	const absorbContextMenuItem: NativeMenuItem = {
-		_tag: "Item",
+	const absorbContextMenuItem = nativeMenuItem({
 		label: "Absorb",
 		enabled: changes.length > 0,
 		accelerator: toElectronAccelerator(outlineHotkeys.absorb.hotkey),
 		onSelect: absorb,
-	};
+	});
 
 	const menuItems: Array<NativeMenuItem> = [absorbContextMenuItem];
 
@@ -1454,20 +1447,18 @@ const Changes: FC<{
 		commitCreate.mutate();
 	};
 	const commitMenuItems: Array<NativeMenuItem> = [
-		{
-			_tag: "Item",
+		nativeMenuItem({
 			label: "Commit",
 			enabled: canCommit,
 			accelerator: toElectronAccelerator(changesHotkeys.commit.hotkey),
 			onSelect: () => commitCreate.mutate(),
-		},
-		{
-			_tag: "Item",
+		}),
+		nativeMenuItem({
 			label: "Amend Commit",
 			enabled: canAmend,
 			accelerator: toElectronAccelerator(changesHotkeys.amendCommit.hotkey),
 			onSelect: () => commitAmend.mutate(),
-		},
+		}),
 	];
 
 	useHotkeys([
@@ -1761,30 +1752,27 @@ const BranchRow: FC<
 		});
 	};
 
-	const startEditingContextMenuItem: NativeMenuItem = {
-		_tag: "Item",
+	const startEditingContextMenuItem = nativeMenuItem({
 		label: "Rename Branch",
 		enabled: !isRenamePending,
 		accelerator: toElectronAccelerator(outlineHotkeys.renameBranch.hotkey),
 		onSelect: startEditing,
-	};
-	const setCommitTargetContextMenuItem: NativeMenuItem = {
-		_tag: "Item",
+	});
+	const setCommitTargetContextMenuItem = nativeMenuItem({
 		label: "Compose Commit Here",
 		accelerator: toElectronAccelerator(outlineHotkeys.composeCommitHere.hotkey),
 		onSelect: composeCommitHere,
-	};
-	const tearOffBranchContextMenuItem: NativeMenuItem = {
-		_tag: "Item",
+	});
+	const tearOffBranchContextMenuItem = nativeMenuItem({
 		label: "Tear Off Branch",
 		enabled: !tearOffBranchMutation.isPending,
 		onSelect: tearOffBranch,
-	};
+	});
 
 	const menuItems: Array<NativeMenuItem> = [
 		startEditingContextMenuItem,
 		setCommitTargetContextMenuItem,
-		{ _tag: "Separator" },
+		nativeMenuSeparator,
 		tearOffBranchContextMenuItem,
 	];
 
@@ -1884,17 +1872,16 @@ const StackRow: FC<
 		unapplyStack.mutate({ projectId, stackId });
 	};
 
-	const unapplyContextMenuItem: NativeMenuItem = {
-		_tag: "Item",
+	const unapplyContextMenuItem = nativeMenuItem({
 		label: "Unapply Stack",
 		enabled: !unapplyStack.isPending,
 		onSelect: unapply,
-	};
+	});
 
 	const menuItems: Array<NativeMenuItem> = [
-		{ _tag: "Item", label: "Move Up", enabled: false },
-		{ _tag: "Item", label: "Move Down", enabled: false },
-		{ _tag: "Separator" },
+		nativeMenuItem({ label: "Move Up", enabled: false }),
+		nativeMenuItem({ label: "Move Down", enabled: false }),
+		nativeMenuSeparator,
 		unapplyContextMenuItem,
 	];
 
