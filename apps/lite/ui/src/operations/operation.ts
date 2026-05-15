@@ -303,7 +303,7 @@ export const useDryRunOperation = ({
 }) => {
 	const changes = useResolveDiffSpecs({
 		projectId,
-		source: operation ? operation.source : undefined,
+		operand: operation ? operation.source : undefined,
 	});
 
 	return useQuery({

@@ -113,15 +113,15 @@ export const resolveDiffSpecs = async ({
 };
 
 export const useResolveDiffSpecs = ({
-	source,
+	operand,
 	projectId,
 }: {
-	source?: Operand;
+	operand?: Operand;
 	projectId: string;
 }) => {
 	const { data: worktreeChanges } = useQuery(changesInWorktreeQueryOptions(projectId));
 
-	const fileParent = source ? operandFileParent(source) : null;
+	const fileParent = operand ? operandFileParent(operand) : null;
 	const commitId = fileParent ? commitIdFromParent(fileParent) : null;
 	const conditionalQueries = useQueries({
 		queries: (commitId !== null ? [commitId] : []).map((commitId) =>
@@ -130,10 +130,10 @@ export const useResolveDiffSpecs = ({
 	});
 	const commitDetails = conditionalQueries[0]?.data;
 
-	if (!source) return null;
+	if (!operand) return null;
 
 	return resolvedDiffSpecsFromOperand({
-		operand: source,
+		operand,
 		worktreeChanges,
 		commitDetails,
 	});
