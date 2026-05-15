@@ -14,8 +14,9 @@ export const Keys: FC<Props> = ({ hotkey }) => (
 	<span className={styles.keys}>
 		{formatKeys(hotkey)
 			.split(" ")
-			.map((key) => (
-				<kbd key={key}>{key}</kbd>
+			.map((key, index) => (
+				// oxlint-disable-next-line react/no-array-index-key -- This is fine.
+				<kbd key={index}>{key}</kbd>
 			))}
 	</span>
 );

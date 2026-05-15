@@ -1,4 +1,3 @@
-import { useNavigationIndexHotkeys } from "#ui/panels.ts";
 import {
 	branchDiffQueryOptions,
 	changesInWorktreeQueryOptions,
@@ -34,7 +33,7 @@ import { DependencyIcon, MenuTriggerIcon } from "#ui/ui/icons.tsx";
 import { mergeProps, useRender } from "@base-ui/react";
 import { Toolbar } from "@base-ui/react/toolbar";
 import { AbsorptionTarget, TreeChange } from "@gitbutler/but-sdk";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { Array, Match } from "effect";
 import { ComponentProps, createContext, FC, Suspense, use, useEffect } from "react";
@@ -46,15 +45,15 @@ import { decodeRefName } from "#ui/api/ref-name.ts";
 import { OperationSourceC } from "#ui/routes/project/$id/workspace/OperationSourceC.tsx";
 import { getDependencyCommitIds, getHunkDependencyDiffsByPath } from "#ui/hunk.ts";
 import { DependencyIndicatorButton } from "#ui/routes/project/$id/workspace/DependencyIndicatorButton.tsx";
-import { focusPanel, useFocusedProjectPanel } from "#ui/panels.ts";
+import { focusPanel, useFocusedProjectPanel, useNavigationIndexHotkeys } from "#ui/panels.ts";
 import {
 	buildNavigationIndex,
 	NavigationIndex,
 	navigationIndexIncludes,
 } from "#ui/workspace/navigation-index.ts";
-import { toElectronAccelerator } from "#ui/hotkeys.ts";
+import { changesFileHotkeys, toElectronAccelerator } from "#ui/hotkeys.ts";
 import { assert } from "#ui/assert.ts";
-import { useHotkey, type RegisterableHotkey } from "@tanstack/react-hotkeys";
+import { useHotkeys } from "@tanstack/react-hotkeys";
 
 const NavigationIndexContext = createContext<NavigationIndex | null>(null);
 
@@ -80,6 +79,71 @@ const useNavigationIndex = (projectId: string, parent: Operand, files: Array<Ope
 	}, [navigationIndex, selection, projectId, dispatch, parent]);
 
 	return navigationIndex;
+};
+
+const useFilesTreeHotkeys = ({
+	navigationIndex,
+	projectId,
+}: {
+	navigationIndex: NavigationIndex;
+	projectId: string;
+}) => {
+	const selection = useAppSelector((state) => selectProjectSelectionFiles(state, projectId));
+	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
+	const focusedPanel = useFocusedProjectPanel(projectId);
+	const { data: worktreeChanges } = useQuery(changesInWorktreeQueryOptions(projectId));
+
+	const dispatch = useAppDispatch();
+
+	const select = (newItem: Operand) =>
+		dispatch(projectActions.selectFiles({ projectId, selection: newItem }));
+
+	const isChangesFileSelected = selection._tag === "File" && selection.parent._tag === "Changes";
+
+	const absorbSelectedFile = () => {
+		if (!isChangesFileSelected) return;
+
+		const change = worktreeChanges?.changes.find((change) => change.path === selection.path);
+		if (!change) return;
+
+		dispatch(
+			projectActions.enterAbsorbMode({
+				projectId,
+				source: selection,
+				sourceTarget: {
+					type: "treeChanges",
+					subject: {
+						changes: [change],
+						assignedStackId: null,
+					},
+				},
+			}),
+		);
+		focusPanel("outline");
+	};
+
+	useHotkeys([
+		{
+			hotkey: changesFileHotkeys.absorb.hotkey,
+			callback: absorbSelectedFile,
+			options: {
+				conflictBehavior: "allow",
+				enabled:
+					isChangesFileSelected && focusedPanel === "files" && outlineMode._tag === "Default",
+				meta: changesFileHotkeys.absorb.meta,
+			},
+		},
+	]);
+
+	useNavigationIndexHotkeys({
+		focusedPanel,
+		navigationIndex,
+		projectId,
+		group: "Files",
+		panel: "files",
+		select,
+		selection,
+	});
 };
 
 const CommitFilesTreePanel: FC<{ projectId: string; commit: CommitOperand } & PanelProps> = ({
@@ -283,21 +347,9 @@ const FilesTreePanel: FC<{ parent: Operand; files: Array<Operand> } & PanelProps
 	const navigationIndex = useNavigationIndex(projectId, parent, files);
 	const selection = useAppSelector((state) => selectProjectSelectionFiles(state, projectId));
 
-	const dispatch = useAppDispatch();
-
-	const focusedPanel = useFocusedProjectPanel(projectId);
-
-	const select = (newItem: Operand) =>
-		dispatch(projectActions.selectFiles({ projectId, selection: newItem }));
-
-	useNavigationIndexHotkeys({
-		focusedPanel,
+	useFilesTreeHotkeys({
 		navigationIndex,
 		projectId,
-		group: "Files",
-		panel: "files",
-		select,
-		selection,
 	});
 
 	return (
@@ -454,14 +506,8 @@ const ChangesFileRow: FC<{
 
 	projectId: string;
 }> = ({ change, dependencyCommitIds, projectId }) => {
-	const hotkeys = {
-		absorb: "A",
-	} satisfies Record<string, RegisterableHotkey>;
-
 	const operand = fileOperand({ parent: changesFileParent, path: change.path });
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
-	const isSelected = useIsSelected({ projectId, operand });
-	const focusedPanel = useFocusedProjectPanel(projectId);
 
 	const dispatch = useAppDispatch();
 	const enterAbsorbMode = (source: Operand, sourceTarget: AbsorptionTarget) => {
@@ -479,17 +525,11 @@ const ChangesFileRow: FC<{
 		});
 	};
 
-	useHotkey(hotkeys.absorb, absorb, {
-		conflictBehavior: "allow",
-		enabled: isSelected && focusedPanel === "files" && outlineMode._tag === "Default",
-		meta: { group: "Changes file", name: "Absorb" },
-	});
-
 	const absorbContextMenuItem: NativeMenuItem = {
 		_tag: "Item",
 		label: "Absorb",
 		enabled: true,
-		accelerator: toElectronAccelerator(hotkeys.absorb),
+		accelerator: toElectronAccelerator(changesFileHotkeys.absorb.hotkey),
 		onSelect: absorb,
 	};
 

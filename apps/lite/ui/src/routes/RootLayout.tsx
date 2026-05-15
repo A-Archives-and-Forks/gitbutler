@@ -4,8 +4,9 @@ import { TopBarActionsElementContext } from "#ui/portals.tsx";
 import { PickerDialog } from "#ui/ui/PickerDialog/PickerDialog.tsx";
 import { ShortcutButton } from "#ui/components/ShortcutButton.tsx";
 import { Spinner } from "#ui/components/Spinner.tsx";
+import { globalHotkeys } from "#ui/hotkeys.ts";
 import uiStyles from "#ui/ui/ui.module.css";
-import { HotkeysProvider } from "@tanstack/react-hotkeys";
+import { HotkeysProvider, useHotkey } from "@tanstack/react-hotkeys";
 import { useIsFetching, useIsMutating, useSuspenseQuery } from "@tanstack/react-query";
 import { Outlet, useMatch, useNavigate } from "@tanstack/react-router";
 import { FC, useState } from "react";
@@ -28,6 +29,11 @@ const ProjectSelect: FC = () => {
 		setPickerOpen(true);
 	};
 
+	useHotkey(globalHotkeys.selectProject.hotkey, openProjectPicker, {
+		enabled: projects.length > 0,
+		meta: globalHotkeys.selectProject.meta,
+	});
+
 	const selectProject = (project: ProjectForFrontend) => {
 		setPickerOpen(false);
 		void navigate({
@@ -43,10 +49,8 @@ const ProjectSelect: FC = () => {
 				aria-label="Select project"
 				className={uiStyles.button}
 				disabled={projects.length === 0}
-				hotkey="Mod+Shift+P"
-				hotkeyOptions={{
-					meta: { group: "Global", name: "Select project" },
-				}}
+				hotkey={globalHotkeys.selectProject.hotkey}
+				hotkeyOptions={{ meta: globalHotkeys.selectProject.meta }}
 				onClick={openProjectPicker}
 			>
 				{selectedProject?.title ?? "Select a project"}

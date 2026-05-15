@@ -3,9 +3,8 @@ import { Keys } from "#ui/components/Keys.tsx";
 import { classes } from "#ui/ui/classes.ts";
 import uiStyles from "#ui/ui/ui.module.css";
 import { Tooltip } from "@base-ui/react";
-import { useMergedRefs } from "@base-ui/utils/useMergedRefs";
-import { useHotkey, type Hotkey, type UseHotkeyOptions } from "@tanstack/react-hotkeys";
-import { ComponentProps, FC, useRef } from "react";
+import { type Hotkey, type UseHotkeyOptions } from "@tanstack/react-hotkeys";
+import { ComponentProps, FC } from "react";
 
 type Props = ComponentProps<"button"> & {
 	hotkey: Hotkey;
@@ -13,21 +12,12 @@ type Props = ComponentProps<"button"> & {
 };
 
 export const ShortcutButton: FC<Props> = ({ hotkey, hotkeyOptions, ...props }) => {
-	const buttonRef = useRef<HTMLButtonElement>(null);
-
 	const hotkeyEnabled = !props.disabled && hotkeyOptions?.enabled !== false;
-
-	useHotkey(hotkey, () => buttonRef.current?.click(), {
-		conflictBehavior: "allow",
-		...hotkeyOptions,
-		enabled: hotkeyEnabled,
-	});
 
 	return (
 		<Tooltip.Root disabled={!hotkeyEnabled}>
 			<Tooltip.Trigger
 				{...props}
-				ref={useMergedRefs(buttonRef, props.ref)}
 				// This is needed to ensure the `disabled` attribute is used.
 				render={
 					<button

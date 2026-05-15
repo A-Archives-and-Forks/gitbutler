@@ -20,7 +20,7 @@ import {
 import { TopBarActionsPortal } from "#ui/portals.tsx";
 import { Keys } from "#ui/components/Keys.tsx";
 import { ShortcutButton } from "#ui/components/ShortcutButton.tsx";
-import type { CommandGroup } from "#ui/hotkeys.ts";
+import { globalHotkeys, workspaceHotkeys, type CommandGroup } from "#ui/hotkeys.ts";
 import { useAppDispatch, useAppSelector } from "#ui/store.ts";
 import { BranchListing, Segment, Stack } from "@gitbutler/but-sdk";
 import {
@@ -28,7 +28,7 @@ import {
 	getSequenceManager,
 	Hotkey,
 	HotkeySequence,
-	useHotkey,
+	useHotkeys,
 	useHotkeyRegistrations,
 } from "@tanstack/react-hotkeys";
 import { useMutation, useQuery, useSuspenseQuery } from "@tanstack/react-query";
@@ -305,18 +305,16 @@ const TopBarActions: FC = () => {
 		<>
 			<ShortcutButton
 				className={uiStyles.button}
-				hotkey="Mod+Shift+A"
-				hotkeyOptions={{ meta: { group: "Branches", name: "Apply branch" } }}
+				hotkey={workspaceHotkeys.applyBranch.hotkey}
+				hotkeyOptions={{ meta: workspaceHotkeys.applyBranch.meta }}
 				onClick={openApplyBranchPicker}
 			>
 				Apply branch
 			</ShortcutButton>
 			<ShortcutButton
 				className={uiStyles.button}
-				hotkey="F"
-				hotkeyOptions={{
-					meta: { group: "Files", name: "Toggle files" },
-				}}
+				hotkey={workspaceHotkeys.toggleFilesPanel.hotkey}
+				hotkeyOptions={{ meta: workspaceHotkeys.toggleFilesPanel.meta }}
 				aria-pressed={isPanelVisible(panelsState, "files")}
 				onClick={toggleFiles}
 			>
@@ -324,10 +322,8 @@ const TopBarActions: FC = () => {
 			</ShortcutButton>
 			<ShortcutButton
 				className={uiStyles.button}
-				hotkey="D"
-				hotkeyOptions={{
-					meta: { group: "Details", name: "Toggle details" },
-				}}
+				hotkey={workspaceHotkeys.toggleDetailsPanel.hotkey}
+				hotkeyOptions={{ meta: workspaceHotkeys.toggleDetailsPanel.meta }}
 				aria-pressed={isPanelVisible(panelsState, "details")}
 				onClick={toggleDetails}
 			>
@@ -337,36 +333,87 @@ const TopBarActions: FC = () => {
 	);
 };
 
-const usePanelsHotkeys = ({
-	focusedPanel,
-	visiblePanels,
-}: {
-	focusedPanel: PanelType | null;
-	visiblePanels: Array<PanelType>;
-}) => {
-	useHotkey(
-		"H",
-		() => {
-			focusAdjacentPanel(-1, visiblePanels);
-		},
-		{
-			conflictBehavior: "allow",
-			enabled: focusedPanel !== null,
-			meta: { group: "Panels", name: "Focus previous panel" },
-		},
-	);
+const useWorkspaceHotkeys = (projectId: string) => {
+	const dispatch = useAppDispatch();
+	const dialog = useAppSelector((state) => selectProjectDialogState(state, projectId));
+	const panelsState = useAppSelector((state) => selectProjectPanelsState(state, projectId));
+	const focusedPanel = useFocusedProjectPanel(projectId);
 
-	useHotkey(
-		"L",
-		() => {
-			focusAdjacentPanel(1, visiblePanels);
+	const togglePanel = (panel: PanelType) => {
+		if (focusedPanel === panel && isPanelVisible(panelsState, panel)) {
+			const panelIndex = panelsState.visiblePanels.indexOf(panel);
+			const nextPanel = panelsState.visiblePanels[panelIndex - 1];
+			if (nextPanel !== undefined) focusPanel(nextPanel);
+		}
+
+		dispatch(projectActions.togglePanel({ projectId, panel }));
+	};
+
+	useHotkeys([
+		{
+			hotkey: globalHotkeys.commandPalette.hotkey,
+			callback: () => {
+				if (dialog._tag === "CommandPalette") dispatch(projectActions.closeDialog({ projectId }));
+				else dispatch(projectActions.openCommandPalette({ projectId, focusedPanel }));
+			},
+			options: {
+				conflictBehavior: "allow",
+				meta: globalHotkeys.commandPalette.meta,
+			},
 		},
 		{
-			conflictBehavior: "allow",
-			enabled: focusedPanel !== null,
-			meta: { group: "Panels", name: "Focus next panel" },
+			hotkey: workspaceHotkeys.applyBranch.hotkey,
+			callback: () => {
+				dispatch(projectActions.openApplyBranchPicker({ projectId }));
+			},
+			options: {
+				conflictBehavior: "allow",
+				meta: workspaceHotkeys.applyBranch.meta,
+			},
 		},
-	);
+		{
+			hotkey: workspaceHotkeys.toggleFilesPanel.hotkey,
+			callback: () => {
+				togglePanel("files");
+			},
+			options: {
+				conflictBehavior: "allow",
+				meta: workspaceHotkeys.toggleFilesPanel.meta,
+			},
+		},
+		{
+			hotkey: workspaceHotkeys.toggleDetailsPanel.hotkey,
+			callback: () => {
+				togglePanel("details");
+			},
+			options: {
+				conflictBehavior: "allow",
+				meta: workspaceHotkeys.toggleDetailsPanel.meta,
+			},
+		},
+		{
+			hotkey: workspaceHotkeys.focusPreviousPanel.hotkey,
+			callback: () => {
+				focusAdjacentPanel(-1, panelsState.visiblePanels);
+			},
+			options: {
+				conflictBehavior: "allow",
+				enabled: focusedPanel !== null,
+				meta: workspaceHotkeys.focusPreviousPanel.meta,
+			},
+		},
+		{
+			hotkey: workspaceHotkeys.focusNextPanel.hotkey,
+			callback: () => {
+				focusAdjacentPanel(1, panelsState.visiblePanels);
+			},
+			options: {
+				conflictBehavior: "allow",
+				enabled: focusedPanel !== null,
+				meta: workspaceHotkeys.focusNextPanel.meta,
+			},
+		},
+	]);
 };
 
 const WorkspacePage: FC = () => {
@@ -378,16 +425,7 @@ const WorkspacePage: FC = () => {
 	const panelsState = useAppSelector((state) => selectProjectPanelsState(state, projectId));
 	const focusedPanel = useFocusedProjectPanel(projectId);
 
-	useHotkey(
-		"Mod+K",
-		() => {
-			if (dialog._tag === "CommandPalette") dispatch(projectActions.closeDialog({ projectId }));
-			else dispatch(projectActions.openCommandPalette({ projectId, focusedPanel }));
-		},
-		{ conflictBehavior: "allow", meta: { group: "Global", name: "Command palette" } },
-	);
-
-	usePanelsHotkeys({ focusedPanel, visiblePanels: panelsState.visiblePanels });
+	useWorkspaceHotkeys(projectId);
 
 	const { defaultLayout, onLayoutChanged } = useDefaultLayout({
 		id: `project:${projectId}:layout`,
