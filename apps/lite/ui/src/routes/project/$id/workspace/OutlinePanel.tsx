@@ -1128,7 +1128,7 @@ const useCommitTargetCombobox = (projectId: string) => {
 	const items = buildCommitTargetComboboxItems({ headInfo, commitTargetState });
 	const selectedItem = selectCommitTargetComboboxItem({ items, commitTargetState });
 
-	return { headInfo, items, selectedItem };
+	return { items, selectedItem };
 };
 
 const CommitTargetComboboxPopup: FC = () => (
@@ -1296,11 +1296,9 @@ const Changes: FC<{
 
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
-	const {
-		headInfo,
-		items: branchComboboxItems,
-		selectedItem: commitTarget,
-	} = useCommitTargetCombobox(projectId);
+	const { data: headInfo } = useQuery(headInfoQueryOptions(projectId));
+	const { items: branchComboboxItems, selectedItem: commitTarget } =
+		useCommitTargetCombobox(projectId);
 	const isAltHeld = useKeyHold("Alt");
 	const isAmendMode = isAltHeld;
 	const hotkeys = {
