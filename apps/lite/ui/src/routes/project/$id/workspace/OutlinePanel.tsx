@@ -534,7 +534,6 @@ const CommitRow: FC<
 	);
 	const dryRunCommit = useDryRunCommit(commit.id);
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
-	const { selectedItem: commitTarget } = useCommitTargetCombobox(projectId);
 
 	const dispatch = useAppDispatch();
 	const commitOperandV: CommitOperand = {
@@ -744,7 +743,7 @@ const CommitRow: FC<
 	};
 
 	const relativeTo: RelativeTo = { type: "commit", subject: commit.id };
-	const isCommitTarget = commitTarget && relativeToEquals(commitTarget.relativeTo, relativeTo);
+	const isCommitTarget = useIsCommitTarget(projectId, relativeTo);
 
 	const composeCommitHere = () => {
 		dispatch(projectActions.setCommitTarget({ projectId, commitTarget: relativeTo }));
@@ -1129,6 +1128,12 @@ const useCommitTargetCombobox = (projectId: string) => {
 	const selectedItem = selectCommitTargetComboboxItem({ items, commitTargetState });
 
 	return { items, selectedItem };
+};
+
+const useIsCommitTarget = (projectId: string, relativeTo: RelativeTo): boolean => {
+	const { selectedItem: commitTarget } = useCommitTargetCombobox(projectId);
+
+	return commitTarget ? relativeToEquals(commitTarget.relativeTo, relativeTo) : false;
 };
 
 const CommitTargetComboboxPopup: FC = () => (
@@ -1549,7 +1554,6 @@ const BranchRow: FC<
 	} satisfies Record<string, RegisterableHotkey>;
 
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
-	const { selectedItem: commitTarget } = useCommitTargetCombobox(projectId);
 	const dispatch = useAppDispatch();
 	const branchOperandV: BranchOperand = {
 		stackId,
@@ -1647,7 +1651,7 @@ const BranchRow: FC<
 	};
 
 	const relativeTo: RelativeTo = { type: "referenceBytes", subject: branchRef };
-	const isCommitTarget = commitTarget && relativeToEquals(relativeTo, commitTarget.relativeTo);
+	const isCommitTarget = useIsCommitTarget(projectId, relativeTo);
 
 	const composeCommitHere = () => {
 		dispatch(projectActions.setCommitTarget({ projectId, commitTarget: relativeTo }));
