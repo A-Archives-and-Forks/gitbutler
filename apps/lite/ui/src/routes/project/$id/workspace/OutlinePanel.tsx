@@ -231,28 +231,11 @@ const useNavigationIndex = ({
 
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
-	const navigationIndex = filterNavigationIndexForOutlineMode({
+	return filterNavigationIndexForOutlineMode({
 		navigationIndex: navigationIndexUnfiltered,
 		outlineMode,
 		absorptionTargetKeys,
 	});
-
-	const focusedPanel = useFocusedProjectPanel(projectId);
-
-	const select = (newItem: Operand) =>
-		dispatch(projectActions.selectOutline({ projectId, selection: newItem }));
-
-	useNavigationIndexHotkeys({
-		focusedPanel,
-		navigationIndex,
-		projectId,
-		group: "Outline",
-		panel: "outline",
-		select,
-		selection,
-	});
-
-	return navigationIndex;
 };
 
 export const OutlinePanel: FC<PanelProps> = ({ ...panelProps }) => (
@@ -293,6 +276,21 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 	const navigationIndex = useNavigationIndex({
 		projectId,
 		absorptionTargetKeys,
+	});
+
+	const focusedPanel = useFocusedProjectPanel(projectId);
+
+	const select = (newItem: Operand) =>
+		dispatch(projectActions.selectOutline({ projectId, selection: newItem }));
+
+	useNavigationIndexHotkeys({
+		focusedPanel,
+		navigationIndex,
+		projectId,
+		group: "Outline",
+		panel: "outline",
+		select,
+		selection,
 	});
 
 	const dryRunOperation = Match.value(outlineMode).pipe(

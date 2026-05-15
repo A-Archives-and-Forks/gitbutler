@@ -79,21 +79,6 @@ const useNavigationIndex = (projectId: string, parent: Operand, files: Array<Ope
 			);
 	}, [navigationIndex, selection, projectId, dispatch, parent]);
 
-	const focusedPanel = useFocusedProjectPanel(projectId);
-
-	const select = (newItem: Operand) =>
-		dispatch(projectActions.selectFiles({ projectId, selection: newItem }));
-
-	useNavigationIndexHotkeys({
-		focusedPanel,
-		navigationIndex,
-		projectId,
-		group: "Files",
-		panel: "files",
-		select,
-		selection,
-	});
-
 	return navigationIndex;
 };
 
@@ -297,6 +282,23 @@ const FilesTreePanel: FC<{ parent: Operand; files: Array<Operand> } & PanelProps
 
 	const navigationIndex = useNavigationIndex(projectId, parent, files);
 	const selection = useAppSelector((state) => selectProjectSelectionFiles(state, projectId));
+
+	const dispatch = useAppDispatch();
+
+	const focusedPanel = useFocusedProjectPanel(projectId);
+
+	const select = (newItem: Operand) =>
+		dispatch(projectActions.selectFiles({ projectId, selection: newItem }));
+
+	useNavigationIndexHotkeys({
+		focusedPanel,
+		navigationIndex,
+		projectId,
+		group: "Files",
+		panel: "files",
+		select,
+		selection,
+	});
 
 	return (
 		<NavigationIndexContext value={navigationIndex}>
