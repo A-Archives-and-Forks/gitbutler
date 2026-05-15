@@ -5,7 +5,7 @@ import {
 	headInfoQueryOptions,
 } from "#ui/api/queries.ts";
 import { findCommit, getCommonBaseCommitId, resolveRelativeTo } from "#ui/api/ref-info.ts";
-import { encodeRefName } from "#ui/api/ref-name.ts";
+import { decodeRefName, encodeRefName } from "#ui/api/ref-name.ts";
 import { commitTitle, shortCommitId } from "#ui/commit.ts";
 import {
 	showNativeContextMenu,
@@ -1597,6 +1597,31 @@ const BranchRow: FC<
 
 	const toastManager = Toast.useToastManager();
 
+	const tearOffBranchMutation = useMutation({
+		mutationFn: window.lite.tearOffBranch,
+		onSuccess: async (response, _input, _context, mutation) => {
+			dispatch(
+				projectActions.addReplacedCommits({
+					projectId,
+					replacedCommits: response.workspace.replacedCommits,
+				}),
+			);
+
+			await mutation.client.invalidateQueries();
+		},
+		onError: (error) => {
+			// oxlint-disable-next-line no-console
+			console.error(error);
+
+			toastManager.add({
+				type: "error",
+				title: "Failed to tear off branch",
+				description: errorMessageForToast(error),
+				priority: "high",
+			});
+		},
+	});
+
 	const saveBranchName = (newBranchName: string) => {
 		const trimmed = newBranchName.trim();
 		if (trimmed === "" || trimmed === branchName) return;
@@ -1631,6 +1656,14 @@ const BranchRow: FC<
 		focusCommitMessageInput();
 	};
 
+	const tearOffBranch = () => {
+		tearOffBranchMutation.mutate({
+			projectId,
+			subjectBranch: decodeRefName(branchRef),
+			dryRun: false,
+		});
+	};
+
 	const defaultBranchHotkeysEnabled =
 		isSelected && focusedPanel === "outline" && outlineMode._tag === "Default";
 
@@ -1659,10 +1692,18 @@ const BranchRow: FC<
 		accelerator: toElectronAccelerator(hotkeys.composeCommitHere),
 		onSelect: composeCommitHere,
 	};
+	const tearOffBranchContextMenuItem: NativeMenuItem = {
+		_tag: "Item",
+		label: "Tear Off Branch",
+		enabled: !tearOffBranchMutation.isPending,
+		onSelect: tearOffBranch,
+	};
 
 	const menuItems: Array<NativeMenuItem> = [
 		startEditingContextMenuItem,
 		setCommitTargetContextMenuItem,
+		{ _tag: "Separator" },
+		tearOffBranchContextMenuItem,
 	];
 
 	return (
