@@ -237,14 +237,14 @@ impl<'a> UpstreamIntegrationContext<'a> {
         }
 
         let (target_ref_name, old_target_id, upstream_commits) = {
-            let (_repo, ws, _db) = ctx.workspace_and_db_with_perm(permission.read_permission())?;
+            let (repo, ws, _db) = ctx.workspace_and_db_with_perm(permission.read_permission())?;
             let target_ref_name = ws
                 .target_ref_name()
                 .context("failed to get target reference name")?
                 .to_owned();
 
             let upstream_commits = ws
-                .upstream_commits(FirstParent::Yes)?
+                .upstream_commits(&repo, target_ref_name.as_ref(), FirstParent::Yes)?
                 .into_iter()
                 .map(|h| h.upstream_commits)
                 .max_by_key(|us| us.len())

@@ -373,7 +373,7 @@ pub(crate) fn target_to_base_branch(
 
     // The longest list of upstream commit ids.
     let upstream_commit_ids = ws
-        .upstream_commits(FirstParent::Yes)?
+        .upstream_commits(repo, target_ref_name.as_ref(), FirstParent::Yes)?
         .into_iter()
         .map(|h| h.upstream_commits)
         .max_by_key(|us| us.len())
