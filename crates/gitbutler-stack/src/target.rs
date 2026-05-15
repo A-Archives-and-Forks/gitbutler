@@ -1,4 +1,4 @@
-use anyhow::{Context as _, Result, anyhow};
+use anyhow::{Result, anyhow};
 use but_ctx::Context;
 use but_error::Code;
 use but_meta::virtual_branches_legacy_types;
@@ -24,24 +24,6 @@ pub struct Target {
     pub sha: gix::ObjectId,
     /// The name of the remote to push to.
     pub push_remote_name: Option<String>,
-}
-
-impl Target {
-    pub fn push_remote_name(&self) -> String {
-        match &self.push_remote_name {
-            Some(remote) => remote.clone(),
-            None => self.branch.remote().to_owned(),
-        }
-    }
-
-    /// Returns the head sha of the remote branch this target is tracking.
-    pub fn remote_head(&self, repo: &gix::Repository) -> Result<gix::ObjectId> {
-        let oid = repo
-            .find_reference(&self.branch.to_string())?
-            .try_id()
-            .context("failed to get default commit")?;
-        Ok(oid.detach())
-    }
 }
 
 impl From<virtual_branches_legacy_types::Target> for Target {
