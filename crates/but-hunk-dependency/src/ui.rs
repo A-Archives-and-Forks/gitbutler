@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 /// Compute the hunk dependencies of a set of tree changes.
 fn hunk_dependencies_for_changes(
     repo: &gix::Repository,
-    workspace: &but_graph::projection::Workspace,
+    workspace: &but_graph::Workspace,
     changes: Vec<but_core::TreeChange>,
 ) -> anyhow::Result<HunkDependencies> {
     // accelerate tree-tree-diffs
@@ -20,7 +20,7 @@ fn hunk_dependencies_for_changes(
 /// and `gitbutler_dir` for obtaining stack information.
 pub fn hunk_dependencies_for_workspace_changes_by_worktree_dir(
     repo: &gix::Repository,
-    workspace: &but_graph::projection::Workspace,
+    workspace: &but_graph::Workspace,
     worktree_changes: Option<Vec<but_core::TreeChange>>,
 ) -> anyhow::Result<HunkDependencies> {
     let worktree_changes = worktree_changes

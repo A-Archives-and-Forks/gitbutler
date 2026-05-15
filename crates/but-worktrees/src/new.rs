@@ -14,7 +14,7 @@ pub struct NewWorktreeOutcome {
 }
 
 /// Creates a new worktree off of workspace branch with given `refname`.
-// TODO: make this plumbing to take the `but_graph::projection::Workspace` directly.
+// TODO: make this plumbing to take the `but_graph::Workspace` directly.
 pub fn worktree_new(
     ctx: &mut Context,
     perm: &RepoShared,

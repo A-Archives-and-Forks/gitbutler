@@ -72,7 +72,7 @@ impl Snapshot {
         &mut self,
         reconcile: ReconcileWithWorkspace,
         repo: Option<&gix::Repository>,
-        projected_workspace: &mut Option<Option<but_graph::projection::Workspace>>,
+        projected_workspace: &mut Option<Option<but_graph::Workspace>>,
     ) -> anyhow::Result<()> {
         if self.changed_at.is_some() || self.has_null_head_hash() || {
             let mut snapshot = self.clone();
@@ -123,7 +123,7 @@ impl Snapshot {
         &self,
         reconcile: ReconcileWithWorkspace,
         repo: Option<&gix::Repository>,
-        projected_workspace: Option<&but_graph::projection::Workspace>,
+        projected_workspace: Option<&but_graph::Workspace>,
     ) -> VirtualBranches {
         // EVIL HACK: assure we fill-in the CommitIDs of heads or else everything breaks.
         //            this probably won't be needed once no old code is running, and by then
@@ -158,7 +158,7 @@ impl Snapshot {
     fn enforce_constraints(
         &mut self,
         repo: Option<&gix::Repository>,
-        projected_workspace: Option<&but_graph::projection::Workspace>,
+        projected_workspace: Option<&but_graph::Workspace>,
     ) -> bool {
         let mut changed = false;
         let mut empty_stacks_to_remove = Vec::new();
@@ -247,18 +247,15 @@ impl Snapshot {
     fn project_workspace_if_uncached<'a>(
         &self,
         repo: Option<&gix::Repository>,
-        cache: &'a mut Option<Option<but_graph::projection::Workspace>>,
-    ) -> Option<&'a but_graph::projection::Workspace> {
+        cache: &'a mut Option<Option<but_graph::Workspace>>,
+    ) -> Option<&'a but_graph::Workspace> {
         if cache.is_none() {
             *cache = Some(repo.and_then(|repo| self.project_workspace(repo).ok()));
         }
         cache.as_ref().and_then(Option::as_ref)
     }
 
-    fn project_workspace(
-        &self,
-        repo: &gix::Repository,
-    ) -> anyhow::Result<but_graph::projection::Workspace> {
+    fn project_workspace(&self, repo: &gix::Repository) -> anyhow::Result<but_graph::Workspace> {
         let mut reference = repo.find_reference(INTEGRATION_BRANCH)?;
         let commit_id = reference.peel_to_commit()?.id();
         let sideeffect_free_meta = std::mem::ManuallyDrop::new(VirtualBranchesTomlMetadata {
@@ -281,9 +278,9 @@ impl Snapshot {
     fn reconcile_and_fix_vb_toml(
         &mut self,
         repo: &gix::Repository,
-        projected_workspace: Option<&but_graph::projection::Workspace>,
+        projected_workspace: Option<&but_graph::Workspace>,
     ) -> anyhow::Result<()> {
-        fn make_heads_match(ws_stack: &but_graph::projection::Stack, vb_stack: &mut Stack) -> bool {
+        fn make_heads_match(ws_stack: &but_graph::workspace::Stack, vb_stack: &mut Stack) -> bool {
             // Always leave extra segments.
 
             // Add missing segments

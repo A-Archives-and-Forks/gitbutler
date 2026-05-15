@@ -708,7 +708,7 @@ fn move_branch_when_base_segment_has_no_ref_name() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn stack_display_order(ws: &but_graph::projection::Workspace) -> Vec<String> {
+fn stack_display_order(ws: &but_graph::Workspace) -> Vec<String> {
     ws.stacks
         .iter()
         .filter_map(|stack| stack.ref_name())
@@ -716,7 +716,7 @@ fn stack_display_order(ws: &but_graph::projection::Workspace) -> Vec<String> {
         .collect()
 }
 
-fn metadata_stack_order(ws: &but_graph::projection::Workspace) -> Vec<String> {
+fn metadata_stack_order(ws: &but_graph::Workspace) -> Vec<String> {
     ws.metadata
         .as_ref()
         .map(|ws_meta| workspace_metadata_stack_order(ws_meta, StackKind::Applied))
@@ -736,7 +736,7 @@ fn workspace_metadata_stack_order(
 
 fn set_workspace_metadata(
     meta: &mut impl RefMetadata,
-    ws: &but_graph::projection::Workspace,
+    ws: &but_graph::Workspace,
     ws_meta: Option<but_core::ref_metadata::Workspace>,
 ) -> anyhow::Result<()> {
     if let Some((ws_meta, ref_name)) = ws_meta.zip(ws.ref_name()) {

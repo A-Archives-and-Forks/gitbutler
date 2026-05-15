@@ -1,7 +1,8 @@
 use anyhow::Context as _;
 use but_core::ref_metadata;
 
-use crate::{Graph, SegmentIndex, projection::Stack};
+use super::Stack;
+use crate::{Graph, SegmentIndex};
 
 pub(super) mod api;
 mod init;
@@ -122,7 +123,7 @@ pub enum WorkspaceKind {
     ///
     /// It can be inside or outside a workspace.
     /// If the respective segment is [not named](Workspace::ref_name), this means the `HEAD` id detached.
-    /// The commit that the working tree is at is always implied to be the first commit of the [`crate::projection::StackSegment`]
+    /// The commit that the working tree is at is always implied to be the first commit of the [`crate::workspace::StackSegment`]
     /// at [`Workspace::id`].
     AdHoc,
 }

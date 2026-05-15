@@ -464,7 +464,7 @@ fn tear_off_non_empty_branch() -> anyhow::Result<()> {
 
 fn set_workspace_metadata(
     meta: &mut impl RefMetadata,
-    ws: &but_graph::projection::Workspace,
+    ws: &but_graph::Workspace,
     ws_meta: Option<but_core::ref_metadata::Workspace>,
 ) -> anyhow::Result<()> {
     if let Some((ws_meta, ref_name)) = ws_meta.zip(ws.ref_name()) {

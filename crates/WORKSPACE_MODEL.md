@@ -29,7 +29,7 @@ This applies both when **changing** state and when **asking questions** about st
 |---|---|---|
 | Rewrite, move, drop, insert commits or ref placements | graph editor (`but_rebase::graph_rebase::Editor`) where an editor model exists | old linear rebase engine (`but_rebase::Rebase`) |
 | Ask graph/dependency/state questions about stacks, branches, commits, or ordering | `but_graph::Graph` | workspace projection / refinfo as source of truth |
-| Render UI or caller state | workspace projection (`but_graph::projection::Workspace`) and refinfo (`but_workspace::RefInfo`) | raw mutation structures directly |
+| Render UI or caller state | workspace projection (`but_graph::Workspace`) and refinfo (`but_workspace::RefInfo`) | raw mutation structures directly |
 | API operation targets | commit IDs and refs at the boundary; selectors inside a live editor operation | stack IDs unless legacy boundary requires it |
 | Lower-level operations | explicit repo/db/meta/workspace handles | taking full `but_ctx::Context` |
 
@@ -98,7 +98,7 @@ Caveats:
 
 ## Workspace projection and refinfo
 
-`but_graph::projection::Workspace` and `but_workspace::RefInfo` are derived, interpreted, compressed views. They are useful for presentation, compatibility, and existing workspace-shaped boundaries, but they are lossy. The warning is broader than mutations: do not use these views as the main internal source when asking substantive new questions about stacks, branches, commits, ordering, dependencies, or reachability.
+`but_graph::Workspace` and `but_workspace::RefInfo` are derived, interpreted, compressed views. They are useful for presentation, compatibility, and existing workspace-shaped boundaries, but they are lossy. The warning is broader than mutations: do not use these views as the main internal source when asking substantive new questions about stacks, branches, commits, ordering, dependencies, or reachability.
 
 Use them for:
 

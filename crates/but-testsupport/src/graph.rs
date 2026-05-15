@@ -2,26 +2,24 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use but_core::ref_metadata::StackId;
 use but_graph::{
-    EntryPoint, Graph, SegmentIndex, SegmentMetadata, projection::StackCommitDebugFlags,
+    EntryPoint, Graph, SegmentIndex, SegmentMetadata, workspace::StackCommitDebugFlags,
 };
 use termtree::Tree;
 
 type StringTree = Tree<String>;
 
 /// Visualize `graph` as a tree.
-pub fn graph_workspace(workspace: &but_graph::projection::Workspace) -> StringTree {
+pub fn graph_workspace(workspace: &but_graph::Workspace) -> StringTree {
     graph_workspace_inner(workspace, None)
 }
 
 /// Visualize `graph` as a tree, and remap random stack ids to something deterministic.
-pub fn graph_workspace_determinisitcally(
-    workspace: &but_graph::projection::Workspace,
-) -> StringTree {
+pub fn graph_workspace_determinisitcally(workspace: &but_graph::Workspace) -> StringTree {
     graph_workspace_inner(workspace, Some(Default::default()))
 }
 
 fn graph_workspace_inner(
-    workspace: &but_graph::projection::Workspace,
+    workspace: &but_graph::Workspace,
     mut stack_id_map: Option<BTreeMap<StackId, StackId>>,
 ) -> StringTree {
     let commit_flags = if workspace.graph.hard_limit_hit() {
@@ -37,7 +35,7 @@ fn graph_workspace_inner(
 }
 
 fn tree_for_stack(
-    stack: &but_graph::projection::Stack,
+    stack: &but_graph::workspace::Stack,
     commit_flags: StackCommitDebugFlags,
     stack_id_map: Option<&mut BTreeMap<StackId, StackId>>,
 ) -> StringTree {
@@ -54,7 +52,7 @@ fn tree_for_stack(
 }
 
 fn tree_for_stack_segment(
-    segment: &but_graph::projection::StackSegment,
+    segment: &but_graph::workspace::StackSegment,
     commit_flags: StackCommitDebugFlags,
 ) -> StringTree {
     let mut root = Tree::new(segment.debug_string());

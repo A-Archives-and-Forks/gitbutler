@@ -19,8 +19,8 @@ use crate::{
         types::{EdgeOwned, TopoWalk},
         walk::{RefsById, WorktreeByBranch, disambiguate_refs_by_branch_metadata},
     },
-    projection::workspace,
     utils::SegmentVisitScratch,
+    workspace::workspace,
 };
 
 pub(super) struct Context<'a> {
@@ -341,7 +341,7 @@ impl Graph {
         for ws_sidx in workspace_segments_with_multiple_commits {
             let s = &mut self[ws_sidx];
             let first_commit = &mut s.commits[0];
-            if !crate::projection::commit::is_managed_workspace_by_message(
+            if !crate::workspace::commit::is_managed_workspace_by_message(
                 repo.find_commit(first_commit.id)?.message_raw()?,
             ) {
                 continue;
@@ -514,7 +514,7 @@ impl Graph {
         target_ref: Option<SegmentIndex>,
         target_commit_sidx: Option<SegmentIndex>,
         ws_low_bound: Option<SegmentIndex>,
-        ws_stacks: &[crate::projection::Stack],
+        ws_stacks: &[crate::workspace::Stack],
         repo: &OverlayRepo<'_>,
     ) -> anyhow::Result<Vec<SegmentIndex>> {
         let mut out: Vec<_> = ws_stacks
@@ -579,7 +579,7 @@ impl Graph {
                 };
 
                 // Never create anything on top of managed commits.
-                if crate::projection::commit::is_managed_workspace_by_message(
+                if crate::workspace::commit::is_managed_workspace_by_message(
                     commit_with_refs
                         .id
                         .attach(repo.for_attach_only())
@@ -1250,7 +1250,7 @@ impl Graph {
 fn find_all_desired_stack_refs_in_commit_for_dependent_branches<'a>(
     ws_data: &'a ref_metadata::Workspace,
     commit_refs: impl Iterator<Item = &'a gix::refs::FullName> + Clone + 'a,
-    only_in_stack: Option<&'a crate::projection::Stack>,
+    only_in_stack: Option<&'a crate::workspace::Stack>,
 ) -> impl Iterator<Item = Vec<gix::refs::FullName>> + 'a {
     ws_data.stacks(Applied).filter_map(move |stack| {
         if only_in_stack.is_some_and(|limit_to| {
@@ -1276,7 +1276,7 @@ fn find_all_desired_stack_refs_in_commit<'a>(
     graph_and_ws_idx_and_candidates: (
         &'a PetGraph,
         SegmentIndex,
-        &'a [crate::projection::Stack],
+        &'a [crate::workspace::Stack],
         &'a [SegmentIndex],
     ),
 ) -> impl Iterator<Item = Vec<gix::refs::FullName>> + 'a {

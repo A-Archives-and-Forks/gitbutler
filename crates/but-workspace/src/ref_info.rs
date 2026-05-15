@@ -9,7 +9,7 @@ use std::{
 
 use bstr::BString;
 use but_core::{WORKSPACE_REF_NAME, ref_metadata};
-use but_graph::{SegmentIndex, projection::StackCommitFlags};
+use but_graph::{SegmentIndex, workspace::StackCommitFlags};
 use gix::Repository;
 
 /// A commit with must useful information extracted from the Git commit itself.
@@ -215,7 +215,7 @@ pub trait WorkspaceExt {
     fn has_workspace_commit_in_ancestry(&self, repo: &gix::Repository) -> bool;
 }
 
-impl WorkspaceExt for but_graph::projection::Workspace {
+impl WorkspaceExt for but_graph::Workspace {
     fn has_workspace_commit_in_ancestry(&self, repo: &Repository) -> bool {
         find_ancestor_workspace_commit(&self.graph, repo, self.id, self.lower_bound_segment_id)
             .is_some()
@@ -363,7 +363,7 @@ use but_core::{is_workspace_ref_name, ref_metadata::ValueInfo};
 use but_graph::{
     Graph,
     petgraph::Direction,
-    projection::{StackCommit, WorkspaceKind},
+    workspace::{StackCommit, WorkspaceKind},
 };
 use gix::prelude::ObjectIdExt;
 use tracing::instrument;
@@ -449,7 +449,7 @@ pub(crate) fn find_ancestor_workspace_commit(
 ///
 /// For details, see [`ref_info()`].
 pub fn graph_to_ref_info(
-    workspace: &but_graph::projection::Workspace,
+    workspace: &but_graph::Workspace,
     repo: &gix::Repository,
     opts: Options,
 ) -> anyhow::Result<RefInfo> {
@@ -459,7 +459,7 @@ pub fn graph_to_ref_info(
         );
     }
 
-    let but_graph::projection::Workspace {
+    let but_graph::Workspace {
         graph,
         id,
         kind,
@@ -525,11 +525,11 @@ pub fn graph_to_ref_info(
 
 impl branch::Stack {
     fn try_from_graph_stack(
-        stack: &but_graph::projection::Stack,
+        stack: &but_graph::workspace::Stack,
         repo: &gix::Repository,
     ) -> anyhow::Result<Self> {
         let base = stack.base();
-        let but_graph::projection::Stack { segments, id } = stack;
+        let but_graph::workspace::Stack { segments, id } = stack;
         Ok(branch::Stack {
             id: *id,
             base,
@@ -543,7 +543,7 @@ impl branch::Stack {
 
 impl crate::ref_info::Segment {
     fn try_from_graph_segment(
-        but_graph::projection::StackSegment {
+        but_graph::workspace::StackSegment {
             ref_info,
             base,
             base_segment_id: _,
@@ -558,7 +558,7 @@ impl crate::ref_info::Segment {
             commits_by_segment: _,
             metadata,
             is_entrypoint,
-        }: &but_graph::projection::StackSegment,
+        }: &but_graph::workspace::StackSegment,
         repo: &gix::Repository,
     ) -> anyhow::Result<Self> {
         let commits: Vec<_> = commits
@@ -608,7 +608,7 @@ impl LocalCommit {
             flags,
             refs,
         } = c;
-        use but_graph::projection::StackCommitFlags;
+        use but_graph::workspace::StackCommitFlags;
         let mut inner: crate::ref_info::Commit = but_core::Commit::from_id(id.attach(repo))?.into();
         inner.refs = refs.clone();
         inner.flags = *flags;

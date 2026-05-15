@@ -444,7 +444,7 @@ fn apply_stack_order_updates(
 }
 
 fn sort_projected_stacks_like_metadata(
-    stacks: &mut [but_graph::projection::Stack],
+    stacks: &mut [but_graph::workspace::Stack],
     metadata_stacks: &[WorkspaceStack],
 ) {
     let stack_orders = metadata_stacks

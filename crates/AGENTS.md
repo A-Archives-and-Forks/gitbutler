@@ -46,7 +46,7 @@ vendored, or fixture data unless the task is specifically about that code.
   operation-local selectors inside editor-backed operations, use
   `but_graph::Graph` for relationship/reachability questions, use
   `but_rebase::graph_rebase::Editor` for Git graph/history/ref rewrites where an
-  editor model exists, and treat `but_graph::projection::Workspace` and
+  editor model exists, and treat `but_graph::Workspace` and
   `but_workspace::RefInfo` as lossy presentation/compatibility views unless an
   existing workspace-shaped boundary requires them.
 

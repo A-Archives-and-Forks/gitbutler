@@ -101,7 +101,7 @@ pub fn process_workspace_rules(
 
 fn handle_amend(
     repo: &gix::Repository,
-    ws: &mut but_graph::projection::Workspace,
+    ws: &mut but_graph::Workspace,
     meta: &mut impl but_core::RefMetadata,
     assignments: Vec<HunkAssignment>,
     change_id: &ChangeId,
@@ -136,12 +136,12 @@ fn handle_amend(
 
 fn get_or_create_stack_id(
     repo: &gix::Repository,
-    ws: &but_graph::projection::Workspace,
+    ws: &but_graph::Workspace,
     meta: &mut impl but_core::RefMetadata,
     target: StackTarget,
     stack_ids_in_ws: &[StackId],
     perm: &mut RepoExclusive,
-) -> Option<(StackId, Option<but_graph::projection::Workspace>)> {
+) -> Option<(StackId, Option<but_graph::Workspace>)> {
     match target {
         StackTarget::StackId(stack_id) => {
             if let Ok(stack_id) = StackId::from_str(&stack_id) {
@@ -177,10 +177,10 @@ fn get_or_create_stack_id(
 
 fn create_stack(
     repo: &gix::Repository,
-    ws: &but_graph::projection::Workspace,
+    ws: &but_graph::Workspace,
     meta: &mut impl but_core::RefMetadata,
     _perm: &mut RepoExclusive,
-) -> anyhow::Result<(StackId, but_graph::projection::Workspace)> {
+) -> anyhow::Result<(StackId, but_graph::Workspace)> {
     use anyhow::Context;
     let branch_name = but_core::branch::unique_canned_refname(repo)?;
     let new_ws = but_workspace::branch::create_reference(
@@ -204,7 +204,7 @@ fn create_stack(
 fn handle_assign(
     db: HunkAssignmentsHandleMut,
     repo: &gix::Repository,
-    workspace: &but_graph::projection::Workspace,
+    workspace: &but_graph::Workspace,
     assignments: Vec<HunkAssignment>,
     context_lines: u32,
 ) -> anyhow::Result<usize> {

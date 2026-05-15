@@ -25,8 +25,8 @@ impl<'a> From<&'a but_graph::Commit> for MinimalCommit<'a> {
     }
 }
 
-impl<'a> From<&'a but_graph::projection::StackCommit> for MinimalCommit<'a> {
-    fn from(value: &'a but_graph::projection::StackCommit) -> Self {
+impl<'a> From<&'a but_graph::workspace::StackCommit> for MinimalCommit<'a> {
+    fn from(value: &'a but_graph::workspace::StackCommit) -> Self {
         MinimalCommit {
             id: value.id,
             parent_ids: &value.parent_ids,
@@ -141,11 +141,11 @@ pub(super) mod function {
         ref_name: impl Borrow<gix::refs::FullNameRef>,
         anchor: impl Into<Option<Anchor<'name>>>,
         repo: &gix::Repository,
-        workspace: &'ws but_graph::projection::Workspace,
+        workspace: &'ws but_graph::Workspace,
         meta: &mut T,
         new_stack_id: impl FnOnce(&gix::refs::FullNameRef) -> StackId,
         order: impl Into<Option<usize>>,
-    ) -> anyhow::Result<Cow<'ws, but_graph::projection::Workspace>> {
+    ) -> anyhow::Result<Cow<'ws, but_graph::Workspace>> {
         let anchor = anchor.into();
         let order = order.into();
 
@@ -488,7 +488,7 @@ pub(super) mod function {
     /// `position` indicates where, in relation to `anchor_id`, the ref name should be inserted.
     /// The first name that is also in `ws_meta` will be used.
     fn instruction_by_named_anchor_for_commit(
-        ws: &but_graph::projection::Workspace,
+        ws: &but_graph::Workspace,
         anchor_id: gix::ObjectId,
     ) -> anyhow::Result<Instruction<'static>> {
         use Position::*;

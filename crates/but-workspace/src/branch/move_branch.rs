@@ -1,6 +1,6 @@
 use anyhow::{Context, bail};
 use but_core::RefMetadata;
-use but_graph::projection::{Stack, StackSegment};
+use but_graph::workspace::{Stack, StackSegment};
 use but_rebase::graph_rebase::{
     Editor, Selector, SuccessfulRebase,
     mutate::{SegmentDelimiter, SelectorSet, SomeSelectors},
@@ -29,7 +29,7 @@ pub(super) mod function {
     use super::Outcome;
     use anyhow::Context;
     use anyhow::bail;
-    use but_graph::projection::WorkspaceKind;
+    use but_graph::workspace::WorkspaceKind;
     use but_rebase::graph_rebase::Editor;
     use gix::refs::FullNameRef;
 
@@ -254,13 +254,13 @@ pub(super) mod function {
 
     /// A segment and its container stack.
     type WorkspaceSegmentContext = (
-        but_graph::projection::Stack,
-        but_graph::projection::StackSegment,
+        but_graph::workspace::Stack,
+        but_graph::workspace::StackSegment,
     );
 
     type WorkspaceSegmentContextRef<'a> = (
-        &'a but_graph::projection::Stack,
-        &'a but_graph::projection::StackSegment,
+        &'a but_graph::workspace::Stack,
+        &'a but_graph::workspace::StackSegment,
     );
 
     fn own_context<'a>(ctx: WorkspaceSegmentContextRef<'a>) -> WorkspaceSegmentContext {
@@ -292,7 +292,7 @@ pub(super) mod function {
     /// the concept of a segment might not hold, and hence we'll have to figure out a better way of determining
     /// what to cut (e.g. letting the clients decide what to cut).
     fn retrieve_branches_and_containers(
-        workspace: &but_graph::projection::Workspace,
+        workspace: &but_graph::Workspace,
         subject_branch_name: &FullNameRef,
         target_branch_name: &FullNameRef,
     ) -> anyhow::Result<(WorkspaceSegmentContext, WorkspaceSegmentContext)> {
@@ -318,7 +318,7 @@ pub(super) mod function {
 /// as well as the right segment delimiter to move.
 fn get_disconnect_parameters<'ws, 'meta, M: RefMetadata>(
     editor: &Editor<'ws, 'meta, M>,
-    workspace: &but_graph::projection::Workspace,
+    workspace: &but_graph::Workspace,
     source_stack: &Stack,
     subject_segment: &StackSegment,
     workspace_head: gix::ObjectId,

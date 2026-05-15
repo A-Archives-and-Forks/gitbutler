@@ -16,8 +16,8 @@ use crate::{
     Commit, CommitFlags, CommitIndex, Edge, EntryPoint, EntryPointCommit, Graph, Segment,
     SegmentFlags, SegmentIndex, SegmentRelation, StopCondition,
     init::PetGraph,
-    projection::commit::is_managed_workspace_by_message,
     utils::{SegmentTable, SegmentVisitScratch},
+    workspace::commit::is_managed_workspace_by_message,
 };
 
 boolean_enums::gen_boolean_enum!(pub FirstParent);

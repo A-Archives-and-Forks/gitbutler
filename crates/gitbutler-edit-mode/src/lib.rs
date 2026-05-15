@@ -204,7 +204,7 @@ fn open_workspace_ref<'repo>(repo: &'repo gix::Repository) -> Result<gix::Refere
 /// By now, edit-mode won't fully detach the commit-to-edit anymore, so the surrounding workspace should still be
 /// found.
 #[deprecated = "extra traversals must not be done and shouldn't be needed here."]
-fn workspace_from_workspace_ref(ctx: &Context) -> Result<but_graph::projection::Workspace> {
+fn workspace_from_workspace_ref(ctx: &Context) -> Result<but_graph::Workspace> {
     let repo = ctx.repo.get()?;
     let meta = ctx.meta()?;
     let mut workspace_ref = open_workspace_ref(&repo)?;

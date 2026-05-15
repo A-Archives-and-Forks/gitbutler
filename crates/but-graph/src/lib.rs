@@ -67,7 +67,7 @@
 //!
 //! #### Managed Workspaces, and unmanaged ones
 //!
-//! A Workspace is considered managed if it [has workspace metadata](projection::Workspace::metadata). This is typically
+//! A Workspace is considered managed if it [has workspace metadata](Workspace::metadata). This is typically
 //! only the case for workspaces that have been created by GitButler.
 //!
 //! Workspaces without such metadata can be anything, and are usually just made up to allow GitButler to work with it based
@@ -90,7 +90,7 @@
 //! contained within it. Thus, [segment flags](Segment::non_empty_flags_of_first_commit()) are equivalent to the flags of
 //! their first commit.
 //!
-//! The same is *not* true for [stack segments](projection::StackSegment), i.e. segments within a [workspace projection](projection::Workspace).
+//! The same is *not* true for [stack segments](workspace::StackSegment), i.e. segments within a [workspace projection](Workspace).
 //! The reason for this is that they are first-parent aggregations of one *or more* [graph segments](Segment), and thus have multiple
 //! sets of flags, possibly one per [segment](Segment).
 //!
@@ -209,7 +209,10 @@ mod api;
 pub use api::FirstParent;
 /// Produce a graph from a Git repository.
 pub mod init;
-pub mod projection;
+#[path = "projection/mod.rs"]
+pub mod workspace;
+pub use workspace::workspace::Workspace;
+
 mod utils;
 
 mod statistics;

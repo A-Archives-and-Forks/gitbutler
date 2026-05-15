@@ -240,7 +240,7 @@ pub struct Editor<'ws, 'meta, M: RefMetadata> {
     /// Provides data about how the editor instance was transformed.
     history: RevisionHistory,
     /// A reference to the workspace that the editor was created for.
-    workspace: &'ws mut but_graph::projection::Workspace,
+    workspace: &'ws mut but_graph::Workspace,
     /// A reference to the metadata that the editor was created for.
     meta: &'meta mut M,
 }
@@ -259,7 +259,7 @@ pub struct SuccessfulRebase<'ws, 'meta, M: RefMetadata> {
     /// Provides data about how the editor instance was transformed.
     pub history: RevisionHistory,
     /// A reference to the workspace that the editor was created for.
-    workspace: &'ws mut but_graph::projection::Workspace,
+    workspace: &'ws mut but_graph::Workspace,
     /// A reference to the metadata that the editor was created for.
     meta: &'meta mut M,
 }
@@ -341,7 +341,7 @@ pub struct MaterializeOutcome<'ws, 'meta, M: RefMetadata> {
     /// Provides data about how the editor instance was transformed.
     pub history: RevisionHistory,
     /// A reference to the workspace that the editor was created for.
-    pub workspace: &'ws mut but_graph::projection::Workspace,
+    pub workspace: &'ws mut but_graph::Workspace,
     /// A reference to the metadata that the editor was created for.
     pub meta: &'meta mut M,
 }

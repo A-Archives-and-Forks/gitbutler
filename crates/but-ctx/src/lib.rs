@@ -132,7 +132,7 @@ pub struct Context {
     /// A workspace based on any version of `repo`. It's expected to be kept up-to-date
     /// by anyone who changes it.
     /// It also can't be public as it needs several of our cached inputs first.
-    workspace: RefCell<Option<but_graph::projection::Workspace>>,
+    workspace: RefCell<Option<but_graph::Workspace>>,
 }
 
 /// A structure that can be passed across thread boundaries.
@@ -545,7 +545,7 @@ impl Context {
     ) -> anyhow::Result<(
         RepoExclusiveGuard,
         cell::Ref<'_, gix::Repository>,
-        cell::RefMut<'_, but_graph::projection::Workspace>,
+        cell::RefMut<'_, but_graph::Workspace>,
         cell::RefMut<'_, but_db::DbHandle>,
     )> {
         let mut guard = self.exclusive_worktree_access();
@@ -571,7 +571,7 @@ impl Context {
         _perm: &mut RepoExclusive,
     ) -> anyhow::Result<(
         cell::Ref<'_, gix::Repository>,
-        cell::RefMut<'_, but_graph::projection::Workspace>,
+        cell::RefMut<'_, but_graph::Workspace>,
         cell::RefMut<'_, but_db::DbHandle>,
     )> {
         let repo = self.repo.get()?;
@@ -607,7 +607,7 @@ impl Context {
     ) -> anyhow::Result<(
         RepoSharedGuard,
         cell::Ref<'_, gix::Repository>,
-        cell::Ref<'_, but_graph::projection::Workspace>,
+        cell::Ref<'_, but_graph::Workspace>,
         cell::RefMut<'_, but_db::DbHandle>,
     )> {
         let guard = self.shared_worktree_access();
@@ -633,7 +633,7 @@ impl Context {
         _perm: &RepoShared,
     ) -> anyhow::Result<(
         cell::Ref<'_, gix::Repository>,
-        cell::Ref<'_, but_graph::projection::Workspace>,
+        cell::Ref<'_, but_graph::Workspace>,
         cell::RefMut<'_, but_db::DbHandle>,
     )> {
         if let Ok(cached) = cell::Ref::filter_map(self.workspace.try_borrow()?, |opt| opt.as_ref())
@@ -665,7 +665,7 @@ impl Context {
     ) -> anyhow::Result<(
         RepoExclusiveGuard,
         cell::Ref<'_, gix::Repository>,
-        cell::RefMut<'_, but_graph::projection::Workspace>,
+        cell::RefMut<'_, but_graph::Workspace>,
         cell::Ref<'_, but_db::DbHandle>,
     )> {
         let mut guard = self.exclusive_worktree_access();
@@ -689,7 +689,7 @@ impl Context {
         _perm: &RepoExclusive,
     ) -> anyhow::Result<(
         cell::Ref<'_, gix::Repository>,
-        cell::RefMut<'_, but_graph::projection::Workspace>,
+        cell::RefMut<'_, but_graph::Workspace>,
         cell::Ref<'_, but_db::DbHandle>,
     )> {
         if let Ok(cached) =
@@ -721,7 +721,7 @@ impl Context {
     ) -> anyhow::Result<(
         RepoSharedGuard,
         cell::Ref<'_, gix::Repository>,
-        cell::Ref<'_, but_graph::projection::Workspace>,
+        cell::Ref<'_, but_graph::Workspace>,
         cell::Ref<'_, but_db::DbHandle>,
     )> {
         let guard = self.shared_worktree_access();
@@ -742,7 +742,7 @@ impl Context {
         _perm: &RepoShared,
     ) -> anyhow::Result<(
         cell::Ref<'_, gix::Repository>,
-        cell::Ref<'_, but_graph::projection::Workspace>,
+        cell::Ref<'_, but_graph::Workspace>,
         cell::Ref<'_, but_db::DbHandle>,
     )> {
         if let Ok(cached) = cell::Ref::filter_map(self.workspace.try_borrow()?, |opt| opt.as_ref())
@@ -759,7 +759,7 @@ impl Context {
         Ok((self.repo.get()?, ws, self.db.get_cache()?))
     }
 
-    fn workspace_from_head(&self) -> anyhow::Result<but_graph::projection::Workspace> {
+    fn workspace_from_head(&self) -> anyhow::Result<but_graph::Workspace> {
         let repo = self.repo.get()?;
         let meta = self.meta_inner_read_only()?;
         let graph = but_graph::Graph::from_head(&repo, &meta, but_graph::init::Options::limited())?;

@@ -28,7 +28,7 @@ impl WorkspaceState {
     /// This is the most direct constructor in this module and is the right choice when
     /// there is no need to inspect or materialize a [`SuccessfulRebase`].
     pub(crate) fn from_workspace(
-        workspace: &but_graph::projection::Workspace,
+        workspace: &but_graph::Workspace,
         repo: &gix::Repository,
         replaced_commits: BTreeMap<gix::ObjectId, gix::ObjectId>,
     ) -> anyhow::Result<WorkspaceState> {

@@ -7,12 +7,11 @@ use petgraph::Direction;
 use tracing::instrument;
 
 use crate::{
-    CommitFlags, CommitIndex, Graph, Segment, SegmentIndex,
-    projection::{
-        Stack, StackCommit, StackSegment, TargetRef, Workspace, WorkspaceKind,
+    CommitFlags, CommitIndex, Graph, Segment, SegmentIndex, Workspace, segment,
+    workspace::{
+        Stack, StackCommit, StackSegment, TargetRef, WorkspaceKind,
         workspace::find_segment_owner_indexes_by_refname,
     },
-    segment,
 };
 
 /// A utility type to represent `(stack_idx, segment_idx, commit_idx)`.

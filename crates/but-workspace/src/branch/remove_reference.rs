@@ -27,13 +27,13 @@ use gix::refs::transaction::PreviousValue;
 pub fn remove_reference(
     ref_name: &gix::refs::FullNameRef,
     repo: &gix::Repository,
-    workspace: &but_graph::projection::Workspace,
+    workspace: &but_graph::Workspace,
     meta: &mut impl RefMetadata,
     Options {
         avoid_anonymous_stacks,
         keep_metadata,
     }: Options,
-) -> anyhow::Result<Option<but_graph::projection::Workspace>> {
+) -> anyhow::Result<Option<but_graph::Workspace>> {
     // We assume the stack-idx can't change by deleting
     let Some((stack, _segment)) = workspace.find_segment_and_stack_by_refname(ref_name) else {
         return Ok(None);

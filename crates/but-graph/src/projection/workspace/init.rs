@@ -15,10 +15,9 @@ use petgraph::{Direction, visit::NodeRef};
 use tracing::instrument;
 
 use crate::{
-    CommitFlags, Graph, Segment, SegmentIndex,
-    projection::{
-        Stack, StackCommit, StackCommitFlags, StackSegment, TargetCommit, TargetRef, Workspace,
-        WorkspaceKind,
+    CommitFlags, Graph, Segment, SegmentIndex, Workspace,
+    workspace::{
+        Stack, StackCommit, StackCommitFlags, StackSegment, TargetCommit, TargetRef, WorkspaceKind,
         workspace::{WorkspaceState, find_segment_owner_indexes_by_refname},
     },
 };

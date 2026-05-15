@@ -86,7 +86,7 @@ pub(crate) fn run(
 }
 
 fn emit_workspace(
-    workspace: &but_graph::projection::Workspace,
+    workspace: &but_graph::Workspace,
     graph_args: &GraphArgs,
     out: &mut dyn io::Write,
     err: &mut dyn io::Write,

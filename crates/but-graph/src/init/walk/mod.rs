@@ -69,7 +69,7 @@ pub fn prioritize_initial_tips_and_assure_ws_commit_ownership<T: RefMetadata>(
 
     let mut out = Vec::new();
     'next_ws_tip: for ws_tip in ws_tips {
-        if crate::projection::commit::is_managed_workspace_by_message(
+        if crate::workspace::commit::is_managed_workspace_by_message(
             repo.find_commit(ws_tip)?.message_raw()?,
         ) {
             if next.iter().filter(|(info, ..)| info.id == ws_tip).count() <= 1 {

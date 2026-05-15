@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 
-use crate::{FirstParent, projection::Workspace};
+use crate::{FirstParent, Workspace};
 
 /// A head with the commits that are considered upstream of it.
 pub struct HeadStatus {

@@ -232,7 +232,7 @@ fn head_info(ctx: &mut Context) -> Result<(String, String)> {
 fn assignments_and_errors(
     db: HunkAssignmentsHandleMut,
     repo: &gix::Repository,
-    workspace: &but_graph::projection::Workspace,
+    workspace: &but_graph::Workspace,
     tree_changes: Vec<TreeChange>,
     context_lines: u32,
 ) -> Result<(Vec<HunkAssignment>, Option<serde_error::Error>)> {

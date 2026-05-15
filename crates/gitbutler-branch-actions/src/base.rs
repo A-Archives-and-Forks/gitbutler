@@ -350,7 +350,7 @@ fn set_exclude_decoration(ctx: &Context) -> Result<()> {
 pub(crate) fn target_to_base_branch(
     repo: &gix::Repository,
     project: &Project,
-    ws: &but_graph::projection::Workspace,
+    ws: &but_graph::Workspace,
     meta: &impl RefMetadata,
 ) -> Result<BaseBranch> {
     // This function is presuming a workspace ref name.
