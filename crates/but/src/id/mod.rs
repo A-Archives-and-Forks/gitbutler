@@ -13,7 +13,7 @@ use bstr::{BStr, BString, ByteSlice};
 use but_core::sync::RepoShared;
 use but_core::{ChangeId, ref_metadata::StackId};
 use but_ctx::Context;
-use but_graph::projection::{Stack, StackCommit, StackSegment};
+use but_graph::workspace::{Stack, StackCommit, StackSegment};
 use but_hunk_assignment::HunkAssignment;
 use nonempty::NonEmpty;
 use self_cell::self_cell;

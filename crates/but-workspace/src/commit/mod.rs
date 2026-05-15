@@ -523,7 +523,7 @@ impl<'repo> WorkspaceCommit<'repo> {
     /// It's supposed to be the legitimate merge of the stacks contained in `workspace`.
     /// Note that it will be written to `repo` immediately for persistence, with its object id returned.
     pub fn from_graph_workspace_and_tree(
-        workspace: &but_graph::projection::Workspace,
+        workspace: &but_graph::Workspace,
         repo: &'repo gix::Repository,
         tree: gix::ObjectId,
     ) -> anyhow::Result<Self> {
@@ -656,7 +656,7 @@ impl WorkspaceCommit<'_> {
     /// If `false`, this is the tip of the stack itself which will be put underneath a *managed* workspace commit
     /// once another branch is added to the workspace.
     pub fn is_managed(&self) -> bool {
-        but_graph::projection::commit::is_managed_workspace_by_message(self.message.as_bstr())
+        but_graph::workspace::commit::is_managed_workspace_by_message(self.message.as_bstr())
     }
 }
 

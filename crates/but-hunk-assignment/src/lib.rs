@@ -406,7 +406,7 @@ impl HunkAssignment {
 pub fn assign(
     db: HunkAssignmentsHandleMut,
     repo: &gix::Repository,
-    workspace: &but_graph::projection::Workspace,
+    workspace: &but_graph::Workspace,
     requests: Vec<HunkAssignmentRequest>,
     context_lines: u32,
 ) -> Result<()> {
@@ -453,7 +453,7 @@ pub fn assign(
 pub fn assignments_with_fallback(
     db: HunkAssignmentsHandleMut,
     repo: &gix::Repository,
-    workspace: &but_graph::projection::Workspace,
+    workspace: &but_graph::Workspace,
     worktree_changes: Option<impl IntoIterator<Item = impl Into<but_core::TreeChange>>>,
     context_lines: u32,
 ) -> Result<(Vec<HunkAssignment>, Option<anyhow::Error>)> {
@@ -470,7 +470,7 @@ pub fn assignments_with_fallback(
 fn reconcile_worktree_changes_with_worktree(
     db: HunkAssignmentsHandleMut,
     repo: &gix::Repository,
-    workspace: &but_graph::projection::Workspace,
+    workspace: &but_graph::Workspace,
     worktree_changes: Option<impl IntoIterator<Item = impl Into<but_core::TreeChange>>>,
     context_lines: u32,
 ) -> Result<Vec<HunkAssignment>> {
@@ -514,7 +514,7 @@ fn reconcile_worktree_changes_with_worktree(
 #[instrument(skip(db, workspace, worktree_assignments), err(Debug))]
 fn reconcile_with_worktree(
     db: HunkAssignmentsHandle,
-    workspace: &but_graph::projection::Workspace,
+    workspace: &but_graph::Workspace,
     worktree_assignments: &[HunkAssignment],
 ) -> Result<Vec<HunkAssignment>> {
     let branches_by_stack = workspace_branches_by_stack(workspace);
@@ -536,7 +536,7 @@ fn reconcile_with_worktree(
 /// reconciliation runs.
 fn backfill_branch_ref_from_legacy_stack_id(
     assignments: &mut [HunkAssignment],
-    workspace: &but_graph::projection::Workspace,
+    workspace: &but_graph::Workspace,
 ) {
     for assignment in assignments.iter_mut() {
         if assignment.branch_ref_bytes.is_none()
@@ -552,7 +552,7 @@ fn backfill_branch_ref_from_legacy_stack_id(
 
 /// Collect the workspace branches keyed by stack for reconciliation validation.
 fn workspace_branches_by_stack(
-    workspace: &but_graph::projection::Workspace,
+    workspace: &but_graph::Workspace,
 ) -> HashMap<StackId, Vec<gix::refs::FullName>> {
     let mut branches_by_stack = HashMap::new();
     for stack in &workspace.stacks {
@@ -569,10 +569,7 @@ fn workspace_branches_by_stack(
 }
 
 /// Derive `stack_id` from the assigned branch ref for API compatibility.
-fn derive_stack_ids(
-    assignments: &mut [HunkAssignment],
-    workspace: &but_graph::projection::Workspace,
-) {
+fn derive_stack_ids(assignments: &mut [HunkAssignment], workspace: &but_graph::Workspace) {
     for assignment in assignments.iter_mut() {
         assignment.stack_id = assignment.branch_ref_bytes.as_ref().and_then(|branch_ref| {
             workspace
@@ -709,7 +706,7 @@ fn line_nums_from_hunk(diff: &BString, old_start: u32, new_start: u32) -> (Vec<u
 
 fn requests_to_assignments(
     request: Vec<HunkAssignmentRequest>,
-    workspace: &but_graph::projection::Workspace,
+    workspace: &but_graph::Workspace,
 ) -> Result<Vec<HunkAssignment>> {
     let mut assignments = vec![];
     for req in request {
@@ -847,8 +844,8 @@ mod tests {
     use bstr::BString;
     use but_core::{HunkHeader, ref_metadata::StackId};
     use but_graph::{
-        SegmentIndex,
-        projection::{Stack, StackSegment, Workspace, WorkspaceKind},
+        SegmentIndex, Workspace,
+        workspace::{Stack, StackSegment, WorkspaceKind},
     };
 
     use super::*;

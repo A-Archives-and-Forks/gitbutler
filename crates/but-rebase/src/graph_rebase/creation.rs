@@ -35,7 +35,7 @@ impl Default for GraphEditorOptions<'_> {
 impl<'ws, 'meta, M: RefMetadata> Editor<'ws, 'meta, M> {
     /// Creates an editor out of the workspace graph with the default options.
     pub fn create(
-        workspace: &'ws mut but_graph::projection::Workspace,
+        workspace: &'ws mut but_graph::Workspace,
         meta: &'meta mut M,
         repo: &gix::Repository,
     ) -> Result<Self> {
@@ -44,7 +44,7 @@ impl<'ws, 'meta, M: RefMetadata> Editor<'ws, 'meta, M> {
 
     /// Creates an editor out of the workspace graph with the specified options.
     pub fn create_with_opts(
-        workspace: &'ws mut but_graph::projection::Workspace,
+        workspace: &'ws mut but_graph::Workspace,
         meta: &'meta mut M,
         repo: &gix::Repository,
         options: &GraphEditorOptions,

@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 use anyhow::{Context, Result, bail};
 
 use but_core::RefMetadata;
-use but_graph::projection::commit::is_managed_workspace_by_message;
+use but_graph::workspace::commit::is_managed_workspace_by_message;
 use but_rebase::{
     commit::DateMode,
     graph_rebase::{
@@ -118,7 +118,7 @@ struct Stack {
 /// - We replace all steps marked as `content_integrated` that are not
 ///   `historically_integrated` with `None` steps.
 pub fn integrate_upstream<'ws, 'meta, M: RefMetadata>(
-    workspace: &'ws mut but_graph::projection::Workspace,
+    workspace: &'ws mut but_graph::Workspace,
     meta: &'meta mut M,
     repo: &gix::Repository,
     updates: Vec<BottomUpdate>,

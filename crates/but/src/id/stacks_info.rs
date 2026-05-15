@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use bstr::BString;
-use but_graph::projection::Stack;
+use but_graph::workspace::Stack;
 
 use crate::id::{
     RemoteCommitWithId, SegmentWithId, ShortId, StackWithId, UNASSIGNED, WorkspaceCommitWithId,

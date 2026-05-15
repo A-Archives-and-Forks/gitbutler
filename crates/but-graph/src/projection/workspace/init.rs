@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::{BTreeSet, HashSet, VecDeque},
+    collections::{BTreeSet, HashSet},
 };
 
 use anyhow::Context;
@@ -11,17 +11,13 @@ use but_core::ref_metadata::{
 };
 use gix::{ObjectId, refs::Category};
 use itertools::Itertools;
-use petgraph::{
-    Direction,
-    visit::{EdgeRef, NodeRef},
-};
+use petgraph::{Direction, visit::NodeRef};
 use tracing::instrument;
 
 use crate::{
-    CommitFlags, Graph, Segment, SegmentIndex,
-    projection::{
-        Stack, StackCommit, StackCommitFlags, StackSegment, TargetCommit, TargetRef, Workspace,
-        WorkspaceKind,
+    CommitFlags, Graph, Segment, SegmentIndex, Workspace,
+    workspace::{
+        Stack, StackCommit, StackCommitFlags, StackSegment, TargetCommit, TargetRef, WorkspaceKind,
         workspace::{WorkspaceState, find_segment_owner_indexes_by_refname},
     },
 };
@@ -528,33 +524,25 @@ impl Graph {
         start: &'a Segment,
         mut stop: impl FnMut(&Segment) -> bool,
     ) -> (Vec<&'a Segment>, Option<&'a Segment>) {
-        let mut out = vec![start];
-        let mut edge = self
-            .inner
-            .edges_directed(start.id, Direction::Outgoing)
-            .next();
+        let mut out = vec![start.id];
         let mut stopped_at = None;
-        let mut seen = BTreeSet::new();
-        while let Some(first_edge) = edge {
-            let next = &self[first_edge.target()];
+        self.visit_segments_downward_along_first_parent_exclude_start(start.id, |next| {
             if stop(next)
                 && !(next.ref_info.is_none()
                     && next
                         .sibling_segment_id
-                        .is_some_and(|sid| out.iter().any(|s| s.id == sid)))
+                        .is_some_and(|sid| out.contains(&sid)))
             {
-                stopped_at = Some(next);
-                break;
+                stopped_at = Some(next.id);
+                return true;
             }
-            out.push(next);
-            if seen.insert(next.id) {
-                edge = self
-                    .inner
-                    .edges_directed(next.id, Direction::Outgoing)
-                    .next();
-            }
-        }
-        (out, stopped_at)
+            out.push(next.id);
+            false
+        });
+        (
+            out.into_iter().map(|sidx| &self[sidx]).collect(),
+            stopped_at.map(|sidx| &self[sidx]),
+        )
     }
 
     /// Visit all segments from `start`, excluding, and return once `find` returns something mapped from the
@@ -662,21 +650,16 @@ impl Graph {
         start: SegmentIndex,
         mut f: impl FnMut(&Segment) -> bool,
     ) -> Option<&Segment> {
-        let mut next = VecDeque::new();
-        next.push_back(start);
-        let mut seen = BTreeSet::new();
-        while let Some(next_sidx) = next.pop_front() {
-            let s = &self[next_sidx];
+        let mut out = None;
+        self.visit_all_segments_including_start_until(start, Direction::Incoming, |s| {
             if f(s) {
-                return Some(s);
+                out = Some(s.id);
+                true
+            } else {
+                false
             }
-            next.extend(
-                self.inner
-                    .neighbors_directed(next_sidx, Direction::Incoming)
-                    .filter(|n| seen.insert(*n)),
-            );
-        }
-        None
+        });
+        out.map(|sidx| &self[sidx])
     }
 }
 

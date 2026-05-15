@@ -31,7 +31,7 @@ pub(crate) struct StatusTarget {
 
 impl ResolvedTarget {
     /// Build a resolved target from workspace projection data.
-    pub(crate) fn from_workspace(workspace: &but_graph::projection::Workspace) -> Result<Self> {
+    pub(crate) fn from_workspace(workspace: &but_graph::Workspace) -> Result<Self> {
         Ok(Self {
             oid: target_oid_from_workspace(workspace)?,
             ref_name: target_ref_name_from_workspace(workspace),
@@ -100,9 +100,7 @@ fn display_name_from_base_branch(base_branch: &gitbutler_branch_actions::BaseBra
 }
 
 /// Resolve the effective target commit OID from workspace projection data.
-fn target_oid_from_workspace(
-    workspace: &but_graph::projection::Workspace,
-) -> Result<gix::ObjectId> {
+fn target_oid_from_workspace(workspace: &but_graph::Workspace) -> Result<gix::ObjectId> {
     workspace
         .target_ref
         .as_ref()
@@ -126,9 +124,7 @@ fn target_oid_from_workspace(
 }
 
 /// Resolve the effective target reference name from workspace projection data.
-fn target_ref_name_from_workspace(
-    workspace: &but_graph::projection::Workspace,
-) -> Option<gix::refs::FullName> {
+fn target_ref_name_from_workspace(workspace: &but_graph::Workspace) -> Option<gix::refs::FullName> {
     workspace
         .target_ref
         .as_ref()
@@ -142,9 +138,7 @@ fn target_ref_name_from_workspace(
 }
 
 /// Resolve the effective target push remote name from workspace projection data.
-fn target_push_remote_name_from_workspace(
-    workspace: &but_graph::projection::Workspace,
-) -> Option<String> {
+fn target_push_remote_name_from_workspace(workspace: &but_graph::Workspace) -> Option<String> {
     workspace
         .metadata
         .as_ref()

@@ -56,7 +56,7 @@ pub use ref_info::{graph_to_ref_info, head_info, ref_info};
 
 mod branch_details;
 pub use branch_details::{branch_details, local_commits_for_branch};
-use but_graph::{SegmentIndex, projection::TargetCommit};
+use but_graph::{SegmentIndex, workspace::TargetCommit};
 
 mod upstream_integration;
 pub use upstream_integration::{
@@ -88,7 +88,7 @@ pub struct RefInfo {
     ///
     /// If `None`, this is a local workspace that doesn't know when possibly pushed branches are considered integrated.
     /// This happens when there is a local branch checked out without a remote tracking branch.
-    pub target_ref: Option<but_graph::projection::TargetRef>,
+    pub target_ref: Option<but_graph::workspace::TargetRef>,
     /// A commit reachable by [`Self::target_ref`] which we chose to keep as base. That way we can extend the workspace
     /// past its computed lower bound.
     ///

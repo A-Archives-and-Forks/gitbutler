@@ -11,8 +11,12 @@
 mod stack;
 pub use stack::{Stack, StackCommit, StackCommitDebugFlags, StackCommitFlags, StackSegment};
 
+#[expect(clippy::module_inception)]
 pub(crate) mod workspace;
-pub use workspace::{TargetCommit, TargetRef, Workspace, WorkspaceKind};
+pub use workspace::{TargetCommit, TargetRef, WorkspaceKind};
+
+#[cfg(feature = "legacy")]
+pub use workspace::api::legacy::HeadStatus;
 
 /// utilities for workspace-related commits.
 pub mod commit {

@@ -1,6 +1,6 @@
 use anyhow::bail;
 use but_core::ref_metadata::StackId;
-use but_graph::projection::Stack;
+use but_graph::workspace::Stack;
 use but_hunk_assignment::HunkAssignment;
 use but_testsupport::{hex_to_id, hunk_header};
 
@@ -1503,7 +1503,7 @@ mod util {
     use anyhow::bail;
     use bstr::BString;
     use but_core::ref_metadata::StackId;
-    use but_graph::projection::{Stack, StackCommit, StackSegment};
+    use but_graph::workspace::{Stack, StackCommit, StackSegment};
     use but_hunk_assignment::HunkAssignment;
     use itertools::Itertools;
 

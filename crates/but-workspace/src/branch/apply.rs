@@ -10,7 +10,7 @@ use crate::branch::OnWorkspaceMergeConflict;
 pub struct Outcome<'workspace> {
     /// The newly created workspace, if owned, useful to project a workspace and see how the workspace looks like with the branch applied.
     /// If borrowed, the graph already contains the desired branch and nothing had to be applied.
-    pub workspace: Cow<'workspace, but_graph::projection::Workspace>,
+    pub workspace: Cow<'workspace, but_graph::Workspace>,
     /// The name of the branch(es) that were actually applied.
     ///
     /// If a remote tracking branch is given to apply, it will actually apply its local tracking branch, which is created on demand as well.
@@ -139,7 +139,7 @@ use but_core::{
         WorkspaceCommitRelation::{Merged, Outside},
     },
 };
-use but_graph::{SegmentIndex, init::Overlay, petgraph::Direction, projection::WorkspaceKind};
+use but_graph::{SegmentIndex, init::Overlay, petgraph::Direction, workspace::WorkspaceKind};
 use gix::{
     prelude::ObjectIdExt,
     reference::Category,
@@ -176,7 +176,7 @@ use crate::{WorkspaceCommit, commit::merge::Tip, ref_info::WorkspaceExt};
 #[instrument(skip(workspace, repo, meta), err(Debug))]
 pub fn apply<'ws>(
     branch: &FullNameRef,
-    workspace: &'ws but_graph::projection::Workspace,
+    workspace: &'ws but_graph::Workspace,
     repo: &gix::Repository,
     meta: &mut impl RefMetadata,
     Options {
@@ -516,7 +516,7 @@ pub fn apply<'ws>(
         .redo_traversal_with_overlay(&in_memory_repo, meta, overlay.clone())?;
 
     let mut ws = graph.into_workspace()?;
-    let collect_unapplied_branches = |ws: &but_graph::projection::Workspace| {
+    let collect_unapplied_branches = |ws: &but_graph::Workspace| {
         branches_to_apply
             .iter()
             .filter(|rn| !ws.refname_is_segment(rn.as_ref()))
@@ -684,7 +684,7 @@ pub fn apply<'ws>(
     })
 }
 
-fn anon_stacks(stacks: &[but_graph::projection::Stack]) -> impl Iterator<Item = (usize, Tip)> {
+fn anon_stacks(stacks: &[but_graph::workspace::Stack]) -> impl Iterator<Item = (usize, Tip)> {
     stacks.iter().enumerate().filter_map(|(idx, s)| {
         if s.ref_name().is_none() {
             s.tip_skip_empty().and_then(|cid| {
@@ -750,7 +750,7 @@ fn filter_superseded_anon_stacks(
 #[expect(clippy::indexing_slicing)]
 fn find_superseded_stacks(
     branch: &FullNameRef,
-    workspace: &but_graph::projection::Workspace,
+    workspace: &but_graph::Workspace,
     ws_meta: &mut ref_metadata::Workspace,
 ) -> Vec<(
     SegmentIndex,
@@ -1005,7 +1005,7 @@ fn set_head_to_reference(
 }
 
 fn needs_workspace_commit_without_remerge(
-    ws: &but_graph::projection::Workspace,
+    ws: &but_graph::Workspace,
     integration_mode: WorkspaceMerge,
 ) -> bool {
     match integration_mode {
