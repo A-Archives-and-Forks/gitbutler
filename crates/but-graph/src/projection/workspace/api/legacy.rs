@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 use crate::{FirstParent, Workspace};
 
@@ -45,39 +45,34 @@ impl Workspace {
     ///
     /// If only the commits that aren't in the workspace were needed (i.e. not per stack),
     /// then one can do a mere pruned traversal from `target_tip ^InWorkspace`.
-    pub fn upstream_commits(&self, first_parent: FirstParent) -> Result<Vec<HeadStatus>> {
-        let graph = &self.graph;
-        let target_segment_id = self
-            .target_ref
-            .as_ref()
-            .context("Upstream commits can only be calculated on a workspace with a target ref")?
-            .segment_index;
+    pub fn upstream_commits(
+        &self,
+        repo: &gix::Repository,
+        target_ref: &gix::refs::FullNameRef,
+        first_parent: FirstParent,
+    ) -> Result<Vec<HeadStatus>> {
         let mut heads = self
             .stacks
             .iter()
             .filter_map(|stack| stack.tip_skip_empty())
             .collect::<Vec<_>>();
         if heads.is_empty()
-            && let Some(entrypoint) = graph.entrypoint_commit()
+            && let Some(entrypoint) = self.graph.entrypoint_commit()
         {
             heads.push(entrypoint.id);
         }
+        let target_ref_id = repo.find_reference(target_ref)?.id();
 
         let mut out = vec![];
 
         for head in heads {
-            let head_segment_id = graph.commit_id_to_segment_id(head)?;
+            let mut walk = repo.rev_walk([target_ref_id]).with_hidden([head]);
+            if first_parent == FirstParent::Yes {
+                walk = walk.first_parent_only();
+            }
             out.push(HeadStatus {
                 head,
-                upstream_commits: graph
-                    .find_segments_reachable_from_a_not_b(
-                        target_segment_id,
-                        head_segment_id,
-                        first_parent,
-                    )
-                    .into_iter()
-                    .map(|commit| commit.id)
-                    .collect(),
+                upstream_commits: walk.all()?.map(|i| Ok(i?.id)).collect::<Result<_>>()?,
             })
         }
 
