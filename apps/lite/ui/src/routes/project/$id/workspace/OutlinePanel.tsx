@@ -42,7 +42,7 @@ import {
 import { OperationSourceC } from "#ui/routes/project/$id/workspace/OperationSourceC.tsx";
 import { OperationSourceLabel } from "#ui/routes/project/$id/workspace/OperationSourceLabel.tsx";
 import { OperationTarget } from "#ui/routes/project/$id/workspace/OperationTarget.tsx";
-import { useAppDispatch, useAppSelector } from "#ui/store.ts";
+import { RootState, useAppDispatch, useAppSelector } from "#ui/store.ts";
 import { classes } from "#ui/ui/classes.ts";
 import { BullseyeIcon, ChevronDownIcon, MenuTriggerIcon, PushIcon } from "#ui/ui/icons.tsx";
 import {
@@ -1121,19 +1121,28 @@ const selectCommitTargetComboboxItem = ({
 	items[0] ??
 	null;
 
-const useCommitTargetCombobox = (projectId: string) => {
-	const commitTargetState = useAppSelector((state) => selectProjectCommitTarget(state, projectId));
-	const { data: headInfo } = useQuery(headInfoQueryOptions(projectId));
+const selectCommitTargetCombobox = (
+	state: RootState,
+	projectId: string,
+	headInfo: RefInfo | undefined,
+) => {
+	const commitTargetState = selectProjectCommitTarget(state, projectId);
 	const items = buildCommitTargetComboboxItems({ headInfo, commitTargetState });
 	const selectedItem = selectCommitTargetComboboxItem({ items, commitTargetState });
-
 	return { items, selectedItem };
 };
 
-const useIsCommitTarget = (projectId: string, relativeTo: RelativeTo): boolean => {
-	const { selectedItem: commitTarget } = useCommitTargetCombobox(projectId);
+const useCommitTargetCombobox = (projectId: string) => {
+	const { data: headInfo } = useQuery(headInfoQueryOptions(projectId));
+	return useAppSelector((state) => selectCommitTargetCombobox(state, projectId, headInfo));
+};
 
-	return commitTarget ? relativeToEquals(commitTarget.relativeTo, relativeTo) : false;
+const useIsCommitTarget = (projectId: string, relativeTo: RelativeTo): boolean => {
+	const { data: headInfo } = useQuery(headInfoQueryOptions(projectId));
+	return useAppSelector((state) => {
+		const { selectedItem: commitTarget } = selectCommitTargetCombobox(state, projectId, headInfo);
+		return commitTarget ? relativeToEquals(commitTarget.relativeTo, relativeTo) : false;
+	});
 };
 
 const CommitTargetComboboxPopup: FC = () => (
