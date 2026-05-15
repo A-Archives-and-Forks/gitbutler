@@ -989,6 +989,8 @@ export type FeatureFlags = {
    * "modern" uses ignore-aware non-recursive watching.
    */
   watchMode: string;
+  /** Experimental. */
+  writeCommitEvolution: boolean;
 };
 
 export type Fetch = {

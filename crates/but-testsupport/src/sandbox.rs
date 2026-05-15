@@ -471,6 +471,7 @@ impl Sandbox {
                 single_branch: true,
                 irc: false,
                 watch_mode: "auto".into(),
+                write_commit_evolution: true,
             },
             extra_csp: ExtraCsp {
                 hosts: vec![],

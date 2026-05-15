@@ -122,6 +122,45 @@ fn basic_leaving_edit_mode() -> Result<()> {
 }
 
 #[test]
+fn evolution_parents_written() -> Result<()> {
+    let (mut ctx, _tempdir) = command_ctx("conficted_entries_get_written_when_leaving_edit_mode")?;
+    let repo = ctx.repo.get()?;
+
+    let foobar = repo.rev_parse_single(b"HEAD^{/foobar}")?.detach();
+
+    let worktree_dir = repo.workdir().unwrap().to_owned();
+    drop(repo);
+    let stack_id = stack_id(&ctx)?;
+    enter_edit_mode(&mut ctx, foobar, stack_id)?;
+
+    std::fs::write(worktree_dir.join("file"), "edited during edit mode\n")?;
+
+    save_and_return_to_workspace(&mut ctx)?;
+
+    let repo = ctx.repo.get()?;
+    let session = git_meta_lib::Session::open(repo.path())?;
+    let evolution_parent = session
+        .target(&git_meta_lib::Target::commit(
+            &repo
+                .rev_parse_single(b"HEAD^{/foobar}")?
+                .to_hex()
+                .to_string(),
+        )?)
+        .get_value("evolution-parent")?;
+    insta::assert_debug_snapshot!(evolution_parent, @r#"
+    Some(
+        Set(
+            {
+                "26804c33bfc7bf602e778b8dd847283bbf886b6a",
+            },
+        ),
+    )
+    "#);
+
+    Ok(())
+}
+
+#[test]
 fn multiple_commits_created_during_edit_mode() -> Result<()> {
     let (mut ctx, _tempdir) = command_ctx("conficted_entries_get_written_when_leaving_edit_mode")?;
     let repo = ctx.repo.get()?;
