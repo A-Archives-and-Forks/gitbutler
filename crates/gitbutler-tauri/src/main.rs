@@ -395,6 +395,7 @@ fn main() -> anyhow::Result<()> {
                 legacy::open::tauri_show_in_finder::show_in_finder,
                 legacy::forge::tauri_pr_templates::pr_templates,
                 legacy::forge::tauri_pr_template::pr_template,
+                legacy::forge::tauri_forge_provider::forge_provider,
                 legacy::forge::tauri_list_reviews::list_reviews,
                 legacy::forge::tauri_publish_review::publish_review,
                 legacy::forge::tauri_merge_review::merge_review,
