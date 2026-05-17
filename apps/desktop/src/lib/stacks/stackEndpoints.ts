@@ -723,6 +723,8 @@ export function buildStackEndpoints(build: BackendEndpointBuilder) {
 				invalidatesList(ReduxTag.HeadSha),
 				invalidatesList(ReduxTag.WorktreeChanges), // Moving commits can cause conflicts
 				invalidatesList(ReduxTag.BranchChanges),
+				invalidatesList(ReduxTag.Stacks),
+				invalidatesList(ReduxTag.StackDetails),
 			],
 		}),
 		moveBranch: build.mutation<

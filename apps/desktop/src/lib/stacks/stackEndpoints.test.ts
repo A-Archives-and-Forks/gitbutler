@@ -95,6 +95,8 @@ describe("buildStackEndpoints", () => {
 			invalidatesList(ReduxTag.HeadSha),
 			invalidatesList(ReduxTag.WorktreeChanges),
 			invalidatesList(ReduxTag.BranchChanges),
+			invalidatesList(ReduxTag.Stacks),
+			invalidatesList(ReduxTag.StackDetails),
 		]);
 	});
 
