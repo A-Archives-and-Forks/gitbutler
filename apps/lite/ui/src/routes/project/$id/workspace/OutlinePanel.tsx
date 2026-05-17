@@ -4,7 +4,12 @@ import {
 	changesInWorktreeQueryOptions,
 	headInfoQueryOptions,
 } from "#ui/api/queries.ts";
-import { findCommit, getCommonBaseCommitId, resolveRelativeTo } from "#ui/api/ref-info.ts";
+import {
+	findCommit,
+	getCommonBaseCommitId,
+	renameBranchInHeadInfo,
+	resolveRelativeTo,
+} from "#ui/api/ref-info.ts";
 import { decodeRefName, encodeRefName } from "#ui/api/ref-name.ts";
 import { commitTitle, shortCommitId } from "#ui/commit.ts";
 import {
@@ -1699,15 +1704,29 @@ const BranchRow: FC<
 	const updateBranchName = useMutation({
 		mutationFn: window.lite.updateBranchName,
 		onSuccess: async (_response, input, _context, mutation) => {
-			await mutation.client.invalidateQueries();
-
+			const newBranchRef = encodeRefName(`refs/heads/${input.newName}`);
 			const newSelection = branchOperand({
 				stackId,
 				// TODO: ideally the API would return the new ref?
-				branchRef: encodeRefName(`refs/heads/${input.newName}`),
+				branchRef: newBranchRef,
 			});
+
+			mutation.client.setQueryData(headInfoQueryOptions(projectId).queryKey, (headInfo) => {
+				if (!headInfo) return headInfo;
+
+				return renameBranchInHeadInfo({
+					headInfo,
+					stackId,
+					branchRef,
+					newName: input.newName,
+					newBranchRef,
+				});
+			});
+
 			dispatch(projectActions.selectOutline({ projectId, selection: newSelection }));
 			dispatch(projectActions.exitMode({ projectId }));
+
+			await mutation.client.invalidateQueries();
 		},
 		onError: (error) => {
 			// oxlint-disable-next-line no-console

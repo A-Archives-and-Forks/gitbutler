@@ -54,6 +54,42 @@ export const findSegmentByBranchRef = ({
 	return null;
 };
 
+export const renameBranchInHeadInfo = ({
+	headInfo,
+	stackId,
+	branchRef,
+	newName,
+	newBranchRef,
+}: {
+	headInfo: RefInfo;
+	stackId: string;
+	branchRef: Array<number>;
+	newName: string;
+	newBranchRef: Array<number>;
+}): RefInfo => ({
+	...headInfo,
+	stacks: headInfo.stacks.map((stack) => {
+		if (stack.id !== stackId) return stack;
+
+		return {
+			...stack,
+			segments: stack.segments.map((segment) => {
+				if (!segment.refName || !refNamesEqual(segment.refName.fullNameBytes, branchRef))
+					return segment;
+
+				return {
+					...segment,
+					refName: {
+						...segment.refName,
+						displayName: newName,
+						fullNameBytes: newBranchRef,
+					},
+				};
+			}),
+		};
+	}),
+});
+
 export const resolveRelativeTo = ({
 	headInfo,
 	relativeTo,
