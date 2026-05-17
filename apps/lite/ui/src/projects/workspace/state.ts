@@ -1,6 +1,6 @@
 import { type OperationType } from "#ui/operations/operation.ts";
 import { refNamesEqual } from "#ui/api/ref-name.ts";
-import { AbsorptionTarget, type RelativeTo } from "@gitbutler/but-sdk";
+import { AbsorptionTarget, type RefInfo, type RelativeTo } from "@gitbutler/but-sdk";
 import { Match } from "effect";
 import {
 	branchOperand,
@@ -23,6 +23,7 @@ import {
 	type OutlineMode,
 	type TransferOperationMode,
 } from "#ui/outline/mode.ts";
+import { findCommitStackId } from "#ui/api/ref-info.ts";
 
 type SelectionState = {
 	outline: Operand;
@@ -150,6 +151,53 @@ export const setHighlightedCommitIds = (state: WorkspaceState, commitIds: Array<
 
 export const setCommitTarget = (state: WorkspaceState, commitTarget: RelativeTo | null) => {
 	state.commitTarget = commitTarget;
+};
+
+const rewrittenCommitOperand = ({
+	commit,
+	headInfo,
+	replacedCommits,
+}: {
+	commit: CommitOperand;
+	headInfo: RefInfo;
+	replacedCommits: Record<string, string>;
+}): CommitOperand | null => {
+	const commitId = replacedCommits[commit.commitId];
+	if (commitId === undefined) return null;
+
+	const stackId = findCommitStackId(headInfo, commitId);
+	if (stackId === null) return null;
+
+	return { stackId, commitId };
+};
+
+export const updateRewrittenCommitReferences = (
+	state: WorkspaceState,
+	replacedCommits: Record<string, string>,
+	headInfo: RefInfo,
+) => {
+	if (state.selection.outline._tag === "Commit") {
+		const commit = rewrittenCommitOperand({
+			commit: state.selection.outline,
+			replacedCommits,
+			headInfo,
+		});
+		if (commit) state.selection.outline = commitOperand(commit);
+	}
+
+	if (state.selection.files._tag === "Commit") {
+		const commit = rewrittenCommitOperand({
+			commit: state.selection.files,
+			replacedCommits,
+			headInfo,
+		});
+		if (commit) state.selection.files = commitOperand(commit);
+	}
+
+	if (state.commitTarget?.type === "commit") {
+		const commitId = replacedCommits[state.commitTarget.subject];
+		if (commitId !== undefined) state.commitTarget = { type: "commit", subject: commitId };
+	}
 };
 
 export const startRenameBranch = (state: WorkspaceState, branch: BranchOperand) => {
