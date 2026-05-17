@@ -1,4 +1,4 @@
-import { encodeRefName } from "#ui/api/ref-name.ts";
+import { encodeRefName, refNamesEqual } from "#ui/api/ref-name.ts";
 import { type Commit, type RefInfo, type RelativeTo, type Segment } from "@gitbutler/but-sdk";
 
 export const getCommonBaseCommitId = (headInfo: RefInfo): string | undefined => {
@@ -40,12 +40,16 @@ export const findCommit = ({
 	return null;
 };
 
-const branchRefsEqual = (left: Array<number> | null, right: Array<number> | null): boolean =>
-	left === right ||
-	(left !== null &&
-		right !== null &&
-		left.length === right.length &&
-		left.every((value, index) => value === right[index]));
+export const findCommitStackId = (headInfo: RefInfo, commitId: string): string | null => {
+	for (const stack of headInfo.stacks) {
+		if (stack.id === null) continue;
+
+		for (const segment of stack.segments)
+			if (segment.commits.some((commit) => commit.id === commitId)) return stack.id;
+	}
+
+	return null;
+};
 
 export const findSegmentByBranchRef = ({
 	headInfo,
@@ -56,10 +60,46 @@ export const findSegmentByBranchRef = ({
 }): Segment | null => {
 	for (const stack of headInfo.stacks)
 		for (const segment of stack.segments)
-			if (branchRefsEqual(segment.refName?.fullNameBytes ?? null, branchRef)) return segment;
+			if (refNamesEqual(segment.refName?.fullNameBytes ?? null, branchRef)) return segment;
 
 	return null;
 };
+
+export const renameBranchInHeadInfo = ({
+	headInfo,
+	stackId,
+	branchRef,
+	newName,
+	newBranchRef,
+}: {
+	headInfo: RefInfo;
+	stackId: string;
+	branchRef: Array<number>;
+	newName: string;
+	newBranchRef: Array<number>;
+}): RefInfo => ({
+	...headInfo,
+	stacks: headInfo.stacks.map((stack) => {
+		if (stack.id !== stackId) return stack;
+
+		return {
+			...stack,
+			segments: stack.segments.map((segment) => {
+				if (!segment.refName || !refNamesEqual(segment.refName.fullNameBytes, branchRef))
+					return segment;
+
+				return {
+					...segment,
+					refName: {
+						...segment.refName,
+						displayName: newName,
+						fullNameBytes: newBranchRef,
+					},
+				};
+			}),
+		};
+	}),
+});
 
 export const resolveRelativeTo = ({
 	headInfo,

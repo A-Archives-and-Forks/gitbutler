@@ -1,5 +1,6 @@
 import { type OperationType } from "#ui/operations/operation.ts";
-import { AbsorptionTarget, type RelativeTo } from "@gitbutler/but-sdk";
+import { refNamesEqual } from "#ui/api/ref-name.ts";
+import { AbsorptionTarget, type RefInfo, type RelativeTo } from "@gitbutler/but-sdk";
 import { Match } from "effect";
 import {
 	branchOperand,
@@ -22,6 +23,7 @@ import {
 	type OutlineMode,
 	type TransferOperationMode,
 } from "#ui/outline/mode.ts";
+import { findCommitStackId } from "#ui/api/ref-info.ts";
 
 type SelectionState = {
 	outline: Operand;
@@ -39,7 +41,6 @@ export type WorkspaceState = {
 	commitTarget: RelativeTo | null;
 	highlightedCommitIds: Array<string>;
 	mode: OutlineMode;
-	replacedCommits: Record<string, string>;
 	selection: SelectionState;
 };
 
@@ -47,7 +48,6 @@ export const createInitialState = (): WorkspaceState => ({
 	commitTarget: null,
 	highlightedCommitIds: [],
 	mode: defaultOutlineMode,
-	replacedCommits: {},
 	selection: createInitialSelectionState(),
 });
 
@@ -153,16 +153,83 @@ export const setCommitTarget = (state: WorkspaceState, commitTarget: RelativeTo 
 	state.commitTarget = commitTarget;
 };
 
-export const addReplacedCommits = (
+const rewrittenCommitOperand = ({
+	commit,
+	headInfo,
+	replacedCommits,
+}: {
+	commit: CommitOperand;
+	headInfo: RefInfo;
+	replacedCommits: Record<string, string>;
+}): CommitOperand | null => {
+	const commitId = replacedCommits[commit.commitId];
+	if (commitId === undefined) return null;
+
+	const stackId = findCommitStackId(headInfo, commitId);
+	if (stackId === null) return null;
+
+	return { stackId, commitId };
+};
+
+export const updateRewrittenCommitReferences = (
 	state: WorkspaceState,
 	replacedCommits: Record<string, string>,
+	headInfo: RefInfo,
 ) => {
-	state.replacedCommits = { ...state.replacedCommits, ...replacedCommits };
+	if (state.selection.outline._tag === "Commit") {
+		const commit = rewrittenCommitOperand({
+			commit: state.selection.outline,
+			replacedCommits,
+			headInfo,
+		});
+		if (commit) state.selection.outline = commitOperand(commit);
+	}
+
+	if (state.selection.files._tag === "Commit") {
+		const commit = rewrittenCommitOperand({
+			commit: state.selection.files,
+			replacedCommits,
+			headInfo,
+		});
+		if (commit) state.selection.files = commitOperand(commit);
+	}
+
+	if (state.commitTarget?.type === "commit") {
+		const commitId = replacedCommits[state.commitTarget.subject];
+		if (commitId !== undefined) state.commitTarget = { type: "commit", subject: commitId };
+	}
 };
 
 export const startRenameBranch = (state: WorkspaceState, branch: BranchOperand) => {
 	selectOutline(state, branchOperand(branch));
 	state.mode = renameBranchOutlineMode({ operand: branch });
+};
+
+export const updateRewrittenBranchReferences = (
+	state: WorkspaceState,
+	oldBranch: BranchOperand,
+	newBranch: BranchOperand,
+) => {
+	const oldBranchOperand = branchOperand(oldBranch);
+	const newBranchOperand = branchOperand(newBranch);
+
+	if (
+		state.selection.outline._tag === "Branch" &&
+		operandEquals(state.selection.outline, oldBranchOperand)
+	)
+		state.selection.outline = newBranchOperand;
+
+	if (
+		state.selection.files._tag === "Branch" &&
+		operandEquals(state.selection.files, oldBranchOperand)
+	)
+		state.selection.files = newBranchOperand;
+
+	if (
+		state.commitTarget?.type === "referenceBytes" &&
+		refNamesEqual(state.commitTarget.subject, oldBranch.branchRef)
+	)
+		state.commitTarget = { type: "referenceBytes", subject: newBranch.branchRef };
 };
 
 export const startRewordCommit = (state: WorkspaceState, commit: CommitOperand) => {
@@ -181,6 +248,3 @@ export const selectHighlightedCommitIds = (state: WorkspaceState): Array<string>
 	state.highlightedCommitIds;
 
 export const selectCommitTarget = (state: WorkspaceState): RelativeTo | null => state.commitTarget;
-
-export const selectReplacedCommits = (state: WorkspaceState): Record<string, string> =>
-	state.replacedCommits;

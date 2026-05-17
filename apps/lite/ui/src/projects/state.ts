@@ -1,6 +1,6 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { RootState } from "#ui/store.ts";
-import { type AbsorptionTarget, type RelativeTo } from "@gitbutler/but-sdk";
+import { type AbsorptionTarget, type RefInfo, type RelativeTo } from "@gitbutler/but-sdk";
 import { type BranchOperand, type CommitOperand, type Operand } from "#ui/operands.ts";
 import { type Panel } from "#ui/panels.ts";
 import * as panels from "#ui/panels/state.ts";
@@ -79,6 +79,18 @@ const projectSlice = createSlice({
 			const projectState = ensureProjectState(state, projectId);
 			workspace.startRenameBranch(projectState.workspace, branch);
 		},
+		updateRewrittenBranchReferences: (
+			state,
+			action: PayloadAction<{
+				projectId: string;
+				oldBranch: BranchOperand;
+				newBranch: BranchOperand;
+			}>,
+		) => {
+			const { projectId, oldBranch, newBranch } = action.payload;
+			const projectState = ensureProjectState(state, projectId);
+			workspace.updateRewrittenBranchReferences(projectState.workspace, oldBranch, newBranch);
+		},
 		enterTransferMode: (
 			state,
 			action: PayloadAction<{ projectId: string; mode: TransferOperationMode }>,
@@ -142,6 +154,21 @@ const projectSlice = createSlice({
 			const { projectId, commitTarget } = action.payload;
 			workspace.setCommitTarget(ensureProjectState(state, projectId).workspace, commitTarget);
 		},
+		updateRewrittenCommitReferences: (
+			state,
+			action: PayloadAction<{
+				projectId: string;
+				replacedCommits: Record<string, string>;
+				headInfo: RefInfo;
+			}>,
+		) => {
+			const { projectId, replacedCommits, headInfo } = action.payload;
+			workspace.updateRewrittenCommitReferences(
+				ensureProjectState(state, projectId).workspace,
+				replacedCommits,
+				headInfo,
+			);
+		},
 		showPanel: (state, action: PayloadAction<{ projectId: string; panel: Panel }>) => {
 			panels.showPanel(
 				ensureProjectState(state, action.payload.projectId).panels,
@@ -186,13 +213,6 @@ const projectSlice = createSlice({
 		closeDialog: (state, action: PayloadAction<{ projectId: string }>) => {
 			ensureProjectState(state, action.payload.projectId).dialog = { _tag: "None" };
 		},
-		addReplacedCommits: (
-			state,
-			action: PayloadAction<{ projectId: string; replacedCommits: Record<string, string> }>,
-		) => {
-			const { projectId, replacedCommits } = action.payload;
-			workspace.addReplacedCommits(ensureProjectState(state, projectId).workspace, replacedCommits);
-		},
 	},
 });
 
@@ -225,6 +245,3 @@ export const selectProjectHighlightedCommitIds = (state: RootState, projectId: s
 
 export const selectProjectCommitTarget = (state: RootState, projectId: string) =>
 	workspace.selectCommitTarget(selectProjectWorkspaceState(state, projectId));
-
-export const selectProjectReplacedCommits = (state: RootState, projectId: string) =>
-	workspace.selectReplacedCommits(selectProjectWorkspaceState(state, projectId));

@@ -4,7 +4,12 @@ import {
 	changesInWorktreeQueryOptions,
 	headInfoQueryOptions,
 } from "#ui/api/queries.ts";
-import { findCommit, getCommonBaseCommitId, resolveRelativeTo } from "#ui/api/ref-info.ts";
+import {
+	findCommit,
+	getCommonBaseCommitId,
+	renameBranchInHeadInfo,
+	resolveRelativeTo,
+} from "#ui/api/ref-info.ts";
 import { decodeRefName, encodeRefName } from "#ui/api/ref-name.ts";
 import { commitTitle, shortCommitId } from "#ui/commit.ts";
 import {
@@ -38,7 +43,6 @@ import {
 	selectProjectCommitTarget,
 	selectProjectHighlightedCommitIds,
 	selectProjectOutlineModeState,
-	selectProjectReplacedCommits,
 	selectProjectSelectionOutline,
 } from "#ui/projects/state.ts";
 import { OperationSourceC } from "#ui/routes/project/$id/workspace/OperationSourceC.tsx";
@@ -87,7 +91,6 @@ import {
 	SubmitEventHandler,
 	Suspense,
 	use,
-	useEffect,
 	useOptimistic,
 	useRef,
 	useState,
@@ -109,6 +112,8 @@ import { Spinner } from "#ui/components/Spinner.tsx";
 import { errorMessageForToast } from "#ui/errors.ts";
 
 const NavigationIndexContext = createContext<NavigationIndex | null>(null);
+
+const OutlineSelectionContext = createContext<Operand | null>(null);
 
 const DryRunWorkspaceContext = createContext<WorkspaceState | null>(null);
 
@@ -179,61 +184,23 @@ const useNavigationIndex = ({
 }) => {
 	const { data: headInfo } = useQuery(headInfoQueryOptions(projectId));
 
-	const dispatch = useAppDispatch();
-
 	const navigationIndexUnfiltered = buildNavigationIndex(sections(headInfo));
 
 	const selection = useAppSelector((state) => selectProjectSelectionOutline(state, projectId));
-	const replacedCommits = useAppSelector((state) => selectProjectReplacedCommits(state, projectId));
-
-	// React allows state updates on render, but not for external stores.
-	// https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
-	useEffect(() => {
-		//
-		// Update selection when the commit was replaced.
-		//
-		const updatedSelection = Match.value(selection).pipe(
-			Match.withReturnType<Operand | null>(),
-			Match.tags({
-				Commit: (selection) => {
-					const newCommitId = replacedCommits[selection.commitId];
-					if (newCommitId === undefined || newCommitId === selection.commitId) return null;
-
-					return commitOperand({ ...selection, commitId: newCommitId });
-				},
-			}),
-			Match.orElse(() => null),
-		);
-
-		if (updatedSelection && navigationIndexIncludes(navigationIndexUnfiltered, updatedSelection)) {
-			dispatch(
-				projectActions.selectOutline({
-					projectId,
-					selection: updatedSelection,
-				}),
-			);
-			return;
-		}
-
-		//
-		// Reset selection when it's no longer part of the workspace.
-		//
-		if (!navigationIndexIncludes(navigationIndexUnfiltered, selection))
-			dispatch(
-				projectActions.selectOutline({
-					projectId,
-					selection: defaultOutlineSelection,
-				}),
-			);
-	}, [navigationIndexUnfiltered, selection, projectId, dispatch, replacedCommits]);
+	const derivedSelection = navigationIndexIncludes(navigationIndexUnfiltered, selection)
+		? selection
+		: defaultOutlineSelection;
 
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
-	return filterNavigationIndexForOutlineMode({
-		navigationIndex: navigationIndexUnfiltered,
-		outlineMode,
-		absorptionTargetKeys,
-	});
+	return {
+		navigationIndex: filterNavigationIndexForOutlineMode({
+			navigationIndex: navigationIndexUnfiltered,
+			outlineMode,
+			absorptionTargetKeys,
+		}),
+		selection: derivedSelection,
+	};
 };
 
 export const OutlinePanel: FC<PanelProps> = ({ ...panelProps }) => (
@@ -251,11 +218,12 @@ export const OutlinePanel: FC<PanelProps> = ({ ...panelProps }) => (
 const useOutlineTreeHotkeys = ({
 	navigationIndex,
 	projectId,
+	selection,
 }: {
 	navigationIndex: NavigationIndex;
 	projectId: string;
+	selection: Operand;
 }) => {
-	const selection = useAppSelector((state) => selectProjectSelectionOutline(state, projectId));
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 	const focusedPanel = useFocusedProjectPanel(projectId);
 	const { data: worktreeChanges } = useQuery(changesInWorktreeQueryOptions(projectId));
@@ -269,10 +237,15 @@ const useOutlineTreeHotkeys = ({
 	const commitMoveMutation = useMutation({
 		mutationFn: window.lite.commitMove,
 		onSuccess: async (response, input, _context, mutation) => {
+			mutation.client.setQueryData(
+				headInfoQueryOptions(input.projectId).queryKey,
+				response.workspace.headInfo,
+			);
 			dispatch(
-				projectActions.addReplacedCommits({
+				projectActions.updateRewrittenCommitReferences({
 					projectId: input.projectId,
 					replacedCommits: response.workspace.replacedCommits,
+					headInfo: response.workspace.headInfo,
 				}),
 			);
 
@@ -506,8 +479,6 @@ const useOutlineTreeHotkeys = ({
 const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 	const { id: projectId } = useParams({ from: "/project/$id/workspace" });
 
-	const selection = useAppSelector((state) => selectProjectSelectionOutline(state, projectId));
-
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
 	const absorptionPlanTarget = Match.value(outlineMode).pipe(
@@ -525,7 +496,7 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 		),
 	);
 
-	const navigationIndex = useNavigationIndex({
+	const { navigationIndex, selection } = useNavigationIndex({
 		projectId,
 		absorptionTargetKeys,
 	});
@@ -547,6 +518,7 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 	useOutlineTreeHotkeys({
 		navigationIndex,
 		projectId,
+		selection,
 	});
 
 	const operationSource = getOperationSource(outlineMode);
@@ -560,60 +532,58 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 
 	return (
 		<NavigationIndexContext value={navigationIndex}>
-			<AbsorptionTargetKeysContext value={absorptionTargetKeys}>
-				<DryRunWorkspaceContext value={dryRunWorkspace}>
-					<Panel
-						{...panelProps}
-						tabIndex={0}
-						role="tree"
-						aria-activedescendant={treeItemId(selection)}
-						className={classes(panelProps.className, styles.panel)}
-					>
-						<div className={styles.panelPadding}>
-							<Changes
-								projectId={projectId}
-								commitTarget={commitTarget}
-								targetComboboxItems={targetComboboxItems}
-							/>
-						</div>
-
-						<div className={styles.headInfo}>
-							{headInfo?.stacks.map((stack) => (
-								<StackC
-									key={stack.id}
+			<OutlineSelectionContext value={selection}>
+				<AbsorptionTargetKeysContext value={absorptionTargetKeys}>
+					<DryRunWorkspaceContext value={dryRunWorkspace}>
+						<Panel
+							{...panelProps}
+							tabIndex={0}
+							role="tree"
+							aria-activedescendant={treeItemId(selection)}
+							className={classes(panelProps.className, styles.panel)}
+						>
+							<div className={styles.panelPadding}>
+								<Changes
 									projectId={projectId}
-									stack={stack}
-									commitTarget={commitTarget?.relativeTo ?? null}
+									commitTarget={commitTarget}
+									targetComboboxItems={targetComboboxItems}
 								/>
-							))}
-
-							<BaseCommit
-								projectId={projectId}
-								commitId={headInfo ? getCommonBaseCommitId(headInfo) : undefined}
-							/>
-						</div>
-
-						{operationSource && headInfo && (
-							<div className={styles.operationSourcePreview}>
-								<OperationSourceLabel headInfo={headInfo} source={operationSource} />
-								{outlineMode._tag === "Absorb" && absorptionPlanQuery?.isPending && (
-									<Spinner aria-label="Loading absorb plan" />
-								)}
 							</div>
-						)}
-					</Panel>
-				</DryRunWorkspaceContext>
-			</AbsorptionTargetKeysContext>
+
+							<div className={styles.headInfo}>
+								{headInfo?.stacks.map((stack) => (
+									<StackC
+										key={stack.id}
+										projectId={projectId}
+										stack={stack}
+										commitTarget={commitTarget?.relativeTo ?? null}
+									/>
+								))}
+
+								<BaseCommit
+									projectId={projectId}
+									commitId={headInfo ? getCommonBaseCommitId(headInfo) : undefined}
+								/>
+							</div>
+
+							{operationSource && headInfo && (
+								<div className={styles.operationSourcePreview}>
+									<OperationSourceLabel headInfo={headInfo} source={operationSource} />
+									{outlineMode._tag === "Absorb" && absorptionPlanQuery?.isPending && (
+										<Spinner aria-label="Loading absorb plan" />
+									)}
+								</div>
+							)}
+						</Panel>
+					</DryRunWorkspaceContext>
+				</AbsorptionTargetKeysContext>
+			</OutlineSelectionContext>
 		</NavigationIndexContext>
 	);
 };
 
-const useIsSelected = ({ projectId, operand }: { projectId: string; operand: Operand }): boolean =>
-	useAppSelector((state) => {
-		const selection = selectProjectSelectionOutline(state, projectId);
-
-		return operandEquals(selection, operand);
-	});
+const useIsSelected = (operand: Operand): boolean =>
+	operandEquals(assert(use(OutlineSelectionContext)), operand);
 
 const treeItemId = (operand: Operand): string =>
 	`outline-treeitem-${encodeURIComponent(operandIdentityKey(operand))}`;
@@ -626,7 +596,7 @@ const ItemRow: FC<
 > = ({ projectId, operand, ...props }) => {
 	const dispatch = useAppDispatch();
 	const navigationIndex = assert(use(NavigationIndexContext));
-	const isSelected = useIsSelected({ projectId, operand });
+	const isSelected = useIsSelected(operand);
 	const selectItem = () => {
 		dispatch(projectActions.selectOutline({ projectId, selection: operand }));
 	};
@@ -643,12 +613,11 @@ const ItemRow: FC<
 
 const TreeItem: FC<
 	{
-		projectId: string;
 		operand: Operand;
 		expanded?: boolean;
 	} & useRender.ComponentProps<"div">
-> = ({ projectId, operand, expanded, render, ...props }) => {
-	const isSelected = useIsSelected({ projectId, operand });
+> = ({ operand, expanded, render, ...props }) => {
+	const isSelected = useIsSelected(operand);
 
 	return useRender({
 		render,
@@ -667,7 +636,7 @@ const OperandC: FC<
 		operand: Operand;
 	} & useRender.ComponentProps<"div">
 > = ({ projectId, operand, render, ...props }) => {
-	const isSelected = useIsSelected({ projectId, operand });
+	const isSelected = useIsSelected(operand);
 	const absorptionTargetKeys = assert(use(AbsorptionTargetKeysContext));
 	const isAbsorptionTarget = absorptionTargetKeys.has(operandIdentityKey(operand));
 	const navigationIndex = assert(use(NavigationIndexContext));
@@ -780,7 +749,7 @@ const CommitRow: FC<
 		commitId: commit.id,
 	};
 	const operand = commitOperand(commitOperandV);
-	const isSelected = useIsSelected({ projectId, operand });
+	const isSelected = useIsSelected(operand);
 	const isRewording =
 		isSelected &&
 		outlineMode._tag === "RewordCommit" &&
@@ -800,10 +769,15 @@ const CommitRow: FC<
 	const commitInsertBlank = useMutation({
 		mutationFn: window.lite.commitInsertBlank,
 		onSuccess: async (response, input, _context, mutation) => {
+			mutation.client.setQueryData(
+				headInfoQueryOptions(input.projectId).queryKey,
+				response.workspace.headInfo,
+			);
 			dispatch(
-				projectActions.addReplacedCommits({
+				projectActions.updateRewrittenCommitReferences({
 					projectId: input.projectId,
 					replacedCommits: response.workspace.replacedCommits,
+					headInfo: response.workspace.headInfo,
 				}),
 			);
 
@@ -824,10 +798,15 @@ const CommitRow: FC<
 	const commitDiscard = useMutation({
 		mutationFn: window.lite.commitDiscard,
 		onSuccess: async (response, input, _context, mutation) => {
+			mutation.client.setQueryData(
+				headInfoQueryOptions(input.projectId).queryKey,
+				response.workspace.headInfo,
+			);
 			dispatch(
-				projectActions.addReplacedCommits({
+				projectActions.updateRewrittenCommitReferences({
 					projectId: input.projectId,
 					replacedCommits: response.workspace.replacedCommits,
+					headInfo: response.workspace.headInfo,
 				}),
 			);
 
@@ -848,10 +827,15 @@ const CommitRow: FC<
 	const commitReword = useMutation({
 		mutationFn: window.lite.commitReword,
 		onSuccess: async (response, input, _context, mutation) => {
+			mutation.client.setQueryData(
+				headInfoQueryOptions(input.projectId).queryKey,
+				response.workspace.headInfo,
+			);
 			dispatch(
-				projectActions.addReplacedCommits({
+				projectActions.updateRewrittenCommitReferences({
 					projectId: input.projectId,
 					replacedCommits: response.workspace.replacedCommits,
+					headInfo: response.workspace.headInfo,
 				}),
 			);
 
@@ -1092,7 +1076,6 @@ const CommitC: FC<{
 
 	return (
 		<TreeItem
-			projectId={projectId}
 			operand={operand}
 			aria-label={commitTitle(commit.message)}
 			render={<OperandC projectId={projectId} operand={operand} />}
@@ -1173,7 +1156,6 @@ const BaseCommit: FC<{
 	return (
 		<div className={workspaceItemRowStyles.section}>
 			<TreeItem
-				projectId={projectId}
 				operand={operand}
 				aria-label="Base commit"
 				render={
@@ -1391,10 +1373,12 @@ const Changes: FC<{
 			});
 		},
 		onSuccess: async (response, _input, _ctx, { client }) => {
+			client.setQueryData(headInfoQueryOptions(projectId).queryKey, response.workspace.headInfo);
 			dispatch(
-				projectActions.addReplacedCommits({
+				projectActions.updateRewrittenCommitReferences({
 					projectId,
 					replacedCommits: response.workspace.replacedCommits,
+					headInfo: response.workspace.headInfo,
 				}),
 			);
 
@@ -1524,7 +1508,6 @@ const Changes: FC<{
 
 	return (
 		<TreeItem
-			projectId={projectId}
 			operand={operand}
 			aria-label={`Changes (${worktreeChanges?.changes.length ?? 0})`}
 			className={classes(workspaceItemRowStyles.section, styles.changesSection)}
@@ -1699,15 +1682,46 @@ const BranchRow: FC<
 	const updateBranchName = useMutation({
 		mutationFn: window.lite.updateBranchName,
 		onSuccess: async (_response, input, _context, mutation) => {
-			await mutation.client.invalidateQueries();
-
-			const newSelection = branchOperand({
+			const newBranchRef = encodeRefName(`refs/heads/${input.newName}`);
+			const newBranch: BranchOperand = {
 				stackId,
 				// TODO: ideally the API would return the new ref?
-				branchRef: encodeRefName(`refs/heads/${input.newName}`),
+				branchRef: newBranchRef,
+			};
+
+			mutation.client.setQueryData(headInfoQueryOptions(projectId).queryKey, (headInfo) => {
+				if (!headInfo) return headInfo;
+
+				return renameBranchInHeadInfo({
+					headInfo,
+					stackId,
+					branchRef,
+					newName: input.newName,
+					newBranchRef,
+				});
 			});
-			dispatch(projectActions.selectOutline({ projectId, selection: newSelection }));
+
+			dispatch(
+				projectActions.updateRewrittenBranchReferences({
+					projectId,
+					oldBranch: branchOperandV,
+					newBranch,
+				}),
+			);
 			dispatch(projectActions.exitMode({ projectId }));
+
+			await mutation.client.invalidateQueries();
+		},
+		onError: (error) => {
+			// oxlint-disable-next-line no-console
+			console.error(error);
+
+			toastManager.add({
+				type: "error",
+				title: "Failed to rename branch",
+				description: errorMessageForToast(error),
+				priority: "high",
+			});
 		},
 	});
 
@@ -1727,10 +1741,15 @@ const BranchRow: FC<
 	const tearOffBranchMutation = useMutation({
 		mutationFn: window.lite.tearOffBranch,
 		onSuccess: async (response, _input, _context, mutation) => {
+			mutation.client.setQueryData(
+				headInfoQueryOptions(projectId).queryKey,
+				response.workspace.headInfo,
+			);
 			dispatch(
-				projectActions.addReplacedCommits({
+				projectActions.updateRewrittenCommitReferences({
 					projectId,
 					replacedCommits: response.workspace.replacedCommits,
+					headInfo: response.workspace.headInfo,
 				}),
 			);
 
@@ -1970,7 +1989,6 @@ const BranchSegment: FC<{
 
 	return (
 		<TreeItem
-			projectId={projectId}
 			operand={operand}
 			aria-label={refName.displayName}
 			expanded
@@ -2063,7 +2081,6 @@ const StackC: FC<{
 
 	return (
 		<TreeItem
-			projectId={projectId}
 			operand={operand}
 			aria-label="Stack"
 			expanded

@@ -13,6 +13,7 @@ import {
 	CommitSquashParams,
 	CommitUncommitParams,
 } from "#electron/ipc.ts";
+import { headInfoQueryOptions } from "#ui/api/queries.ts";
 import { rejectedChangesToastOptions } from "#ui/operations/rejectedChangesToastOptions.tsx";
 import { DiffSpec, InsertSide, RelativeTo } from "@gitbutler/but-sdk";
 import { Operand, operandEquals, operandFileParent } from "#ui/operands.ts";
@@ -337,12 +338,14 @@ export const useRunOperation = () => {
 				resolveChanges: (source) => resolveDiffSpecs({ projectId, queryClient, source }),
 				dryRun: false,
 			}),
-		onSuccess: async (response, input, _ctx, { client }) => {
+		onSuccess: async (response, _input, _ctx, { client }) => {
 			if (response) {
+				client.setQueryData(headInfoQueryOptions(projectId).queryKey, response.workspace.headInfo);
 				dispatch(
-					projectActions.addReplacedCommits({
+					projectActions.updateRewrittenCommitReferences({
 						projectId,
 						replacedCommits: response.workspace.replacedCommits,
+						headInfo: response.workspace.headInfo,
 					}),
 				);
 
