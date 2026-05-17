@@ -1709,6 +1709,17 @@ const BranchRow: FC<
 			dispatch(projectActions.selectOutline({ projectId, selection: newSelection }));
 			dispatch(projectActions.exitMode({ projectId }));
 		},
+		onError: (error) => {
+			// oxlint-disable-next-line no-console
+			console.error(error);
+
+			toastManager.add({
+				type: "error",
+				title: "Failed to rename branch",
+				description: errorMessageForToast(error),
+				priority: "high",
+			});
+		},
 	});
 
 	const startEditing = () => {
