@@ -91,7 +91,6 @@ import {
 	SubmitEventHandler,
 	Suspense,
 	use,
-	useEffect,
 	useOptimistic,
 	useRef,
 	useState,
@@ -113,6 +112,8 @@ import { Spinner } from "#ui/components/Spinner.tsx";
 import { errorMessageForToast } from "#ui/errors.ts";
 
 const NavigationIndexContext = createContext<NavigationIndex | null>(null);
+
+const OutlineSelectionContext = createContext<Operand | null>(null);
 
 const DryRunWorkspaceContext = createContext<WorkspaceState | null>(null);
 
@@ -183,34 +184,23 @@ const useNavigationIndex = ({
 }) => {
 	const { data: headInfo } = useQuery(headInfoQueryOptions(projectId));
 
-	const dispatch = useAppDispatch();
-
 	const navigationIndexUnfiltered = buildNavigationIndex(sections(headInfo));
 
 	const selection = useAppSelector((state) => selectProjectSelectionOutline(state, projectId));
-
-	// React allows state updates on render, but not for external stores.
-	// https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
-	useEffect(() => {
-		//
-		// Reset selection when it's no longer part of the workspace.
-		//
-		if (!navigationIndexIncludes(navigationIndexUnfiltered, selection))
-			dispatch(
-				projectActions.selectOutline({
-					projectId,
-					selection: defaultOutlineSelection,
-				}),
-			);
-	}, [navigationIndexUnfiltered, selection, projectId, dispatch]);
+	const derivedSelection = navigationIndexIncludes(navigationIndexUnfiltered, selection)
+		? selection
+		: defaultOutlineSelection;
 
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
-	return filterNavigationIndexForOutlineMode({
-		navigationIndex: navigationIndexUnfiltered,
-		outlineMode,
-		absorptionTargetKeys,
-	});
+	return {
+		navigationIndex: filterNavigationIndexForOutlineMode({
+			navigationIndex: navigationIndexUnfiltered,
+			outlineMode,
+			absorptionTargetKeys,
+		}),
+		selection: derivedSelection,
+	};
 };
 
 export const OutlinePanel: FC<PanelProps> = ({ ...panelProps }) => (
@@ -228,11 +218,12 @@ export const OutlinePanel: FC<PanelProps> = ({ ...panelProps }) => (
 const useOutlineTreeHotkeys = ({
 	navigationIndex,
 	projectId,
+	selection,
 }: {
 	navigationIndex: NavigationIndex;
 	projectId: string;
+	selection: Operand;
 }) => {
-	const selection = useAppSelector((state) => selectProjectSelectionOutline(state, projectId));
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 	const focusedPanel = useFocusedProjectPanel(projectId);
 	const { data: worktreeChanges } = useQuery(changesInWorktreeQueryOptions(projectId));
@@ -488,8 +479,6 @@ const useOutlineTreeHotkeys = ({
 const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 	const { id: projectId } = useParams({ from: "/project/$id/workspace" });
 
-	const selection = useAppSelector((state) => selectProjectSelectionOutline(state, projectId));
-
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
 	const absorptionPlanTarget = Match.value(outlineMode).pipe(
@@ -507,7 +496,7 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 		),
 	);
 
-	const navigationIndex = useNavigationIndex({
+	const { navigationIndex, selection } = useNavigationIndex({
 		projectId,
 		absorptionTargetKeys,
 	});
@@ -529,6 +518,7 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 	useOutlineTreeHotkeys({
 		navigationIndex,
 		projectId,
+		selection,
 	});
 
 	const operationSource = getOperationSource(outlineMode);
@@ -542,60 +532,58 @@ const OutlineTreePanel: FC<PanelProps> = ({ ...panelProps }) => {
 
 	return (
 		<NavigationIndexContext value={navigationIndex}>
-			<AbsorptionTargetKeysContext value={absorptionTargetKeys}>
-				<DryRunWorkspaceContext value={dryRunWorkspace}>
-					<Panel
-						{...panelProps}
-						tabIndex={0}
-						role="tree"
-						aria-activedescendant={treeItemId(selection)}
-						className={classes(panelProps.className, styles.panel)}
-					>
-						<div className={styles.panelPadding}>
-							<Changes
-								projectId={projectId}
-								commitTarget={commitTarget}
-								targetComboboxItems={targetComboboxItems}
-							/>
-						</div>
-
-						<div className={styles.headInfo}>
-							{headInfo?.stacks.map((stack) => (
-								<StackC
-									key={stack.id}
+			<OutlineSelectionContext value={selection}>
+				<AbsorptionTargetKeysContext value={absorptionTargetKeys}>
+					<DryRunWorkspaceContext value={dryRunWorkspace}>
+						<Panel
+							{...panelProps}
+							tabIndex={0}
+							role="tree"
+							aria-activedescendant={treeItemId(selection)}
+							className={classes(panelProps.className, styles.panel)}
+						>
+							<div className={styles.panelPadding}>
+								<Changes
 									projectId={projectId}
-									stack={stack}
-									commitTarget={commitTarget?.relativeTo ?? null}
+									commitTarget={commitTarget}
+									targetComboboxItems={targetComboboxItems}
 								/>
-							))}
-
-							<BaseCommit
-								projectId={projectId}
-								commitId={headInfo ? getCommonBaseCommitId(headInfo) : undefined}
-							/>
-						</div>
-
-						{operationSource && headInfo && (
-							<div className={styles.operationSourcePreview}>
-								<OperationSourceLabel headInfo={headInfo} source={operationSource} />
-								{outlineMode._tag === "Absorb" && absorptionPlanQuery?.isPending && (
-									<Spinner aria-label="Loading absorb plan" />
-								)}
 							</div>
-						)}
-					</Panel>
-				</DryRunWorkspaceContext>
-			</AbsorptionTargetKeysContext>
+
+							<div className={styles.headInfo}>
+								{headInfo?.stacks.map((stack) => (
+									<StackC
+										key={stack.id}
+										projectId={projectId}
+										stack={stack}
+										commitTarget={commitTarget?.relativeTo ?? null}
+									/>
+								))}
+
+								<BaseCommit
+									projectId={projectId}
+									commitId={headInfo ? getCommonBaseCommitId(headInfo) : undefined}
+								/>
+							</div>
+
+							{operationSource && headInfo && (
+								<div className={styles.operationSourcePreview}>
+									<OperationSourceLabel headInfo={headInfo} source={operationSource} />
+									{outlineMode._tag === "Absorb" && absorptionPlanQuery?.isPending && (
+										<Spinner aria-label="Loading absorb plan" />
+									)}
+								</div>
+							)}
+						</Panel>
+					</DryRunWorkspaceContext>
+				</AbsorptionTargetKeysContext>
+			</OutlineSelectionContext>
 		</NavigationIndexContext>
 	);
 };
 
-const useIsSelected = ({ projectId, operand }: { projectId: string; operand: Operand }): boolean =>
-	useAppSelector((state) => {
-		const selection = selectProjectSelectionOutline(state, projectId);
-
-		return operandEquals(selection, operand);
-	});
+const useIsSelected = (operand: Operand): boolean =>
+	operandEquals(assert(use(OutlineSelectionContext)), operand);
 
 const treeItemId = (operand: Operand): string =>
 	`outline-treeitem-${encodeURIComponent(operandIdentityKey(operand))}`;
@@ -608,7 +596,7 @@ const ItemRow: FC<
 > = ({ projectId, operand, ...props }) => {
 	const dispatch = useAppDispatch();
 	const navigationIndex = assert(use(NavigationIndexContext));
-	const isSelected = useIsSelected({ projectId, operand });
+	const isSelected = useIsSelected(operand);
 	const selectItem = () => {
 		dispatch(projectActions.selectOutline({ projectId, selection: operand }));
 	};
@@ -625,12 +613,11 @@ const ItemRow: FC<
 
 const TreeItem: FC<
 	{
-		projectId: string;
 		operand: Operand;
 		expanded?: boolean;
 	} & useRender.ComponentProps<"div">
-> = ({ projectId, operand, expanded, render, ...props }) => {
-	const isSelected = useIsSelected({ projectId, operand });
+> = ({ operand, expanded, render, ...props }) => {
+	const isSelected = useIsSelected(operand);
 
 	return useRender({
 		render,
@@ -649,7 +636,7 @@ const OperandC: FC<
 		operand: Operand;
 	} & useRender.ComponentProps<"div">
 > = ({ projectId, operand, render, ...props }) => {
-	const isSelected = useIsSelected({ projectId, operand });
+	const isSelected = useIsSelected(operand);
 	const absorptionTargetKeys = assert(use(AbsorptionTargetKeysContext));
 	const isAbsorptionTarget = absorptionTargetKeys.has(operandIdentityKey(operand));
 	const navigationIndex = assert(use(NavigationIndexContext));
@@ -762,7 +749,7 @@ const CommitRow: FC<
 		commitId: commit.id,
 	};
 	const operand = commitOperand(commitOperandV);
-	const isSelected = useIsSelected({ projectId, operand });
+	const isSelected = useIsSelected(operand);
 	const isRewording =
 		isSelected &&
 		outlineMode._tag === "RewordCommit" &&
@@ -1089,7 +1076,6 @@ const CommitC: FC<{
 
 	return (
 		<TreeItem
-			projectId={projectId}
 			operand={operand}
 			aria-label={commitTitle(commit.message)}
 			render={<OperandC projectId={projectId} operand={operand} />}
@@ -1170,7 +1156,6 @@ const BaseCommit: FC<{
 	return (
 		<div className={workspaceItemRowStyles.section}>
 			<TreeItem
-				projectId={projectId}
 				operand={operand}
 				aria-label="Base commit"
 				render={
@@ -1523,7 +1508,6 @@ const Changes: FC<{
 
 	return (
 		<TreeItem
-			projectId={projectId}
 			operand={operand}
 			aria-label={`Changes (${worktreeChanges?.changes.length ?? 0})`}
 			className={classes(workspaceItemRowStyles.section, styles.changesSection)}
@@ -2005,7 +1989,6 @@ const BranchSegment: FC<{
 
 	return (
 		<TreeItem
-			projectId={projectId}
 			operand={operand}
 			aria-label={refName.displayName}
 			expanded
@@ -2098,7 +2081,6 @@ const StackC: FC<{
 
 	return (
 		<TreeItem
-			projectId={projectId}
 			operand={operand}
 			aria-label="Stack"
 			expanded
