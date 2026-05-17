@@ -186,13 +186,6 @@ const projectSlice = createSlice({
 		closeDialog: (state, action: PayloadAction<{ projectId: string }>) => {
 			ensureProjectState(state, action.payload.projectId).dialog = { _tag: "None" };
 		},
-		addReplacedCommits: (
-			state,
-			action: PayloadAction<{ projectId: string; replacedCommits: Record<string, string> }>,
-		) => {
-			const { projectId, replacedCommits } = action.payload;
-			workspace.addReplacedCommits(ensureProjectState(state, projectId).workspace, replacedCommits);
-		},
 	},
 });
 
@@ -225,6 +218,3 @@ export const selectProjectHighlightedCommitIds = (state: RootState, projectId: s
 
 export const selectProjectCommitTarget = (state: RootState, projectId: string) =>
 	workspace.selectCommitTarget(selectProjectWorkspaceState(state, projectId));
-
-export const selectProjectReplacedCommits = (state: RootState, projectId: string) =>
-	workspace.selectReplacedCommits(selectProjectWorkspaceState(state, projectId));

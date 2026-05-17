@@ -43,7 +43,6 @@ import {
 	selectProjectCommitTarget,
 	selectProjectHighlightedCommitIds,
 	selectProjectOutlineModeState,
-	selectProjectReplacedCommits,
 	selectProjectSelectionOutline,
 } from "#ui/projects/state.ts";
 import { OperationSourceC } from "#ui/routes/project/$id/workspace/OperationSourceC.tsx";
@@ -102,7 +101,7 @@ import { Panel, PanelProps } from "react-resizable-panels";
 import styles from "./OutlinePanel.module.css";
 import workspaceItemRowStyles from "./WorkspaceItemRow.module.css";
 import { WorkspaceItemRow, WorkspaceItemRowToolbar } from "./WorkspaceItemRow.tsx";
-import { useDryRunOperation } from "#ui/operations/operation.ts";
+import { rewrittenCommitSelection, useDryRunOperation } from "#ui/operations/operation.ts";
 import { isNonEmptyArray, NonEmptyArray } from "effect/Array";
 import { defaultOutlineSelection } from "#ui/projects/workspace/state.ts";
 import { ShortcutButton } from "#ui/components/ShortcutButton.tsx";
@@ -189,37 +188,10 @@ const useNavigationIndex = ({
 	const navigationIndexUnfiltered = buildNavigationIndex(sections(headInfo));
 
 	const selection = useAppSelector((state) => selectProjectSelectionOutline(state, projectId));
-	const replacedCommits = useAppSelector((state) => selectProjectReplacedCommits(state, projectId));
 
 	// React allows state updates on render, but not for external stores.
 	// https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
 	useEffect(() => {
-		//
-		// Update selection when the commit was replaced.
-		//
-		const updatedSelection = Match.value(selection).pipe(
-			Match.withReturnType<Operand | null>(),
-			Match.tags({
-				Commit: (selection) => {
-					const newCommitId = replacedCommits[selection.commitId];
-					if (newCommitId === undefined || newCommitId === selection.commitId) return null;
-
-					return commitOperand({ ...selection, commitId: newCommitId });
-				},
-			}),
-			Match.orElse(() => null),
-		);
-
-		if (updatedSelection && navigationIndexIncludes(navigationIndexUnfiltered, updatedSelection)) {
-			dispatch(
-				projectActions.selectOutline({
-					projectId,
-					selection: updatedSelection,
-				}),
-			);
-			return;
-		}
-
 		//
 		// Reset selection when it's no longer part of the workspace.
 		//
@@ -230,7 +202,7 @@ const useNavigationIndex = ({
 					selection: defaultOutlineSelection,
 				}),
 			);
-	}, [navigationIndexUnfiltered, selection, projectId, dispatch, replacedCommits]);
+	}, [navigationIndexUnfiltered, selection, projectId, dispatch]);
 
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
 
@@ -274,12 +246,21 @@ const useOutlineTreeHotkeys = ({
 	const commitMoveMutation = useMutation({
 		mutationFn: window.lite.commitMove,
 		onSuccess: async (response, input, _context, mutation) => {
-			dispatch(
-				projectActions.addReplacedCommits({
-					projectId: input.projectId,
-					replacedCommits: response.workspace.replacedCommits,
-				}),
+			mutation.client.setQueryData(
+				headInfoQueryOptions(input.projectId).queryKey,
+				response.workspace.headInfo,
 			);
+			const rewrittenSelection = rewrittenCommitSelection({
+				selection,
+				workspace: response.workspace,
+			});
+			if (rewrittenSelection)
+				dispatch(
+					projectActions.selectOutline({
+						projectId: input.projectId,
+						selection: rewrittenSelection,
+					}),
+				);
 
 			await mutation.client.invalidateQueries();
 		},
@@ -778,6 +759,7 @@ const CommitRow: FC<
 	);
 	const dryRunCommit = useDryRunCommit(commit.id);
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
+	const selection = useAppSelector((state) => selectProjectSelectionOutline(state, projectId));
 
 	const dispatch = useAppDispatch();
 	const commitOperandV: CommitOperand = {
@@ -805,12 +787,21 @@ const CommitRow: FC<
 	const commitInsertBlank = useMutation({
 		mutationFn: window.lite.commitInsertBlank,
 		onSuccess: async (response, input, _context, mutation) => {
-			dispatch(
-				projectActions.addReplacedCommits({
-					projectId: input.projectId,
-					replacedCommits: response.workspace.replacedCommits,
-				}),
+			mutation.client.setQueryData(
+				headInfoQueryOptions(input.projectId).queryKey,
+				response.workspace.headInfo,
 			);
+			const rewrittenSelection = rewrittenCommitSelection({
+				selection,
+				workspace: response.workspace,
+			});
+			if (rewrittenSelection)
+				dispatch(
+					projectActions.selectOutline({
+						projectId: input.projectId,
+						selection: rewrittenSelection,
+					}),
+				);
 
 			await mutation.client.invalidateQueries();
 		},
@@ -829,12 +820,21 @@ const CommitRow: FC<
 	const commitDiscard = useMutation({
 		mutationFn: window.lite.commitDiscard,
 		onSuccess: async (response, input, _context, mutation) => {
-			dispatch(
-				projectActions.addReplacedCommits({
-					projectId: input.projectId,
-					replacedCommits: response.workspace.replacedCommits,
-				}),
+			mutation.client.setQueryData(
+				headInfoQueryOptions(input.projectId).queryKey,
+				response.workspace.headInfo,
 			);
+			const rewrittenSelection = rewrittenCommitSelection({
+				selection,
+				workspace: response.workspace,
+			});
+			if (rewrittenSelection)
+				dispatch(
+					projectActions.selectOutline({
+						projectId: input.projectId,
+						selection: rewrittenSelection,
+					}),
+				);
 
 			await mutation.client.invalidateQueries();
 		},
@@ -853,12 +853,21 @@ const CommitRow: FC<
 	const commitReword = useMutation({
 		mutationFn: window.lite.commitReword,
 		onSuccess: async (response, input, _context, mutation) => {
-			dispatch(
-				projectActions.addReplacedCommits({
-					projectId: input.projectId,
-					replacedCommits: response.workspace.replacedCommits,
-				}),
+			mutation.client.setQueryData(
+				headInfoQueryOptions(input.projectId).queryKey,
+				response.workspace.headInfo,
 			);
+			const rewrittenSelection = rewrittenCommitSelection({
+				selection,
+				workspace: response.workspace,
+			});
+			if (rewrittenSelection)
+				dispatch(
+					projectActions.selectOutline({
+						projectId: input.projectId,
+						selection: rewrittenSelection,
+					}),
+				);
 
 			await mutation.client.invalidateQueries();
 		},
@@ -1312,6 +1321,7 @@ const Changes: FC<{
 	const toastManager = Toast.useToastManager();
 	const queryClient = useQueryClient();
 	const dispatch = useAppDispatch();
+	const selection = useAppSelector((state) => selectProjectSelectionOutline(state, projectId));
 
 	const commitCreate = useMutation({
 		mutationFn: async () => {
@@ -1396,12 +1406,13 @@ const Changes: FC<{
 			});
 		},
 		onSuccess: async (response, _input, _ctx, { client }) => {
-			dispatch(
-				projectActions.addReplacedCommits({
-					projectId,
-					replacedCommits: response.workspace.replacedCommits,
-				}),
-			);
+			client.setQueryData(headInfoQueryOptions(projectId).queryKey, response.workspace.headInfo);
+			const rewrittenSelection = rewrittenCommitSelection({
+				selection,
+				workspace: response.workspace,
+			});
+			if (rewrittenSelection)
+				dispatch(projectActions.selectOutline({ projectId, selection: rewrittenSelection }));
 
 			if (commitTarget?.relativeTo.type === "commit" && response.newCommit !== null)
 				dispatch(
@@ -1686,6 +1697,7 @@ const BranchRow: FC<
 	...restProps
 }) => {
 	const outlineMode = useAppSelector((state) => selectProjectOutlineModeState(state, projectId));
+	const selection = useAppSelector((state) => selectProjectSelectionOutline(state, projectId));
 	const dispatch = useAppDispatch();
 	const branchOperandV: BranchOperand = {
 		stackId,
@@ -1757,12 +1769,16 @@ const BranchRow: FC<
 	const tearOffBranchMutation = useMutation({
 		mutationFn: window.lite.tearOffBranch,
 		onSuccess: async (response, _input, _context, mutation) => {
-			dispatch(
-				projectActions.addReplacedCommits({
-					projectId,
-					replacedCommits: response.workspace.replacedCommits,
-				}),
+			mutation.client.setQueryData(
+				headInfoQueryOptions(projectId).queryKey,
+				response.workspace.headInfo,
 			);
+			const rewrittenSelection = rewrittenCommitSelection({
+				selection,
+				workspace: response.workspace,
+			});
+			if (rewrittenSelection)
+				dispatch(projectActions.selectOutline({ projectId, selection: rewrittenSelection }));
 
 			await mutation.client.invalidateQueries();
 		},

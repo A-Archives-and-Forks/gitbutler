@@ -39,7 +39,6 @@ export type WorkspaceState = {
 	commitTarget: RelativeTo | null;
 	highlightedCommitIds: Array<string>;
 	mode: OutlineMode;
-	replacedCommits: Record<string, string>;
 	selection: SelectionState;
 };
 
@@ -47,7 +46,6 @@ export const createInitialState = (): WorkspaceState => ({
 	commitTarget: null,
 	highlightedCommitIds: [],
 	mode: defaultOutlineMode,
-	replacedCommits: {},
 	selection: createInitialSelectionState(),
 });
 
@@ -153,13 +151,6 @@ export const setCommitTarget = (state: WorkspaceState, commitTarget: RelativeTo 
 	state.commitTarget = commitTarget;
 };
 
-export const addReplacedCommits = (
-	state: WorkspaceState,
-	replacedCommits: Record<string, string>,
-) => {
-	state.replacedCommits = { ...state.replacedCommits, ...replacedCommits };
-};
-
 export const startRenameBranch = (state: WorkspaceState, branch: BranchOperand) => {
 	selectOutline(state, branchOperand(branch));
 	state.mode = renameBranchOutlineMode({ operand: branch });
@@ -181,6 +172,3 @@ export const selectHighlightedCommitIds = (state: WorkspaceState): Array<string>
 	state.highlightedCommitIds;
 
 export const selectCommitTarget = (state: WorkspaceState): RelativeTo | null => state.commitTarget;
-
-export const selectReplacedCommits = (state: WorkspaceState): Record<string, string> =>
-	state.replacedCommits;

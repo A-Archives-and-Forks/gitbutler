@@ -13,13 +13,15 @@ import {
 	CommitSquashParams,
 	CommitUncommitParams,
 } from "#electron/ipc.ts";
+import { headInfoQueryOptions } from "#ui/api/queries.ts";
+import { findCommitStackId } from "#ui/api/ref-info.ts";
 import { rejectedChangesToastOptions } from "#ui/operations/rejectedChangesToastOptions.tsx";
-import { DiffSpec, InsertSide, RelativeTo } from "@gitbutler/but-sdk";
-import { Operand, operandEquals, operandFileParent } from "#ui/operands.ts";
+import { DiffSpec, InsertSide, RelativeTo, type WorkspaceState } from "@gitbutler/but-sdk";
+import { commitOperand, Operand, operandEquals, operandFileParent } from "#ui/operands.ts";
 import { resolveDiffSpecs, useResolveDiffSpecs } from "#ui/operations/diff-specs.ts";
 import { decodeRefName } from "#ui/api/ref-name.ts";
-import { projectActions } from "#ui/projects/state.ts";
-import { useAppDispatch } from "#ui/store.ts";
+import { projectActions, selectProjectSelectionOutline } from "#ui/projects/state.ts";
+import { useAppDispatch, useAppSelector } from "#ui/store.ts";
 import { useParams } from "@tanstack/react-router";
 import { errorMessageForToast } from "#ui/errors.ts";
 
@@ -78,6 +80,25 @@ export type Operation =
 	| ({ _tag: "CommitUncommitChanges" } & CommitUncommitChangesOperation)
 	| ({ _tag: "MoveBranch" } & MoveBranchOperation)
 	| ({ _tag: "TearOffBranch" } & TearOffBranchOperation);
+
+// TODO: move
+export const rewrittenCommitSelection = ({
+	selection,
+	workspace,
+}: {
+	selection: Operand;
+	workspace: WorkspaceState;
+}): Operand | null => {
+	if (selection._tag !== "Commit") return null;
+
+	const commitId = workspace.replacedCommits[selection.commitId];
+	if (commitId === undefined) return null;
+
+	const stackId = findCommitStackId(workspace.headInfo, commitId);
+	if (stackId === null) return null;
+
+	return commitOperand({ stackId, commitId });
+};
 
 /** @public */
 export const commitAmendOperation = (operation: CommitAmendOperation): Operation => ({
@@ -326,6 +347,7 @@ export const useDryRunOperation = ({
 export const useRunOperation = () => {
 	const { id: projectId } = useParams({ from: "/project/$id/workspace" });
 	const dispatch = useAppDispatch();
+	const selection = useAppSelector((state) => selectProjectSelectionOutline(state, projectId));
 	const queryClient = useQueryClient();
 	const toastManager = Toast.useToastManager();
 
@@ -337,14 +359,15 @@ export const useRunOperation = () => {
 				resolveChanges: (source) => resolveDiffSpecs({ projectId, queryClient, source }),
 				dryRun: false,
 			}),
-		onSuccess: async (response, input, _ctx, { client }) => {
+		onSuccess: async (response, _input, _ctx, { client }) => {
 			if (response) {
-				dispatch(
-					projectActions.addReplacedCommits({
-						projectId,
-						replacedCommits: response.workspace.replacedCommits,
-					}),
-				);
+				client.setQueryData(headInfoQueryOptions(projectId).queryKey, response.workspace.headInfo);
+				const rewrittenSelection = rewrittenCommitSelection({
+					selection,
+					workspace: response.workspace,
+				});
+				if (rewrittenSelection)
+					dispatch(projectActions.selectOutline({ projectId, selection: rewrittenSelection }));
 
 				if ("rejectedChanges" in response && response.rejectedChanges.length > 0)
 					toastManager.add(

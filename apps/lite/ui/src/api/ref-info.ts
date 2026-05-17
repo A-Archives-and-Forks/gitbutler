@@ -40,6 +40,17 @@ export const findCommit = ({
 	return null;
 };
 
+export const findCommitStackId = (headInfo: RefInfo, commitId: string): string | null => {
+	for (const stack of headInfo.stacks) {
+		if (stack.id === null) continue;
+
+		for (const segment of stack.segments)
+			if (segment.commits.some((commit) => commit.id === commitId)) return stack.id;
+	}
+
+	return null;
+};
+
 export const findSegmentByBranchRef = ({
 	headInfo,
 	branchRef,
