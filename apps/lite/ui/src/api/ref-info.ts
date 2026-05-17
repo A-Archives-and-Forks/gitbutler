@@ -1,4 +1,4 @@
-import { encodeRefName } from "#ui/api/ref-name.ts";
+import { encodeRefName, refNamesEqual } from "#ui/api/ref-name.ts";
 import { type Commit, type RefInfo, type RelativeTo, type Segment } from "@gitbutler/but-sdk";
 
 export const getCommonBaseCommitId = (headInfo: RefInfo): string | undefined => {
@@ -40,13 +40,6 @@ export const findCommit = ({
 	return null;
 };
 
-const branchRefsEqual = (left: Array<number> | null, right: Array<number> | null): boolean =>
-	left === right ||
-	(left !== null &&
-		right !== null &&
-		left.length === right.length &&
-		left.every((value, index) => value === right[index]));
-
 export const findSegmentByBranchRef = ({
 	headInfo,
 	branchRef,
@@ -56,7 +49,7 @@ export const findSegmentByBranchRef = ({
 }): Segment | null => {
 	for (const stack of headInfo.stacks)
 		for (const segment of stack.segments)
-			if (branchRefsEqual(segment.refName?.fullNameBytes ?? null, branchRef)) return segment;
+			if (refNamesEqual(segment.refName?.fullNameBytes ?? null, branchRef)) return segment;
 
 	return null;
 };
