@@ -1717,11 +1717,11 @@ const BranchRow: FC<
 		mutationFn: window.lite.updateBranchName,
 		onSuccess: async (_response, input, _context, mutation) => {
 			const newBranchRef = encodeRefName(`refs/heads/${input.newName}`);
-			const newSelection = branchOperand({
+			const newBranch: BranchOperand = {
 				stackId,
 				// TODO: ideally the API would return the new ref?
 				branchRef: newBranchRef,
-			});
+			};
 
 			mutation.client.setQueryData(headInfoQueryOptions(projectId).queryKey, (headInfo) => {
 				if (!headInfo) return headInfo;
@@ -1735,7 +1735,13 @@ const BranchRow: FC<
 				});
 			});
 
-			dispatch(projectActions.selectOutline({ projectId, selection: newSelection }));
+			dispatch(
+				projectActions.updateRewrittenBranchReferences({
+					projectId,
+					oldBranch: branchOperandV,
+					newBranch,
+				}),
+			);
 			dispatch(projectActions.exitMode({ projectId }));
 
 			await mutation.client.invalidateQueries();
